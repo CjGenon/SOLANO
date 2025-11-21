@@ -1,0 +1,399 @@
+/* ======================== RESET ======================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+  background-color: #000;
+  color: white;
+  line-height: 1.6;
+}
+
+/* ======================== NAVBAR ======================== */
+.navbar {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  padding: 12px 30px;
+  background-color: rgba(141, 108, 57, 1); /* starts solid */
+  backdrop-filter: blur(4px);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  z-index: 1000;
+}
+.navbar.scrolled {
+  background-color: rgba(141, 108, 57, 0.7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.logo-container img {
+  height: 60px;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.logo-container {
+  margin-right: auto;
+}
+
+
+.nav-content > ul {
+  list-style: none;
+  display: flex;
+  gap: 30px;
+}
+
+.nav-content li a {
+  color: white;
+  text-decoration: none;
+  font-size: 16px;
+  text-transform: uppercase;
+  transition: color 0.3s;
+}
+
+.nav-content li a:hover {
+  color: #ffcc99;
+}
+/*========================Dropdown============================*/
+.dropdown-parent {
+  position: relative;
+}
+
+/* Dropdown list hidden by default */
+.dropdown {
+  list-style: none;
+display: none;
+  position: absolute;
+  background-color: rgba(141, 108, 57, 0.95);
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  border-radius: 5px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  z-index: 999;
+
+}
+
+/* Show dropdown on hover */
+.dropdown-parent:hover .dropdown {
+  display: block;
+}
+
+/* Dropdown link styling */
+.dropdown li a {
+  display: block;
+  padding: 10px 15px;
+  color: white;
+  text-decoration: none;
+  text-transform: none;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown li a:hover {
+  background-color: #a57934;
+}
+.dropdown-parent > a::after {
+  content: ' ▾';
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+/* ======================== HERO ======================== */
+.hero-header {
+  height: 100vh;
+  background: linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url("solana08.jpg");
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8%;
+  padding-top: 100px;
+}
+
+.hero-content {
+  max-width: 600px;
+  text-align: center;
+}
+
+.hero-content h2 {
+  font-size: 18px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  color: #f5deb3;
+  font-weight: lighter;
+}
+
+.hero-content h1 {
+  font-size: 48px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.hero-content p {
+  font-size: 16px;
+  color: #e0e0e0;
+  margin-bottom: 30px;
+}
+
+.hero-btn-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.hero-btn {
+  background-color: #8d6c39;
+  padding: 12px 30px;
+  color: white;
+  text-decoration: none;
+  border-radius: 30px;
+  border: 2px solid black;
+  font-weight: bold;
+  transition: background-color 0.3s;
+  text-transform: uppercase;
+}
+
+.hero-btn:hover {
+  background-color: #3e1f00;
+}
+
+/* ======================== SECTION SPLIT LAYOUT ======================== */
+.section-split {
+  padding: 100px 40px;
+  background: linear-gradient(to right, #000, #4a3728);
+}
+
+.section-split.reverse {
+  background: linear-gradient(to left, #000, #4a3728);
+}
+.split-image .slider-inner {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.slider-wrapper {
+  display: flex;
+  transition: transform 0.5s ease;
+}
+
+.slide {
+  min-width: 100%;
+}
+
+.slide img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+/* Arrows inside image area */
+.slider-nav {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+}
+
+.arrow {
+  background-color: rgba(0,0,0,0.5);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.split-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.split-text {
+  flex: 1 1 50%;
+  max-width: 550px;
+  text-align: left;
+}
+
+.split-text h2 {
+  font-size: 32px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.split-text p {
+  font-size: 16px;
+  color: #e0e0e0;
+  margin-bottom: 20px;
+}
+
+.split-text ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+.split-image {
+  flex: 1 1 50%;
+  display: flex;
+  justify-content: center;
+}
+
+.split-image img,
+.split-image iframe {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  border: 2px solid white;
+}
+/* ===== AMENITIES SLIDER (right side) ===== */
+.split-image .slider-inner {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+#amenities-slider {
+  display: flex;
+  transition: transform 0.5s ease;
+}
+
+#amenities-slider .slide {
+  min-width: 100%;
+}
+
+#amenities-slider .slide img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+/* Navigation arrows */
+.slider-nav {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+}
+
+.slider-nav .arrow {
+  background-color: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+
+/* ======================== BUTTON SHARED ======================== */
+.roombtn {
+  background-color: #000;
+  padding: 12px 24px;
+  border-radius: 200px;
+  border: 2px solid white;
+  color: white;
+  text-decoration: none;
+  font-size: 15px;
+  transition: box-shadow 0.4s;
+  display: inline-block;
+}
+
+.roombtn:hover {
+  box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+}
+/*=========================CONTACT SECTION====================*/
+.contact-link-btn {
+  display: inline-block;
+  margin-top: 15px;
+  padding: 10px 24px;
+  background-color: #cfa85b;
+  color: #2e2e2e;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.contact-link-btn:hover {
+  background-color: #a57934;
+}
+
+/* ======================== FOOTER ======================== */
+.contact-section {
+  background-color: #834009;
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.contact-section h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.contact-section p {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+/* ======================== RESPONSIVE ======================== */
+@media (max-width: 768px) {
+  .split-wrapper {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .split-text,
+  .split-image {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .nav-content ul {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .hero-content h1 {
+    font-size: 36px;
+  }
+}

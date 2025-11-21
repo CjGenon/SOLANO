@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact Our Team – Solano Hills</title>
+  <link rel="stylesheet" href="contact.css" />
+</head>
+<body>
+  <!-- ======================== NAVBAR ======================== -->
+  <div class="navbar" id="navbar">
+    <div class="nav-inner">
+      <div class="logo-container">
+        <img class="logo" src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+      </div>
+      <nav class="nav-content">
+        <ul>
+          <li><a href="index.html#home">Home</a></li>
+          <li><a href="index.html#about">About</a></li>
+          <li><a href="index.html#apartments">Apartments</a></li>
+          <li><a href="index.html#amenities">Amenities</a></li>
+          <li><a href="index.html#contact">Contact</a></li>
+         <li><a href="LogIn.html">Log In</a></li>
+  </ul>
+
+  </ul>
+</nav>
+    </div>
+  </div>
+  <!-- ======================== CONTACT HEADER ======================== -->
+  <header class="contact-header">
+  <h1>Get in Touch</h1>
+  <p>Our team is here to help you with your questions about getting your new home.</p>
+</header>
+<!-- contact.html -->
+ <section class = "inquiry-form-section">
+<h2>Contact Us</h2>
+<form id="contactForm">
+  <input type="text" id="name" placeholder="Your Name" required />
+  <input type="email" id="email" placeholder="Your Email" required />
+  <input type="number" id="number" placeholder="Your number" required />
+  <select id ="Employement_Type" name="Employement_Type"required>
+        <option value=""disabled selected>Select Employment Type</option>
+        <option value="Employed">Employed</option>
+        <option value="Self-Employed">Self-Employed</option>
+         <option value="Business Owner">Business Owner</option>
+         
+      </select>
+  <textarea id="message" placeholder="Your Question" required></textarea>
+  <button type="submit">Send Message</button>
+  </form>
+</section>
+
+
+<div id="popup" class="popup hidden">
+  <div class="popup-content">
+    <p>Form Submitted.<br>Wait for our team to reach out to you within 24 hours.</p>
+    <button onclick="closePopup()">Close</button>
+  </div>
+</div>
+<div id="status"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+    authDomain: "solanodb-a4f65.firebaseapp.com",
+    projectId: "solanodb-a4f65",
+    storageBucket: "solanodb-a4f65.firebasestorage.app",
+    messagingSenderId: "98081894649",
+    appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+document.getElementById('contactForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const name = document.getElementById('name').value;
+  const email = document.getElementById('email').value;
+  const number = document.getElementById('number').value;
+  const Employement_Type = document.getElementById('Employement_Type').value;
+  const message = document.getElementById('message').value;
+
+  try {
+    await addDoc(collection(db, "messages"), {
+      name,
+      email,
+      number,
+      Employement_Type,
+      message,
+      timestamp: serverTimestamp()
+    });
+document.getElementById("popup").classList.remove("hidden");
+    e.target.reset();
+  } catch (error) {
+    document.getElementById("status").innerText = "Error: " + error.message;
+  }
+})
+window.closePopup = function () {
+  document.getElementById("popup").classList.add("hidden");
+}
+</script>
+</body>
+</html>

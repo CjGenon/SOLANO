@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Send & Receive Files</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f9f9f9; }
+    .card { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    button { padding: 8px 15px; margin-top: 10px; cursor: pointer; background:#007BFF; color:white; border:none; border-radius:5px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Send File or Image</h2>
+    <input type="file" id="fileInput">
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <div class="card">
+    <h2>Received Files</h2>
+    <div id="filesList"></div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+  <script>
+    // 🔹 Replace this with YOUR Firebase config
+    const firebaseConfig = {
+        apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+        authDomain: "solanodb-a4f65.firebaseapp.com",
+        projectId: "solanodb-a4f65",
+        storageBucket: "solanodb-a4f65.appspot.com",
+        messagingSenderId: "98081894649",
+        appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+
+    const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
+    const filesList = document.getElementById('filesList');
+
+    sendBtn.addEventListener('click', () => {
+  console.log("Send button clicked"); // <-- test
+  const file = fileInput.files[0];
+  if (!file) {
+    alert("Please choose a file first!");
+    return;
+  }
+  console.log("File chosen:", file.name); // <-- test
+
+
+      // Upload to Firebase Storage
+      const storageRef = storage.ref('uploads/' + file.name);
+      const uploadTask = storageRef.put(file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          console.log("Uploading... " + (snapshot.bytesTransferred / snapshot.totalBytes * 100) + "%");
+        },
+        (error) => {
+          console.error("Upload failed:", error);
+          alert("Upload failed: " + error.message);
+        },
+        () => {
+          uploadTask.snapshot.ref.getDownloadURL().then((url) => {
+            const link = document.createElement('a');
+            link.href = url;
+            link.innerText = file.name;
+            link.target = "_blank";
+            filesList.appendChild(link);
+            filesList.appendChild(document.createElement("br"));
+            alert("Upload successful!");
+          });
+        }
+      );
+    });
+  </script>
+</body>
+</html>

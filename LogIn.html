@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Log In – Solano Hills</title>
+  <link rel="stylesheet" href="Login.css" />
+</head>
+<body class="login-body">
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-logo">
+        <a href="index.html">
+          <img src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+        </a>
+      </div>
+      <h2 class="login-title">Welcome Back</h2>
+
+      <form id="loginForm">
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Password" required />
+
+        <div class="login-options">
+          <label><input type="checkbox" /> Remember Me</label>
+          <a href="changepasspage.html">Forgot Password?</a>
+        </div>
+
+        <button id="submit" type="submit">Log In</button>
+      </form>
+
+      <div id="changePasswordSection" style="display: none; margin-top: 20px;">
+        <h3>Change Your Password</h3>
+        <form id="changePasswordForm">
+          <input type="password" id="newPassword" placeholder="New Password" required />
+          <button type="submit">Update Password</button>
+        </form>
+      </div>
+
+      <p id="status" style="color: red; margin-top: 10px;"></p>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+    authDomain: "solanodb-a4f65.firebaseapp.com",
+    projectId: "solanodb-a4f65",
+    storageBucket: "solanodb-a4f65.firebasestorage.app",
+    messagingSenderId: "98081894649",
+    appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const loginForm = document.getElementById('loginForm');
+loginForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const status = document.getElementById('status');
+
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+
+      if (data.mustChangePassword === true) {
+        loginForm.style.display = 'none';
+        document.getElementById('changePasswordSection').style.display = 'block';
+        window.loggedInUser = user;
+        return;
+      }
+
+      switch (data.role) {
+        case "admin":
+          window.location.href = "ADMINDASHBORD.html";
+          break;
+        case "project_manager":
+          window.location.href = "PM-dashboard.html";
+          break;
+        default:
+          window.location.href = "dashboard.html";
+      }
+    } else {
+      status.innerText = "No role found for this user.";
+    }
+  } catch (error) {
+    status.innerText = "Email or Password is incorrect please try again";
+  }
+});
+
+const changePasswordForm = document.getElementById('changePasswordForm');
+changePasswordForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const newPassword = document.getElementById('newPassword').value;
+  const status = document.getElementById('status');
+
+  try {
+    await updatePassword(window.loggedInUser, newPassword);
+    await updateDoc(doc(db, "users", window.loggedInUser.uid), {
+      mustChangePassword: false
+    });
+    status.textContent = "Password changed successfully! Redirecting...";
+    setTimeout(() => {
+      window.location.href = "dashboard.html";
+    }, 1500);
+  } catch (error) {
+    status.textContent = "Error: " + error.message;
+  }
+});
+</script>
+
+</body>
+</html>

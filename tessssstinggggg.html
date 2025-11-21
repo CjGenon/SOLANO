@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Inbox</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script src="https://cdn.emailjs.com/sdk/3.11.0/email.min.js"></script>
+</head>
+<body>
+  <h1>Inbox</h1>
+  <div id="messages"></div>
+
+  <script>
+    // ====== FIREBASE CONFIG ======
+    const firebaseConfig = {
+    apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+    authDomain: "solanodb-a4f65.firebaseapp.com",
+    projectId: "solanodb-a4f65",
+    storageBucket: "solanodb-a4f65.firebasestorage.app",
+    messagingSenderId: "98081894649",
+    appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ====== EMAILJS INIT ======
+    (function() {
+      emailjs.init("YOUR_PUBLIC_KEY"); // replace this
+    })();
+
+    // ====== LOAD MESSAGES FROM FIRESTORE ======
+    async function loadMessages() {
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML = '';
+
+      const snapshot = await db.collection('contactMessages').get();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const container = document.createElement('div');
+        container.style.border = "1px solid #ccc";
+        container.style.padding = "10px";
+        container.style.marginBottom = "10px";
+        container.innerHTML = `
+          <strong>Name:</strong> ${data.name}<br>
+          <strong>Email:</strong> ${data.email}<br>
+          <strong>Message:</strong> ${data.message}<br><br>
+          <button onclick="showReplyForm('${data.email}', '${doc.id}')">Reply</button>
+          <div id="reply-${doc.id}" style="display:none; margin-top:10px;">
+            <textarea id="replyText-${doc.id}" rows="3" cols="40" placeholder="Type your reply..."></textarea><br>
+            <button onclick="sendReply('${data.email}', '${doc.id}')">Send Reply</button>
+          </div>
+        `;
+        messagesDiv.appendChild(container);
+      });
+    }
+
+    // ====== SHOW REPLY FORM ======
+    function showReplyForm(email, id) {
+      document.getElementById(`reply-${id}`).style.display = 'block';
+    }
+
+    // ====== SEND REPLY ======
+    function sendReply(toEmail, id) {
+      const replyText = document.getElementById(`replyText-${id}`).value;
+
+      if (!replyText.trim()) {
+        alert("Please type a message.");
+        return;
+      }
+
+      const templateParams = {
+        to_email: toEmail,
+        from_name: "Apartment Inbox Manager",
+        message: replyText
+      };
+
+      emailjs.send('service_u1n5d9t', 'avvdJIIs04H8nGyu_', templateParams)
+        .then(() => {
+          alert('Reply sent successfully to ' + toEmail);
+          document.getElementById(`reply-${id}`).style.display = 'none';
+          document.getElementById(`replyText-${id}`).value = '';
+        }, (error) => {
+          alert('Failed to send email: ' + JSON.stringify(error));
+        });
+    }
+
+    loadMessages();
+  </script>
+</body>
+</html>
+
+<script type="text/javascript" src="https://cdn.emailjs.com/sdk/3.11.0/email.min.js"></script>
+<script>
+  (function() {
+    emailjs.init('YOUR_PUBLIC_KEY'); // replace with your actual public key
+  })();
+</script>

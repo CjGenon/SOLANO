@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <title>Solana</title>
+    <link href="ROOMS.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="navbar" id="navbar">
+  <div class="nav-inner">
+    <div class="logo-container">
+      <img class="logo" src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+    </div>
+    <nav class="nav-content">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="index.html">About</a></li>
+        <li><a href="index.html">Apartments</a></li>
+        <li><a href="index.html">Amenities</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+        <li><a href="LogIn.html">Log In</a></li>
+      </ul>
+    </nav>
+  </div>
+</div>
+
+<!-- ======================== FLOOR PLAN SECTION ======================== -->
+<section class="floorplan-section" style="padding: 120px 40px;">
+  <h1 style="text-align: center;">Explore Our Floor Plans</h1>
+  <p style="text-align: center; max-width: 800px; margin: 0 auto 50px;">
+    Here are detailed layouts of our available studio, 1-bedroom, and 2-bedroom units.
+    Scroll down to view 360° previews and architectural floor plans.
+  </p>
+
+  <!-- Floor Plan Gallery -->
+  <div class="floorplan-gallery">
+
+    <!-- 1-Bedroom Section -->
+    <div class="floorplan-item">
+      <h3>1-Bedroom Unit</h3>
+      <img src="1000015589.jpg" alt="1BR Floor Plan" />
+
+      <!-- ⭐ Embedded Panoee 360 Tour -->
+      <iframe id="tour-embeded"
+              name="Bahay ni cj"
+              src="https://tour.panoee.net/iframe/691b1599cc487c30a020f225"
+              frameBorder="0"
+              width="100%"
+              height="400px"
+              scrolling="no"
+              allowvr="yes"
+              allow="vr; xr; accelerometer; gyroscope; autoplay;"
+              allowFullScreen="false"
+              webkitallowfullscreen="false"
+              mozallowfullscreen="false"
+              loading="eager"></iframe>
+    </div>
+
+    <!-- 2-Bedroom still using your old embed (you can replace later) -->
+    <div class="floorplan-item">
+      <h3>2-Bedroom Unit</h3>
+      <img src="1000015588.jpg" alt="2BR Floor Plan" />
+      <iframe src="2br-360.html" width="100%" height="300" style="margin-top: 10px;" allowfullscreen></iframe>
+    </div>
+
+  </div>
+
+  <!-- ======================== DEVELOPMENT INFO TABLE ======================== -->
+  <div class="development-info" style="margin-top: 80px; max-width: 800px; margin-left: auto; margin-right: auto;">
+    <h2 style="text-align: center; margin-bottom: 20px;">Project Details</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tbody>
+        <tr><td>Development Type</td><td>Medium-rise Residential Development</td></tr>
+        <tr><td>Total Development Area</td><td>3,733 sqm.</td></tr>
+        <tr><td>No. of Buildings</td><td>2 Buildings</td></tr>
+        <tr><td>No. of Units</td><td>288</td></tr>
+        <tr><td>Unit Types</td><td>One Bedroom, 30sqm</td></tr>
+        <tr><td>Start of Turnover</td><td>Q4 2026</td></tr>
+        <tr><td>No. of Parking Spaces</td><td>110 slots</td></tr>
+        <tr><td>Parking Ratio</td><td>1:3</td></tr>
+        <tr><td>Open Space</td><td>60%</td></tr>
+        <tr><td>Target Selling Date</td><td>June 2024</td></tr>
+        <tr><td>Ave. Selling Price</td><td>4.025M to 4.585M</td></tr>
+        <tr><td>Location</td><td>Villongco Road, West Service Road<br/>Sucat, Muntinlupa City</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+<!-- Required script for Panoee mobile motion -->
+<script>
+  var pano_iframe_name = "tour-embeded";
+  window.addEventListener("devicemotion", function(e){
+    var iframe = document.getElementById(pano_iframe_name);
+    if (iframe) iframe.contentWindow.postMessage({
+      type:"devicemotion",
+      deviceMotionEvent:{
+        acceleration:{ x:e.acceleration.x, y:e.acceleration.y, z:e.acceleration.z },
+        accelerationIncludingGravity:{ x:e.accelerationIncludingGravity.x, y:e.accelerationIncludingGravity.y, z:e.accelerationIncludingGravity.z },
+        rotationRate:{ alpha:e.rotationRate.alpha, beta:e.rotationRate.beta, gamma:e.rotationRate.gamma },
+        interval:e.interval,
+        timeStamp:e.timeStamp
+      }
+    }, "*");
+  });
+</script>
+
+<script src="jaba.js"></script>
+</body>
+</html>

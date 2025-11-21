@@ -1,0 +1,101 @@
+/* ===== BACKGROUND ===== */
+.login-body {
+ background: linear-gradient(to bottom right, #1a1a1a, #6c512b, #d4b05d);
+  font-family: 'Segoe UI', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+/* ===== LOGIN CONTAINER ===== */
+.login-wrapper {
+  background-color: #4a3728;
+  padding: 40px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.4);
+  color: #f3efe9;
+  text-align: center;
+}
+
+/* ===== LOGO ===== */
+.login-logo img {
+  height: 50px;
+  margin-bottom: 20px;
+}
+
+/* ===== FORM SHARED ===== */
+form {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+form h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+  color: #f3efe9;
+  text-transform: uppercase;
+}
+
+form input {
+  padding: 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  border: 1px solid #b2956f;
+  background-color: #f3efe9;
+  color: #4a3728;
+  font-size: 14px;
+}
+
+/* ===== BUTTONS ===== */
+form button {
+  background-color: #cfa85b;
+  color: #4a3728;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+form button:hover {
+  background-color: #a57934;
+}
+
+/* ===== DIVIDERS & LINKS ===== */
+.divider {
+  font-size: 12px;
+  margin: 10px 0;
+  color: #f3efe9;
+}
+
+.login-options {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.login-options a,
+.back-link a {
+  color: #cfa85b;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.back-link {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+/* ===== HIDDEN FORM CLASS ===== */
+.hidden {
+  display: none !important;
+}

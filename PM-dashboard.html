@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Project Manager Dashboard</title>
+  <link rel="stylesheet" href="PM-dasboard.css" />
+</head>
+<body>
+  <!-- ======================== SIDEBAR ======================== -->
+  <div class="sidebar">
+    <div class="logo">
+      <img src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
+        <li><a href="#" id="showInboxBtn" onclick="loadContent(event, 'inbox')">Inbox</a></li>
+        <li><a href="#" onclick="loadContent(event, 'document')">Document</a></li>
+        <li><a href="LogIn.html">Logout</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- ======================== MAIN CONTENT ======================== -->
+  <main class="main-content">
+    <div id="mainContent">
+      <h1 id="Greeting">Welcome Back!</h1>
+      <p>Select a sidebar to start managing.</p>
+    </div>
+  </main>
+
+  <!-- ======================== EMAILJS SDK ======================== -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script>
+    (function () {
+      emailjs.init("avvdJIIs04H8nGyu_");
+    })();
+  </script>
+
+  <!-- ======================== FIREBASE & INBOX ======================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+    import { getFirestore, collection, query, orderBy, getDocs, addDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import { deleteDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+    // ================= FIREBASE CONFIG =================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+      authDomain: "solanodb-a4f65.firebaseapp.com",
+      projectId: "solanodb-a4f65",
+      storageBucket: "solanodb-a4f65.firebasestorage.app",
+      messagingSenderId: "98081894649",
+      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const mainContent = document.getElementById("mainContent");
+
+    // ================= CONTENT LOADER =================
+    window.loadContent = function (event, section) {
+      if(event) event.preventDefault();
+
+      // Remove active class and add to clicked
+      document.querySelectorAll(".sidebar nav ul li a").forEach(link => link.classList.remove("active"));
+      if (event?.target?.tagName === "A") event.target.classList.add("active");
+
+      mainContent.innerHTML = "";
+
+      switch (section) {
+        /* ================= DASHBOARD ================= */
+        case "dashboard":
+          mainContent.innerHTML = `
+            <h1 id="Greeting1">Dashboard</h1>
+            <div class="dashboard-container">
+              
+              <!-- ======== LEFT: WELCOME SLIDER ======== -->
+              <div class="welcome-slider">
+                <div class="slide fade"><img src="1Entertainment room.jpg" alt="Welcome Slide 1"></div>
+                <div class="slide fade"><img src="1Fitness Gym.jpg" alt="Welcome Slide 2"></div>
+                <div class="slide fade"><img src="1Roof Garden.jpg" alt="Welcome Slide 3"></div>
+                <button class="prev" id="sliderPrev">&#10094;</button>
+                <button class="next" id="sliderNext">&#10095;</button>
+              </div>
+
+              <!-- ======== RIGHT: CALENDAR + INBOX ======== -->
+              <div class="right-side">
+                <div class="calendar-card">
+                  <h3>📅 Calendar</h3>
+                  <div id="calendar"></div>
+                </div>
+
+                <div class="inbox-card">
+                  <h3>📩 Inbox Summary</h3>
+                  <p>Check and reply to tenant feedback or messages.</p>
+                  <button id="goToInboxBtn">Go to Inbox</button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          // Image slider logic
+          (function () {
+            let slideIndexLocal = 1;
+            const slides = () => document.querySelectorAll(".welcome-slider .slide");
+
+            function showSlidesLocal(n) {
+              const nodeList = slides();
+              if (!nodeList || nodeList.length === 0) return;
+              if (n > nodeList.length) slideIndexLocal = 1;
+              if (n < 1) slideIndexLocal = nodeList.length;
+              nodeList.forEach(s => (s.style.display = "none"));
+              nodeList[slideIndexLocal - 1].style.display = "block";
+            }
+
+            showSlidesLocal(slideIndexLocal);
+
+            document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
+            document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
+
+            const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
+            const sliderEl = document.querySelector(".welcome-slider");
+            if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
+          })();
+
+          // Calendar logic
+          (function () {
+            function generateCalendar() {
+              const calendar = document.getElementById("calendar");
+              if (!calendar) return;
+
+              const today = new Date();
+              const monthName = today.toLocaleString("default", { month: "long" });
+              const year = today.getFullYear();
+              const firstDay = new Date(year, today.getMonth(), 1);
+              const lastDay = new Date(year, today.getMonth() + 1, 0);
+              const startDay = firstDay.getDay();
+
+              let html = "<table class='cal-table'>";
+              html += "<tr><th class='cal-header' colspan='7'>" + monthName + " " + year + "</th></tr>";
+              html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+              for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+              for (let day = 1; day <= lastDay.getDate(); day++) {
+                const isToday = day === today.getDate();
+                html += "<td" + (isToday ? " class='today'" : "") + ">" + day + "</td>";
+                if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
+              }
+
+              html += "</tr></table>";
+              calendar.innerHTML = html;
+            }
+            generateCalendar();
+          })();
+
+          // Hook Inbox summary button on dashboard to inbox tab
+          (function () {
+            const goBtn = document.getElementById("goToInboxBtn");
+            if (goBtn) {
+              goBtn.addEventListener("click", () => {
+                loadContent(null, "inbox");
+                // Also update sidebar active class
+                document.querySelectorAll(".sidebar nav ul li a").forEach(link => link.classList.remove("active"));
+                document.querySelector("#showInboxBtn").classList.add("active");
+              });
+            }
+          })();
+
+          break;
+
+        /* ================= INBOX ================= */
+        case "inbox":
+          mainContent.innerHTML = `
+            <h3>Inbox Messages</h3>
+            <div id="unrepliedSection">
+              <h4>Unreplied Messages</h4>
+              <div id="unrepliedList">Loading...</div>
+            </div>
+
+            <button id="toggleRepliedBtn" style="margin-top:20px; background-color:#8d6c39; color:white; padding:8px 12px; border:none; border-radius:6px; cursor:pointer;">
+              Show Replied Messages ▼
+            </button>
+
+            <div id="repliedSection" style="display:none; margin-top:10px;">
+              <h4>Replied Messages</h4>
+              <div id="repliedList"></div>
+            </div>
+          `;
+
+          const unrepliedList = document.getElementById("unrepliedList");
+          const repliedList = document.getElementById("repliedList");
+          const repliedSection = document.getElementById("repliedSection");
+          const toggleBtn = document.getElementById("toggleRepliedBtn");
+
+          toggleBtn.addEventListener("click", () => {
+            const isVisible = repliedSection.style.display === "block";
+            repliedSection.style.display = isVisible ? "none" : "block";
+            toggleBtn.textContent = isVisible ? "Show Replied Messages ▼" : "Hide Replied Messages ▲";
+          });
+
+          // Load messages from Firestore
+          (async () => {
+            try {
+              const q = query(collection(db, "messages"), orderBy("timestamp", "desc"));
+              const snapshot = await getDocs(q);
+
+              if (snapshot.empty) {
+                unrepliedList.innerHTML = "<p>No messages yet.</p>";
+                return;
+              }
+
+              unrepliedList.innerHTML = "";
+              repliedList.innerHTML = "";
+
+              snapshot.forEach(docItem => {
+                const data = docItem.data();
+                const messageEl = document.createElement("div");
+                messageEl.className = "message";
+
+                if (data.replied) {
+                  // Replied message with Delete button
+                  messageEl.innerHTML = `
+                    <strong>Name:</strong> ${data.name}<br/>
+                    <strong>Email:</strong> ${data.email}<br/>
+                    <strong>Number:</strong> ${data.number}<br/>
+                    <strong>Employment Type:</strong> ${data.Employement_Type}<br/>
+                    <strong>Message:</strong> ${data.message}<br/>
+                    <em style="color:green;">(Already Replied)</em><br/>
+                    <button class="deleteBtn" data-id="${docItem.id}" 
+                      style="margin-top:5px; background-color:#d9534f; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer;">
+                      Delete
+                    </button>
+                  `;
+                  repliedList.appendChild(messageEl);
+                } else {
+                  // Unreplied message with Reply and Send Pricelist buttons
+                  messageEl.innerHTML = `
+                    <strong>Name:</strong> ${data.name}<br/>
+                    <strong>Email:</strong> ${data.email}<br/>
+                    <strong>Number:</strong> ${data.number}<br/>
+                    <strong>Employment Type:</strong> ${data.Employement_Type}<br/>
+                    <strong>Message:</strong> ${data.message}<br/>
+                    <button onclick="showReplyForm('${data.email}', '${docItem.id}', '${data.name}')">Reply</button>
+                    <button onclick="sendPricelistEmail('${data.email}')">Send Pricelist</button>
+                    <div id="reply-${docItem.id}" style="display:none; margin-top:10px;">
+                      <textarea id="replyText-${docItem.id}" rows="3" cols="40" placeholder="Type your reply..."></textarea><br>
+                      <button onclick="sendReply('${data.email}', '${docItem.id}', '${data.name}')">Send Reply</button>
+                    </div>
+                  `;
+                  unrepliedList.appendChild(messageEl);
+                }
+              });
+
+              // Attach delete event listeners
+              document.querySelectorAll(".deleteBtn").forEach(button => {
+                button.addEventListener("click", async (event) => {
+                  const idToDelete = event.target.getAttribute("data-id");
+                  if (confirm("Are you sure you want to delete this message?")) {
+                    try {
+                      await deleteDoc(doc(db, "messages", idToDelete));
+                      alert("Message deleted successfully.");
+                      loadContent(null, "inbox"); // refresh inbox
+                    } catch (error) {
+                      alert("Error deleting message: " + error.message);
+                    }
+                  }
+                });
+              });
+
+            } catch (error) {
+              unrepliedList.innerHTML = "Error loading messages: " + error.message;
+            }
+          })();
+
+          break;
+
+        /* ================= DOCUMENT ================= */
+        case "document":
+          mainContent.innerHTML = `
+            <h1>Upload Client Documents</h1>
+            <p>To submit client documents, please use the button below to open the document upload form.</p>
+            <button id="openFormBtn" style="
+              padding: 12px 20px;
+              background-color: #4CAF50;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 16px;
+              cursor: pointer;
+            ">Open Document Upload Form</button>
+          `;
+
+          const openFormBtn = document.getElementById("openFormBtn");
+          openFormBtn.addEventListener("click", () => {
+            window.open("https://docs.google.com/forms/d/e/1FAIpQLSc9GekVOFqdbdXQF9wqOJPZeOwh4e69T8ZJvvPbKNXlHlvlVA/viewform?usp=dialog", "_blank");
+          });
+
+          break;
+
+        /* ================= DEFAULT ================= */
+        default:
+          mainContent.innerHTML = "<h1>Welcome</h1><p>Select an option from the sidebar.</p>";
+      }
+    };
+
+    // ================= AUTHENTICATION CHECK =================
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        alert("You're not signed in. Redirecting to login...");
+        window.location.href = "index.html";
+        return;
+      }
+      // Show welcome message
+      const greeting = document.getElementById("Greeting");
+      const nameToShow = user.displayName || user.email;
+      if (greeting) greeting.textContent = `Welcome Back!, ${nameToShow}`;
+    });
+
+    // ================= AUTO LOAD DASHBOARD ON PAGE OPEN =================
+    window.addEventListener("load", () => {
+      loadContent(null, "dashboard");
+
+      // highlight sidebar tab
+      document.querySelectorAll(".sidebar nav ul li a").forEach(link =>
+        link.classList.remove("active")
+      );
+      document.querySelector(".sidebar nav ul li a[href='#']").classList.add("active");
+    });
+
+    // ================= SHOW REPLY FORM =================
+    window.showReplyForm = function (email, id) {
+      document.getElementById(`reply-${id}`).style.display = "block";
+    };
+
+    // ================= SEND REPLY VIA EMAILJS =================
+    window.sendReply = async function (toEmail, id, toName) {
+      const replyText = document.getElementById(`replyText-${id}`).value.trim();
+      if (!replyText) {
+        alert("Please type a reply message.");
+        return;
+      }
+
+      const templateParams = {
+        to_email: toEmail,
+        name: "Project Manager",
+        from_name: "Project Manager",
+        message: replyText,
+        title: "Reply from Project Manager"
+      };
+
+      try {
+        await emailjs.send("service_u1n5d9t", "template_f2fwz7a", templateParams);
+        alert("Reply sent successfully to " + toEmail);
+
+        const messageRef = doc(db, "messages", id);
+        await updateDoc(messageRef, { replied: true });
+
+        await addDoc(collection(db, "sentReplies"), {
+          to: toEmail,
+          message: replyText,
+          timestamp: new Date()
+        });
+
+        document.getElementById(`reply-${id}`).style.display = "none";
+        document.getElementById(`replyText-${id}`).value = "";
+
+        // Refresh inbox tab
+        loadContent(null, "inbox");
+      } catch (error) {
+        console.error("EmailJS Error:", error);
+        alert("Failed to send reply: " + JSON.stringify(error));
+      }
+    };
+
+    // ================= SEND PRICELIST EMAIL VIA EMAILJS =================
+    window.sendPricelistEmail = async function (toEmail) {
+      // Use direct download link for Google Drive file
+      const pricelistUrl = "https://drive.google.com/uc?export=download&id=1G84pqvHUuAK46TUUO25eRXwyBEbO8VPm";
+
+      const templateParams = {
+        to_email: toEmail,
+        name: "Project Manager",
+        from_name: "Project Manager",
+        message: `Hello,\n\nPlease find the apartment pricelist here:\n${pricelistUrl}\n\nBest regards.`,
+        title: "Apartment Pricelist"
+      };
+
+      try {
+        await emailjs.send("service_u1n5d9t", "template_f2fwz7a", templateParams);
+        alert("Pricelist sent successfully to " + toEmail);
+      } catch (error) {
+        console.error("EmailJS Error:", error);
+        alert("Failed to send pricelist: " + error.message);
+      }
+    };
+  </script>
+</body>
+</html>
