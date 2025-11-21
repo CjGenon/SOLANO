@@ -89,7 +89,7 @@ loginForm.addEventListener('submit', async function(e) {
           window.location.href = "PM-dashboard.html";
           break;
         default:
-          window.location.href = "dashboard.html";
+          window.location.href = "DASHBOARD.html";
       }
     } else {
       status.innerText = "No role found for this user.";
@@ -112,7 +112,7 @@ changePasswordForm.addEventListener('submit', async function(e) {
     });
     status.textContent = "Password changed successfully! Redirecting...";
     setTimeout(() => {
-      window.location.href = "dashboard.html";
+      window.location.href = "DASHBOARD.html";
     }, 1500);
   } catch (error) {
     status.textContent = "Error: " + error.message;
@@ -122,3 +122,4 @@ changePasswordForm.addEventListener('submit', async function(e) {
 
 </body>
 </html>
+
