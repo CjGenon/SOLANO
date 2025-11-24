@@ -36,6 +36,12 @@
 
   <!-- ======================== FIREBASE SCRIPTS ======================== -->
    <script src="https://www.paypal.com/sdk/js?client-id=ASbUIe1_A3shQqfiUe1_TnYnp7jGyD-_pClj10rYjAG7Fmbu_sPi6s8LoJD2bRv6bT2XkJBo-FpPO5t4&currency=PHP"></script>
+   <script type="text/javascript" src="https://cdn.emailjs.com/sdk/3.2.0/email.min.js"></script>
+  <script>
+    (function(){
+      emailjs.init("avvdJIIs04H8nGyu_");
+    })();
+  </script>
    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
@@ -489,232 +495,253 @@
           break;
 
        case 'billing':
-        mainContent.innerHTML = `
-          <div class="payment-tab">
-            <h2>Billing and Payments</h2>
-            <p>Pay your monthly dues securely or send a cash receipt.</p>
+          mainContent.innerHTML = `
+            <div class="payment-tab">
+              <h2>Billing and Payments</h2>
+              <p>Pay your monthly dues securely or send a cash receipt.</p>
 
-            <div id="invoiceSection" style="margin-top:20px;">
-              <h3>Your Current Invoice</h3>
-              <p id="invoiceDetails">Loading your invoice...</p>
+              <div id="invoiceSection" style="margin-top:20px;">
+                <h3>Your Current Invoice</h3>
+                <p id="invoiceDetails">Loading your invoice...</p>
+              </div>
+
+              <hr style="margin:25px 0;">
+
+              <h3>Choose Payment Method</h3>
+              <label>
+                <input type="radio" name="paymentMethod" value="paypal" checked /> PayPal
+              </label>
+              <label style="margin-left: 20px;">
+                <input type="radio" name="paymentMethod" value="cash" /> Cash on Hand
+              </label>
+
+              <div id="paypal-section" style="margin-top:20px;">
+                <div id="paypal-button-container"></div>
+              </div>
+
+              <div id="cash-section" style="margin-top:20px; display:none;">
+                <p>Please upload a photo of your cash payment receipt (JPEG only):</p>
+                <input type="file" id="cashReceipt" accept="image/jpeg" />
+                <button id="submitCashPayment" style="margin-top:10px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer;">Submit Cash Receipt</button>
+                <p id="cashStatus" style="margin-top:10px; color:green;"></p>
+              </div>
+
+              <hr style="margin:25px 0;">
+
+              <h3>Payment History</h3>
+              <div id="paymentHistory" style="max-height:300px; overflow-y:auto; font-size:14px;">
+                <p>Loading your payment history...</p>
+              </div>
             </div>
-
-            <hr style="margin:25px 0;">
-
-            <h3>Choose Payment Method</h3>
-            <label>
-              <input type="radio" name="paymentMethod" value="paypal" checked /> PayPal
-            </label>
-            <label style="margin-left: 20px;">
-              <input type="radio" name="paymentMethod" value="cash" /> Cash on Hand
-            </label>
-
-            <div id="paypal-section" style="margin-top:20px;">
-              <div id="paypal-button-container"></div>
-            </div>
-
-            <div id="cash-section" style="margin-top:20px; display:none;">
-              <p>Please upload a photo of your cash payment receipt (JPEG only):</p>
-              <input type="file" id="cashReceipt" accept="image/jpeg" />
-              <button id="submitCashPayment" style="margin-top:10px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer;">Submit Cash Receipt</button>
-              <p id="cashStatus" style="margin-top:10px; color:green;"></p>
-            </div>
-
-            <hr style="margin:25px 0;">
-
-            <h3>Payment History</h3>
-            <div id="paymentHistory" style="max-height:300px; overflow-y:auto; font-size:14px;">
-              <p>Loading your payment history...</p>
-            </div>
-          </div>
-        `;
-
-        const invoiceDetails = document.getElementById('invoiceDetails');
-        const paymentHistory = document.getElementById('paymentHistory');
-        const paypalContainer = document.getElementById('paypal-button-container');
-        const cashSection = document.getElementById('cash-section');
-        const paypalSection = document.getElementById('paypal-section');
-        const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
-        const cashReceiptInput = document.getElementById('cashReceipt');
-        const submitCashPaymentBtn = document.getElementById('submitCashPayment');
-        const cashStatus = document.getElementById('cashStatus');
-
-        // Switch payment method UI
-        paymentMethodRadios.forEach(radio => {
-          radio.addEventListener('change', () => {
-            if (radio.value === 'cash' && radio.checked) {
-              cashSection.style.display = 'block';
-              paypalSection.style.display = 'none';
-            } else if (radio.value === 'paypal' && radio.checked) {
-              cashSection.style.display = 'none';
-              paypalSection.style.display = 'block';
-            }
-          });
-        });
-
-        async function loadInvoice() {
-          const tenantEmail = await getCurrentUserEmail();
-          invoiceDetails.innerHTML = `
-            <strong>Tenant:</strong> ${tenantEmail}<br>
-            <strong>Amount Due:</strong> ₱2,500<br>
-            <strong>Due Date:</strong> 25th of this month
           `;
-        }
 
-        async function loadPaymentHistory() {
-          paymentHistory.innerHTML = '<p>Loading your payment history...</p>';
-          const tenantEmail = await getCurrentUserEmail();
+          const invoiceDetails = document.getElementById('invoiceDetails');
+          const paymentHistory = document.getElementById('paymentHistory');
+          const paypalContainer = document.getElementById('paypal-button-container');
+          const cashSection = document.getElementById('cash-section');
+          const paypalSection = document.getElementById('paypal-section');
+          const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+          const cashReceiptInput = document.getElementById('cashReceipt');
+          const submitCashPaymentBtn = document.getElementById('submitCashPayment');
+          const cashStatus = document.getElementById('cashStatus');
 
-          try {
-            const q = query(
-              collection(db, "payments"),
-              where("tenantEmail", "==", tenantEmail),
-              orderBy("timestamp", "desc")
-            );
-            const snapshot = await getDocs(q);
+          // Switch payment method UI
+          paymentMethodRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+              if (radio.value === 'cash' && radio.checked) {
+                cashSection.style.display = 'block';
+                paypalSection.style.display = 'none';
+              } else if (radio.value === 'paypal' && radio.checked) {
+                cashSection.style.display = 'none';
+                paypalSection.style.display = 'block';
+              }
+            });
+          });
 
-            if (snapshot.empty) {
-              paymentHistory.innerHTML = '<p>No payment records found.</p>';
+          async function loadInvoice() {
+            const tenantEmail = await getCurrentUserEmail();
+            invoiceDetails.innerHTML = `
+              <strong>Tenant:</strong> ${tenantEmail}<br>
+              <strong>Amount Due:</strong> ₱2,500<br>
+              <strong>Due Date:</strong> 25th of this month
+            `;
+          }
+
+          async function loadPaymentHistory() {
+            paymentHistory.innerHTML = '<p>Loading your payment history...</p>';
+            const tenantEmail = await getCurrentUserEmail();
+
+            try {
+              const q = query(
+                collection(db, "payments"),
+                where("tenantEmail", "==", tenantEmail),
+                orderBy("timestamp", "desc")
+              );
+              const snapshot = await getDocs(q);
+
+              if (snapshot.empty) {
+                paymentHistory.innerHTML = '<p>No payment records found.</p>';
+                return;
+              }
+
+              paymentHistory.innerHTML = '';
+              snapshot.forEach(doc => {
+                const d = doc.data();
+                const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
+                const div = document.createElement('div');
+                div.style.borderBottom = "1px solid #ccc";
+                div.style.padding = "8px 0";
+
+                // Show receipt image if cash payment
+                let receiptHtml = '';
+                if (d.method === "Cash on Hand" && d.receiptUrl) {
+                  receiptHtml = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" alt="Cash Receipt" style="max-width:150px; border-radius:6px; margin-top:5px;" />`;
+                }
+
+                div.innerHTML = `
+                  <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
+                  <strong>Amount:</strong> ₱${d.amount}<br>
+                  <strong>Status:</strong> ${d.status}<br>
+                  <strong>Date:</strong> ${time}<br>
+                  <strong>Payment Method:</strong> ${d.method}
+                  ${receiptHtml}
+                `;
+                paymentHistory.appendChild(div);
+              });
+            } catch (error) {
+              paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
+            }
+          }
+
+          // PayPal setup with EmailJS integration
+          async function setupPayPal() {
+            const tenantEmail = await getCurrentUserEmail();
+            const amount = 2500;
+            const invoiceId = "INV-" + Date.now();
+
+            paypal.Buttons({
+              style: {
+                color: "gold",
+                shape: "rect",
+                label: "pay",
+                height: 40
+              },
+
+              createOrder: function(data, actions) {
+                return actions.order.create({
+                  purchase_units: [{
+                    reference_id: invoiceId,
+                    description: "Monthly Dues Payment - Solano Hills",
+                    amount: {
+                      currency_code: "PHP",
+                      value: amount.toString()
+                    }
+                  }]
+                });
+              },
+
+              onApprove: async function(data, actions) {
+                const order = await actions.order.capture();
+                console.log("Payment successful:", order);
+
+                // Save payment record in Firestore
+                await addDoc(collection(db, "payments"), {
+                  tenantEmail,
+                  invoiceId,
+                  amount,
+                  method: "PayPal",
+                  status: "Paid",
+                  transactionId: order.id,
+                  payerName: order.payer.name.given_name + " " + order.payer.name.surname,
+                  payerEmail: order.payer.email_address,
+                  timestamp: serverTimestamp()
+                });
+
+                // Prepare EmailJS params
+                const emailParams = {
+                  to_email: order.payer.email_address,
+                  payer_name: order.payer.name.given_name + " " + order.payer.name.surname,
+                  invoice_id: invoiceId,
+                  amount: amount,
+                  transaction_id: order.id,
+                  payment_method: "PayPal",
+                  payment_date: new Date().toLocaleString()
+                };
+
+                // Send email via EmailJS
+                emailjs.send('service_u1n5d9t', 'template_qu1s2lh', emailParams)
+                  .then(() => {
+                    console.log('Email sent successfully!');
+                    showPopup("✅ Payment successful! Receipt emailed to " + order.payer.email_address);
+                    loadPaymentHistory();
+                  })
+                  .catch((error) => {
+                    console.error('EmailJS error:', error);
+                    showPopup("✅ Payment successful! But failed to send email receipt.");
+                    loadPaymentHistory();
+                  });
+              },
+
+              onCancel: async function() {
+                await showPopup("⚠️ Payment cancelled by user.");
+              },
+
+              onError: async function(err) {
+                console.error("PayPal error:", err);
+                await showPopup("❌ Payment failed. Please try again later.");
+              }
+            }).render(paypalContainer);
+          }
+
+          // Handle cash payment submission
+          submitCashPaymentBtn.addEventListener('click', async () => {
+            cashStatus.style.color = 'gray';
+            cashStatus.textContent = '';
+
+            const file = cashReceiptInput.files[0];
+            if (!file) {
+              await showPopup('Please select a JPEG receipt image to upload.');
               return;
             }
 
-            paymentHistory.innerHTML = '';
-            snapshot.forEach(doc => {
-              const d = doc.data();
-              const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
-              const div = document.createElement('div');
-              div.style.borderBottom = "1px solid #ccc";
-              div.style.padding = "8px 0";
+            if (file.type !== 'image/jpeg') {
+              await showPopup('Only JPEG images are allowed.');
+              return;
+            }
 
-              // Show receipt image if cash payment
-              let receiptHtml = '';
-              if (d.method === "Cash on Hand" && d.receiptUrl) {
-                receiptHtml = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" alt="Cash Receipt" style="max-width:150px; border-radius:6px; margin-top:5px;" />`;
-              }
+            cashStatus.textContent = 'Uploading receipt... Please wait.';
+            try {
+              const tenantEmail = await getCurrentUserEmail();
+              const receiptUrl = await uploadToCloudinary(file);
+              const amount = 2500; // You can adjust this if dynamic
+              const invoiceId = "INV-" + Date.now();
 
-              div.innerHTML = `
-                <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
-                <strong>Amount:</strong> ₱${d.amount}<br>
-                <strong>Status:</strong> ${d.status}<br>
-                <strong>Date:</strong> ${time}<br>
-                <strong>Payment Method:</strong> ${d.method}
-                ${receiptHtml}
-              `;
-              paymentHistory.appendChild(div);
-            });
-          } catch (error) {
-            paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
-          }
-        }
-
-        // PayPal setup (same as your existing code)
-        async function setupPayPal() {
-          const tenantEmail = await getCurrentUserEmail();
-          const amount = 2500;
-          const invoiceId = "INV-" + Date.now();
-
-          paypal.Buttons({
-            style: {
-              color: "gold",
-              shape: "rect",
-              label: "pay",
-              height: 40
-            },
-
-            createOrder: function(data, actions) {
-              return actions.order.create({
-                purchase_units: [{
-                  reference_id: invoiceId,
-                  description: "Monthly Dues Payment - Solano Hills",
-                  amount: {
-                    currency_code: "PHP",
-                    value: amount.toString()
-                  }
-                }]
-              });
-            },
-
-            onApprove: async function(data, actions) {
-              const order = await actions.order.capture();
-              console.log("Payment successful:", order);
-
+              // Save payment record with receipt URL
               await addDoc(collection(db, "payments"), {
                 tenantEmail,
                 invoiceId,
                 amount,
-                method: "PayPal",
-                status: "Paid",
-                transactionId: order.id,
-                payerName: order.payer.name.given_name + " " + order.payer.name.surname,
-                payerEmail: order.payer.email_address,
+                method: "Cash on Hand",
+                status: "Pending Verification",
+                receiptUrl,
                 timestamp: serverTimestamp()
               });
 
-              await showPopup("✅ Payment successful! Thank you, " + order.payer.name.given_name + ".");
+              cashStatus.style.color = 'green';
+              cashStatus.textContent = "Receipt uploaded successfully! Waiting for admin verification.";
+              cashReceiptInput.value = "";
               loadPaymentHistory();
-            },
-
-            onCancel: async function() {
-              await showPopup("⚠️ Payment cancelled by user.");
-            },
-
-            onError: async function(err) {
-              console.error("PayPal error:", err);
-              await showPopup("❌ Payment failed. Please try again later.");
+            } catch (error) {
+              console.error(error);
+              cashStatus.style.color = 'red';
+              cashStatus.textContent = "Failed to upload receipt: " + error.message;
             }
-          }).render(paypalContainer);
-        }
+          });
 
-        // Handle cash payment submission
-        submitCashPaymentBtn.addEventListener('click', async () => {
-          cashStatus.style.color = 'gray';
-          cashStatus.textContent = '';
-
-          const file = cashReceiptInput.files[0];
-          if (!file) {
-            await showPopup('Please select a JPEG receipt image to upload.');
-            return;
-          }
-
-          if (file.type !== 'image/jpeg') {
-            await showPopup('Only JPEG images are allowed.');
-            return;
-          }
-
-          cashStatus.textContent = 'Uploading receipt... Please wait.';
-          try {
-            const tenantEmail = await getCurrentUserEmail();
-            const receiptUrl = await uploadToCloudinary(file);
-            const amount = 2500; // You can adjust this if dynamic
-            const invoiceId = "INV-" + Date.now();
-
-            // Save payment record with receipt URL
-            await addDoc(collection(db, "payments"), {
-              tenantEmail,
-              invoiceId,
-              amount,
-              method: "Cash on Hand",
-              status: "Pending Verification",
-              receiptUrl,
-              timestamp: serverTimestamp()
-            });
-
-            cashStatus.style.color = 'green';
-            cashStatus.textContent = "Receipt uploaded successfully! Waiting for admin verification.";
-            cashReceiptInput.value = "";
-            loadPaymentHistory();
-          } catch (error) {
-            console.error(error);
-            cashStatus.style.color = 'red';
-            cashStatus.textContent = "Failed to upload receipt: " + error.message;
-          }
-        });
-
-        loadInvoice();
-        loadPaymentHistory();
-        setupPayPal();
-        break;
-
+          loadInvoice();
+          loadPaymentHistory();
+          setupPayPal();
+          break;
   
         case 'feedback':
           loadFeedbackForm();
