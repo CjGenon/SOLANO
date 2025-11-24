@@ -616,7 +616,7 @@
           // PayPal setup with EmailJS integration
           async function setupPayPal() {
             const tenantEmail = await getCurrentUserEmail();
-            const amount = 2500;
+            const amount = 10;
             const invoiceId = "INV-" + Date.now();
 
             paypal.Buttons({
@@ -946,3 +946,4 @@
 </div>
 </body>
 </html>
+
