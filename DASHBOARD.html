@@ -713,7 +713,7 @@
             try {
               const tenantEmail = await getCurrentUserEmail();
               const receiptUrl = await uploadToCloudinary(file);
-              const amount = 2500; // You can adjust this if dynamic
+              const amount = 10; // You can adjust this if dynamic
               const invoiceId = "INV-" + Date.now();
 
               // Save payment record with receipt URL
@@ -946,4 +946,5 @@
 </div>
 </body>
 </html>
+
 
