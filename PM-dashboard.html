@@ -279,11 +279,36 @@
           break;
 
         /* ================= DOCUMENT ================= */
-        case "document":
-          mainContent.innerHTML = `
-            <h1>Upload Client Documents</h1>
-            <p>To submit client documents, please use the button below to open the document upload form.</p>
-            <button id="openFormBtn" style="
+       case "document":
+        mainContent.innerHTML = `
+          <h1>Upload Client Documents</h1>
+          <p>Type your name/description and attach exactly 8 files below:</p>
+          
+          <form id="uploadForm" style="display:flex; flex-direction:column; gap:10px; max-width: 400px;">
+
+            <input type="text" id="name" placeholder="Client Name" required style="padding:8px; width: 80%;" />
+
+            <!-- Unit Room Dropdown -->
+            <label for="unitRoom" style="font-weight: 600;">Select Unit Room:</label>
+            <select id="unitRoom" required style="padding:8px; width: 80%;">
+              <option value="" disabled selected>Select a unit</option>
+              <option value="Unit 101">Unit 101</option>
+              <option value="Unit 102">Unit 102</option>
+              <option value="Unit 103">Unit 103</option>
+              <option value="Unit 104">Unit 104</option>
+              <option value="Unit 105">Unit 105</option>
+            </select>
+
+            <input type="file" id="file1" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file2" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file3" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file4" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file5" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file6" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file7" required style="padding:8px; width: 80%;" />
+            <input type="file" id="file8" required style="padding:8px; width: 80%;" />
+
+            <button type="submit" style="
               padding: 12px 20px;
               background-color: #4CAF50;
               color: white;
@@ -291,16 +316,276 @@
               border-radius: 6px;
               font-size: 16px;
               cursor: pointer;
-            ">Open Document Upload Form</button>
+              width: fit-content;
+            ">Upload</button>
+          </form>
+          
+          <div id="status" style="margin-top:10px;"></div>
+
+          <h2>Upload History</h2>
+          <div id="uploadHistory" style="margin-top:10px; max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
+        `;
+
+        const form = document.getElementById("uploadForm");
+        const statusDiv = document.getElementById("status");
+        const uploadHistory = document.getElementById("uploadHistory");
+        const nameInput = document.getElementById("name");
+        const unitRoomSelect = document.getElementById("unitRoom");
+
+        const fileInputs = [
+          document.getElementById("file1"),
+          document.getElementById("file2"),
+          document.getElementById("file3"),
+          document.getElementById("file4"),
+          document.getElementById("file5"),
+          document.getElementById("file6"),
+          document.getElementById("file7"),
+          document.getElementById("file8")
+        ];
+
+        const circumference = 2 * Math.PI * 45;
+
+        // Helper to create a progress circle SVG element with elements references
+        function createProgressCircle() {
+          const svgNS = "http://www.w3.org/2000/svg";
+          const svg = document.createElementNS(svgNS, "svg");
+          svg.setAttribute("width", "100");
+          svg.setAttribute("height", "100");
+          svg.setAttribute("viewBox", "0 0 100 100");
+          svg.style.flexShrink = "0";
+
+          const bgCircle = document.createElementNS(svgNS, "circle");
+          bgCircle.setAttribute("cx", "50");
+          bgCircle.setAttribute("cy", "50");
+          bgCircle.setAttribute("r", "45");
+          bgCircle.setAttribute("stroke", "#eee");
+          bgCircle.setAttribute("stroke-width", "10");
+          bgCircle.setAttribute("fill", "none");
+          svg.style.marginLeft = "20px"; // move right
+          svg.style.marginRight = "20px"; // move left
+          svg.appendChild(bgCircle);
+
+          const progressCircle = document.createElementNS(svgNS, "circle");
+          progressCircle.setAttribute("cx", "50");
+          progressCircle.setAttribute("cy", "50");
+          progressCircle.setAttribute("r", "45");
+          progressCircle.setAttribute("stroke", "#4CAF50");
+          progressCircle.setAttribute("stroke-width", "10");
+          progressCircle.setAttribute("fill", "none");
+          progressCircle.setAttribute("stroke-linecap", "round");
+          progressCircle.setAttribute("stroke-dasharray", circumference);
+          progressCircle.setAttribute("stroke-dashoffset", circumference);
+          progressCircle.setAttribute("transform", "rotate(-90 50 50)");
+          svg.appendChild(progressCircle);
+
+          const progressText = document.createElementNS(svgNS, "text");
+          progressText.setAttribute("x", "50");
+          progressText.setAttribute("y", "55");
+          progressText.setAttribute("font-size", "20");
+          progressText.setAttribute("text-anchor", "middle");
+          progressText.setAttribute("fill", "#white");
+          progressText.textContent = "0%";
+          svg.appendChild(progressText);
+
+          return { svg, progressCircle, progressText };
+        }
+
+        // Set progress on a given circle and text elements
+        function setCircleProgress(circle, text, percent) {
+          const offset = circumference - (percent / 100) * circumference;
+          circle.style.strokeDashoffset = offset;
+          text.textContent = `${Math.round(percent)}%`;
+        }
+
+        function loadHistory() {
+          const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+          uploadHistory.innerHTML = "";
+          if (history.length === 0) {
+            uploadHistory.innerHTML = "<p>No upload history yet.</p>";
+            return;
+          }
+          history.forEach((entry) => {
+            const div = document.createElement("div");
+            div.style.borderBottom = "1px solid #ddd";
+            div.style.marginBottom = "12px";
+            div.style.paddingBottom = "12px";
+            div.style.display = "flex";
+            div.style.alignItems = "center";
+            div.style.gap = "12px";
+            div.style.justifyContent = "space-between";
+
+            const contentDiv = document.createElement("div");
+            contentDiv.innerHTML = `
+              <strong>${entry.name}</strong> - <em>${entry.unitRoom}</em><br/>
+              <small><em>Uploaded at ${entry.time}</em></small>
+              <ul style="margin: 8px 0 0 20px; padding-left: 0; list-style: disc;">
+                ${entry.files.map(f => `<li>${f}</li>`).join("")}
+              </ul>
+              <p style="margin-top: 8px; font-weight: 600; color: #2e7d32;">
+                The client is ready for account creation.
+              </p>
+            `;
+
+            const { svg, progressCircle, progressText } = createProgressCircle();
+            // Progress is 100% for completed entries
+            setCircleProgress(progressCircle, progressText, 100);
+
+            // Append content first (left), progress circle second (right)
+            div.appendChild(contentDiv);
+            div.appendChild(svg);
+
+            uploadHistory.appendChild(div);
+          });
+        }
+
+        loadHistory();
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const name = nameInput.value.trim();
+          const unitRoom = unitRoomSelect.value;
+
+          if (!unitRoom) {
+            alert("Please select a unit room.");
+            return;
+          }
+
+          statusDiv.innerHTML = "Uploading files to Cloudinary...";
+
+          let totalSize = 0;
+          const files = [];
+          for (let i = 0; i < fileInputs.length; i++) {
+            const file = fileInputs[i].files[0];
+            if (!file) {
+              alert(`Please select a file for attachment ${i + 1}`);
+              return;
+            }
+            totalSize += file.size;
+            files.push(file);
+          }
+
+          let uploadedSize = 0;
+          const uploadedUrls = [];
+          const uploadedFileNames = [];
+
+          // Create temporary upload history entry with progress circle on right
+          const tempEntryDiv = document.createElement("div");
+          tempEntryDiv.style.borderBottom = "1px solid #ddd";
+          tempEntryDiv.style.marginBottom = "12px";
+          tempEntryDiv.style.paddingBottom = "12px";
+          tempEntryDiv.style.display = "flex";
+          tempEntryDiv.style.justifyContent = "space-between"; // key change here
+          tempEntryDiv.style.alignItems = "center";
+          tempEntryDiv.style.gap = "12px";
+
+          const tempContentDiv = document.createElement("div");
+          tempContentDiv.innerHTML = `
+            <strong>${name}</strong> - <em>${unitRoom}</em><br/>
+            <small><em>Uploading...</em></small>
           `;
 
-          const openFormBtn = document.getElementById("openFormBtn");
-          openFormBtn.addEventListener("click", () => {
-            window.open("https://docs.google.com/forms/d/e/1FAIpQLSc9GekVOFqdbdXQF9wqOJPZeOwh4e69T8ZJvvPbKNXlHlvlVA/viewform?usp=dialog", "_blank");
-          });
+          const { svg, progressCircle, progressText } = createProgressCircle();
 
-          break;
+          tempEntryDiv.appendChild(tempContentDiv);
+          tempEntryDiv.appendChild(svg);
 
+          uploadHistory.prepend(tempEntryDiv);
+
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", "upload_preset"); // <-- Replace with your unsigned preset
+
+            try {
+              await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open("POST", "https://api.cloudinary.com/v1_1/dfklsyjch/upload");
+
+                xhr.upload.onprogress = (event) => {
+                  if (event.lengthComputable) {
+                    const currentFileProgress = event.loaded;
+                    const totalProgress = ((uploadedSize + currentFileProgress) / totalSize) * 100;
+                    setCircleProgress(progressCircle, progressText, totalProgress);
+                  }
+                };
+
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    const data = JSON.parse(xhr.responseText);
+                    if (!data.secure_url) {
+                      reject(new Error("Upload failed: no secure_url"));
+                      return;
+                    }
+                    uploadedUrls.push(data.secure_url);
+                    uploadedFileNames.push(file.name);
+                    uploadedSize += file.size;
+                    setCircleProgress(progressCircle, progressText, (uploadedSize / totalSize) * 100);
+                    resolve();
+                  } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                  }
+                };
+
+                xhr.onerror = () => {
+                  reject(new Error("Network error during upload"));
+                };
+
+                xhr.send(formData);
+              });
+            } catch (err) {
+              console.error("Upload error:", err);
+              statusDiv.innerHTML = `Error uploading ${file.name}`;
+              setCircleProgress(progressCircle, progressText, 0);
+              return;
+            }
+          }
+
+          statusDiv.innerHTML = "Sending email...";
+
+          const fileLinksHtml = uploadedUrls.map((url, idx) => {
+            const fileName = uploadedFileNames[idx];
+            return `<a href="${url}" target="_blank" style="color:#1a0dab; text-decoration:underline;">${fileName}</a>`;
+          }).join('<br>');
+
+          const templateParams = {
+            name: name,
+            unitRoom: unitRoom,
+            time: new Date().toLocaleString(),
+            message: fileLinksHtml
+          };
+
+          try {
+            await emailjs.send("service_u1n5d9t", "template_qu1s2lh", templateParams);
+            statusDiv.innerHTML = "Email sent successfully!";
+
+            // Remove temp entry
+            uploadHistory.removeChild(tempEntryDiv);
+
+            // Save to localStorage history and reload
+            const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+            history.unshift({
+              name,
+              unitRoom,
+              time: new Date().toLocaleString(),
+              files: uploadedFileNames
+            });
+            if (history.length > 10) history.pop();
+            localStorage.setItem("uploadHistory", JSON.stringify(history));
+
+            loadHistory();
+
+            form.reset();
+
+          } catch (err) {
+            console.error("Email error:", err);
+            statusDiv.innerHTML = "Error sending email.";
+          }
+        });
+
+        break;
         /* ================= DEFAULT ================= */
         default:
           mainContent.innerHTML = "<h1>Welcome</h1><p>Select an option from the sidebar.</p>";
@@ -400,3 +685,4 @@
   </script>
 </body>
 </html>
+
