@@ -4,7 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contact Our Team – Solano Hills</title>
-  <link rel="stylesheet" href="CONTACT.css" />
+  <link rel="stylesheet" href="contact.css" />
+  <style>
+    /* small helper styles so hidden sections don't jump around */
+    .hidden { display: none; }
+    .inquiry-section { margin: 0.75rem 0; }
+    label.small { display:block; font-size:0.9rem; margin-bottom:0.25rem; }
+  </style>
 </head>
 <body>
   <!-- ======================== NAVBAR ======================== -->
@@ -20,89 +26,161 @@
           <li><a href="index.html#apartments">Apartments</a></li>
           <li><a href="index.html#amenities">Amenities</a></li>
           <li><a href="index.html#contact">Contact</a></li>
-         <li><a href="LogIn.html">Log In</a></li>
-  </ul>
-
-  </ul>
-</nav>
+          <li><a href="LogIn.html">Log In</a></li>
+        </ul>
+      </nav>
     </div>
   </div>
+
   <!-- ======================== CONTACT HEADER ======================== -->
   <header class="contact-header">
-  <h1>Get in Touch</h1>
-  <p>Our team is here to help you with your questions about getting your new home.</p>
-</header>
-<!-- contact.html -->
- <section class = "inquiry-form-section">
-<h2>Contact Us</h2>
-<form id="contactForm">
-  <input type="text" id="name" placeholder="Your Name" required />
-  <input type="email" id="email" placeholder="Your Email" required />
-  <input type="number" id="number" placeholder="Your number" required />
-  <select id ="Employement_Type" name="Employement_Type"required>
-        <option value=""disabled selected>Select Employment Type</option>
+    <h1>Get in Touch</h1>
+    <p>Our team is here to help you with your questions about getting your new home.</p>
+  </header>
+
+  <!-- ======================== CONTACT FORM ======================== -->
+  <section class="inquiry-form-section">
+    <h2>Contact Us</h2>
+
+    <form id="contactForm">
+      <input type="text" id="name" placeholder="Your Name" required />
+      <input type="email" id="email" placeholder="Your Email" required />
+      <input type="tel" id="number" placeholder="Your Number" required />
+
+      <select id="Employement_Type" name="Employement_Type" required>
+        <option value="" disabled selected>Select Employment Type</option>
         <option value="Employed">Employed</option>
         <option value="Self-Employed">Self-Employed</option>
-         <option value="Business Owner">Business Owner</option>
-         
+        <option value="Business Owner">Business Owner</option>
       </select>
-  <textarea id="message" placeholder="Your Question" required></textarea>
-  <button type="submit">Send Message</button>
-  </form>
-</section>
 
+      <!-- ===== NEW: Main inquiry topic ===== -->
+      
+        <label class="small" for="inquiry_topic">What are you inquiring about?</label>
+        <select id="inquiry_topic" name="inquiry_topic" required>
+          <option value="" disabled selected>Select an option</option>
+          <option value="payment">Payment / Price</option>
+          <option value="interested_1b">I'm interested in 1 Bedroom</option>
+          <option value="interested_2b">I'm interested in 2 Bedroom</option>
+          <option value="interested_both">I'm interested in both bedrooms</option>
+          <option value="other">Other (explain in message)</option>
+        </select>
+      
 
-<div id="popup" class="popup hidden">
-  <div class="popup-content">
-    <p>Form Submitted.<br>Wait for our team to reach out to you within 24 hours.</p>
-    <button onclick="closePopup()">Close</button>
+      <!-- ===== Payment info section (shown when payment selected) ===== -->
+      <div id="paymentSection" class="inquiry-section hidden">
+        <label class="small" for="payment_info">Which payment detail do you want to know?</label>
+        <select id="payment_info" name="payment_info">
+          <option value="" disabled selected>Select payment info</option>
+          <option value="downpayment">Downpayment</option>
+          <option value="monthly_amortization">Monthly Amortization</option>
+          <option value="total_price">Total Price</option>
+          <option value="payment_terms">Payment Terms</option>
+          <option value="other_payment">Other (explain in message)</option>
+        </select>
+      </div>
+
+      <!-- Message textarea -->
+      <textarea id="message" placeholder="Your Question or details (use this to clarify what you need)" required></textarea>
+
+      <button type="submit">Send Message</button>
+    </form>
+  </section>
+
+  <!-- POPUP -->
+  <div id="popup" class="popup hidden">
+    <div class="popup-content">
+      <p>Form Submitted.<br>Wait for our team to reach out to you within 24 hours.</p>
+      <button onclick="closePopup()">Close</button>
+    </div>
   </div>
-</div>
-<div id="status"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+  <div id="status"></div>
 
-const firebaseConfig = {
-    apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
-    authDomain: "solanodb-a4f65.firebaseapp.com",
-    projectId: "solanodb-a4f65",
-    storageBucket: "solanodb-a4f65.firebasestorage.app",
-    messagingSenderId: "98081894649",
-    appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
-};
+  <!-- ======================== FIREBASE & SCRIPT ======================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+    const firebaseConfig = {
+      apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+      authDomain: "solanodb-a4f65.firebaseapp.com",
+      projectId: "solanodb-a4f65",
+      storageBucket: "solanodb-a4f65.appspot.com",
+      messagingSenderId: "98081894649",
+      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+    };
 
-document.getElementById('contactForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const name = document.getElementById('name').value;
-  const email = document.getElementById('email').value;
-  const number = document.getElementById('number').value;
-  const Employement_Type = document.getElementById('Employement_Type').value;
-  const message = document.getElementById('message').value;
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  try {
-    await addDoc(collection(db, "messages"), {
-      name,
-      email,
-      number,
-      Employement_Type,
-      message,
-      timestamp: serverTimestamp()
+    // Elements
+    const inquiryTopic = document.getElementById('inquiry_topic');
+    const paymentSection = document.getElementById('paymentSection');
+    const paymentSelect = document.getElementById('payment_info');
+
+    // Hide payment section and remove required attribute initially
+    function hideAllConditionalSections() {
+      paymentSection.classList.add('hidden');
+      paymentSelect.removeAttribute('required');
+    }
+
+    // Initialize hidden on page load
+    hideAllConditionalSections();
+
+    // Show/hide based on inquiry topic selection
+    inquiryTopic.addEventListener('change', () => {
+      const val = inquiryTopic.value;
+      hideAllConditionalSections();
+
+      if (val === 'payment') {
+        paymentSection.classList.remove('hidden');
+        paymentSelect.setAttribute('required', 'required');
+      }
     });
-document.getElementById("popup").classList.remove("hidden");
-    e.target.reset();
-  } catch (error) {
-    document.getElementById("status").innerText = "Error: " + error.message;
-  }
-})
-window.closePopup = function () {
-  document.getElementById("popup").classList.add("hidden");
-}
-</script>
-</body>
 
+    // Form submit
+    document.getElementById('contactForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const number = document.getElementById('number').value.trim();
+      const Employement_Type = document.getElementById('Employement_Type').value;
+      const inquiry_topic = document.getElementById('inquiry_topic').value;
+      const payment_info = paymentSelect.value || null;
+      const message = document.getElementById('message').value.trim();
+
+      const payload = {
+        name,
+        email,
+        number,
+        Employement_Type,
+        inquiry_topic,
+        message,
+        timestamp: serverTimestamp()
+      };
+
+      if (inquiry_topic === 'payment') {
+        payload.payment_info = payment_info;
+      }
+
+      try {
+        await addDoc(collection(db, "messages"), payload);
+
+        document.getElementById("popup").classList.remove("hidden");
+        e.target.reset();
+        hideAllConditionalSections();
+
+      } catch (error) {
+        document.getElementById("status").innerText = "Error: " + error.message;
+      }
+    });
+
+    // Close Popup
+    window.closePopup = function () {
+      document.getElementById("popup").classList.add("hidden");
+    };
+  </script>
+</body>
 </html>
