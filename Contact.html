@@ -2,15 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Our Team – Solano Hills</title>
-  <link rel="stylesheet" href="CONTACT.css" />
-  <style>
-    /* small helper styles so hidden sections don't jump around */
-    .hidden { display: none; }
-    .inquiry-section { margin: 0.75rem 0; }
-    label.small { display:block; font-size:0.9rem; margin-bottom:0.25rem; }
-  </style>
+  <link rel="stylesheet" href="contact.css" />
 </head>
 <body>
   <!-- ======================== NAVBAR ======================== -->
@@ -54,20 +48,16 @@
         <option value="Business Owner">Business Owner</option>
       </select>
 
-      <!-- ===== NEW: Main inquiry topic ===== -->
-      
-        <label class="small" for="inquiry_topic">What are you inquiring about?</label>
-        <select id="inquiry_topic" name="inquiry_topic" required>
-          <option value="" disabled selected>Select an option</option>
-          <option value="payment">Payment / Price</option>
-          <option value="interested_1b">I'm interested in 1 Bedroom unit</option>
-          <option value="interested_2b">I'm interested in 2 Bedroom unit</option>
-          <option value="interested_both">I'm interested in both bedroom unit</option>
-          <option value="other">Other (explain in message)</option>
-        </select>
-      
+      <label class="small" for="inquiry_topic">What are you inquiring about?</label>
+      <select id="inquiry_topic" name="inquiry_topic" required>
+        <option value="" disabled selected>Select an option</option>
+        <option value="payment">Payment / Price</option>
+        <option value="interested_1b">I'm interested in 1 Bedroom unit</option>
+        <option value="interested_2b">I'm interested in 2 Bedroom unit</option>
+        <option value="interested_both">I'm interested in both bedroom unit</option>
+        <option value="other">Other (explain in message)</option>
+      </select>
 
-      <!-- ===== Payment info section (shown when payment selected) ===== -->
       <div id="paymentSection" class="inquiry-section hidden">
         <label class="small" for="payment_info">Which payment detail do you want to know?</label>
         <select id="payment_info" name="payment_info">
@@ -80,7 +70,6 @@
         </select>
       </div>
 
-      <!-- Message textarea -->
       <textarea id="message" placeholder="Your Question or details (use this to clarify what you need)" required></textarea>
 
       <button type="submit">Send Message</button>
@@ -95,13 +84,42 @@
     </div>
   </div>
 
-  <div id="status"></div>
+  <div id="status" style="color:red; margin-top:10px;"></div>
+
+  <!-- ======================== CHAT TOGGLE BUTTON & CHAT BOX ======================== -->
+  <div id="chatToggleBtn">Chat</div>
+  <div id="chatBox" aria-hidden="true">
+    <div id="chatHeader">
+      Live Chat
+      <button id="chatCloseBtn" aria-label="Close chat">&times;</button>
+    </div>
+    <div id="messagesContainerChat">
+      Loading chat messages...
+    </div>
+    <div id="chatInputContainer">
+      <textarea id="chatMessageInput" placeholder="Type your message..." rows="2"></textarea>
+      <button id="sendChatBtn" disabled>Send</button>
+    </div>
+  </div>
 
   <!-- ======================== FIREBASE & SCRIPT ======================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      serverTimestamp,
+      query,
+      where,
+      getDocs,
+      orderBy,
+      updateDoc,
+      doc,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
       authDomain: "solanodb-a4f65.firebaseapp.com",
@@ -111,24 +129,28 @@
       appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
     };
 
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Elements
+    // UI elements
     const inquiryTopic = document.getElementById('inquiry_topic');
     const paymentSection = document.getElementById('paymentSection');
     const paymentSelect = document.getElementById('payment_info');
+    const chatToggleBtn = document.getElementById('chatToggleBtn');
+    const chatBox = document.getElementById('chatBox');
+    const chatCloseBtn = document.getElementById('chatCloseBtn');
+    const messagesContainerChat = document.getElementById('messagesContainerChat');
+    const chatMessageInput = document.getElementById('chatMessageInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
 
-    // Hide payment section and remove required attribute initially
+    // Hide payment section initially
     function hideAllConditionalSections() {
       paymentSection.classList.add('hidden');
       paymentSelect.removeAttribute('required');
     }
-
-    // Initialize hidden on page load
     hideAllConditionalSections();
 
-    // Show/hide based on inquiry topic selection
     inquiryTopic.addEventListener('change', () => {
       const val = inquiryTopic.value;
       hideAllConditionalSections();
@@ -139,7 +161,17 @@
       }
     });
 
-    // Form submit
+    // Get or create anonymous ID for session
+    function getAnonymousId() {
+      let anonId = sessionStorage.getItem('anonId');
+      if (!anonId) {
+        anonId = crypto.randomUUID();
+        sessionStorage.setItem('anonId', anonId);
+      }
+      return anonId;
+    }
+
+    // Form submit for new inquiry
     document.getElementById('contactForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -151,38 +183,203 @@
       const payment_info = paymentSelect.value || null;
       const message = document.getElementById('message').value.trim();
 
+      const anonId = getAnonymousId();
+
       const payload = {
         name,
         email,
         number,
         Employement_Type,
         inquiry_topic,
-        message,
-        timestamp: serverTimestamp()
+        payment_info: inquiry_topic === 'payment' ? payment_info : null,
+        anonymousId: anonId,
+        status: "new",
+        createdAt: serverTimestamp()
       };
 
-      if (inquiry_topic === 'payment') {
-        payload.payment_info = payment_info;
-      }
-
       try {
-        await addDoc(collection(db, "messages"), payload);
+        // Create inquiry document
+        const inquiryRef = await addDoc(collection(db, "inquiries"), payload);
+
+        // Add first message inside subcollection "messages"
+        await addDoc(collection(db, "inquiries", inquiryRef.id, "messages"), {
+          sender: "user",
+          senderName: name,
+          content: message,
+          timestamp: serverTimestamp(),
+          readByPM: false,
+          readByUser: true
+        });
 
         document.getElementById("popup").classList.remove("hidden");
         e.target.reset();
         hideAllConditionalSections();
+
+        // Refresh chat messages if chat is open
+        if(chatBox.classList.contains('open')) {
+          startListeningToMessages(); // restart listener to get latest data
+        }
 
       } catch (error) {
         document.getElementById("status").innerText = "Error: " + error.message;
       }
     });
 
-    // Close Popup
     window.closePopup = function () {
       document.getElementById("popup").classList.add("hidden");
     };
+
+    // Function to clear message box
+    function clearMessageBox() {
+      // Use a small timeout to ensure it happens after Firebase operations
+      setTimeout(() => {
+        const input = document.getElementById('chatMessageInput');
+        if (input) {
+          input.value = '';
+          input.innerText = '';
+          input.innerHTML = '';
+          // Force DOM update
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }, 100);
+    }
+
+    // Real-time listener unsubscribe handle
+    let unsubscribeMessages = null;
+    let currentInquiryId = null;
+
+    // Real-time listener function for chat messages
+    async function startListeningToMessages() {
+      const anonId = getAnonymousId();
+
+      // Query inquiries by anonymousId, get the latest one (by createdAt desc)
+      const inquiriesQuery = query(
+        collection(db, "inquiries"),
+        where("anonymousId", "==", anonId),
+        orderBy("createdAt", "desc")
+      );
+
+      const inquiriesSnapshot = await getDocs(inquiriesQuery);
+      if (inquiriesSnapshot.empty) {
+        messagesContainerChat.innerHTML = "<p>No inquiries found. Use the contact form above to send a message first.</p>";
+        chatMessageInput.disabled = true;
+        sendChatBtn.disabled = true;
+        currentInquiryId = null;
+        return;
+      }
+
+      // Take the latest inquiry
+      const latestInquiryDoc = inquiriesSnapshot.docs[0];
+      currentInquiryId = latestInquiryDoc.id;
+      const inquiryData = latestInquiryDoc.data();
+
+      // Map inquiry topic codes to readable text
+      const inquiryTopicMap = {
+        payment: "Payment / Price",
+        interested_1b: "I'm interested in 1 Bedroom unit",
+        interested_2b: "I'm interested in 2 Bedroom unit",
+        interested_both: "I'm interested in both bedroom unit",
+        other: "Other (explain in message)"
+      };
+
+      const inquiryTopicText = inquiryTopicMap[inquiryData.inquiry_topic] || inquiryData.inquiry_topic || "N/A";
+
+      // Unsubscribe previous listener if any
+      if (unsubscribeMessages) unsubscribeMessages();
+
+      // Query messages subcollection ordered by timestamp asc
+      const messagesQuery = query(
+        collection(db, "inquiries", currentInquiryId, "messages"),
+        orderBy("timestamp", "asc")
+      );
+
+      unsubscribeMessages = onSnapshot(messagesQuery, (messagesSnapshot) => {
+        let html = `<div class="system-message"><strong>Your Inquiry Topic:</strong> ${inquiryTopicText}</div>`;
+        if (messagesSnapshot.empty) {
+          html += "<p>No messages yet.</p>";
+        } else {
+          messagesSnapshot.forEach(msgDoc => {
+            const msg = msgDoc.data();
+            const senderClass = msg.sender === "user" ? "sender-user" : "sender-pm";
+            html += `
+              <div class="message-block ${senderClass}">
+                <strong>${msg.sender === "user" ? "You" : "Project Manager"}:</strong><br />
+                <span>${msg.content}</span><br />
+                <small>${msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ""}</small>
+              </div>
+            `;
+          });
+        }
+        messagesContainerChat.innerHTML = html;
+        chatMessageInput.disabled = false;
+        sendChatBtn.disabled = true; // disable send initially until input
+      });
+    }
+
+    // Toggle chat box open/close
+    chatToggleBtn.addEventListener('click', () => {
+      chatBox.classList.add('open');
+      chatBox.setAttribute('aria-hidden', 'false');
+      chatToggleBtn.style.opacity = '0';
+      chatToggleBtn.style.pointerEvents = 'none';
+      startListeningToMessages();
+      chatMessageInput.focus();
+    });
+
+    chatCloseBtn.addEventListener('click', () => {
+      chatBox.classList.remove('open');
+      chatBox.setAttribute('aria-hidden', 'true');
+      chatToggleBtn.style.opacity = '1';
+      chatToggleBtn.style.pointerEvents = 'auto';
+
+      if (unsubscribeMessages) unsubscribeMessages();
+      unsubscribeMessages = null;
+      currentInquiryId = null;
+    });
+
+    // Enable send button only when input has text
+    chatMessageInput.addEventListener('input', () => {
+      sendChatBtn.disabled = chatMessageInput.value.trim() === '';
+    });
+
+    // Send a chat message to the latest inquiry
+    sendChatBtn.addEventListener('click', async () => {
+      const content = chatMessageInput.value.trim();
+      if (!content) return;
+
+      if (!currentInquiryId) {
+        alert("No inquiry found. Please submit the contact form first.");
+        return;
+      }
+
+      sendChatBtn.disabled = true;
+      
+      // Clear the input immediately
+      chatMessageInput.value = '';
+      chatMessageInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      try {
+        // Add message in messages subcollection
+        await addDoc(collection(db, "inquiries", currentInquiryId, "messages"), {
+          sender: "user",
+          senderName: "Anonymous",
+          content,
+          timestamp: serverTimestamp(),
+          readByPM: false,
+          readByUser: true
+        });
+
+        // Try to update inquiry status (may fail if no permission)
+        await updateDoc(doc(db, "inquiries", currentInquiryId), { status: "user replied" });
+
+        // Messages update automatically via real-time listener, no manual reload needed
+
+      } catch (error) {
+        console.error("Error sending message:", error.message);
+        sendChatBtn.disabled = false;
+      }
+    });
+
   </script>
 </body>
 </html>
-
-
