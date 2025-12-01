@@ -35,12 +35,14 @@
   </main>
 
   <!-- ======================== FIREBASE SCRIPTS ======================== -->
-   <script src="https://www.paypal.com/sdk/js?client-id=ASbUIe1_A3shQqfiUe1_TnYnp7jGyD-_pClj10rYjAG7Fmbu_sPi6s8LoJD2bRv6bT2XkJBo-FpPO5t4&currency=PHP"></script>
-   <script type="text/javascript" src="https://cdn.emailjs.com/sdk/3.2.0/email.min.js"></script>
-  <script>
-    (function(){
-      emailjs.init("avvdJIIs04H8nGyu_");
-    })();
+   <script src="https://www.paypal.com/sdk/js?client-id=ASDYl8DDDQKLSnsL75To3794uumVSxwIKExnbGsTeuNsmrdqIMJTf9FKF3BWjULxHoQOvA5oNflYDSgh&currency=PHP"></script>
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  (function(){
+    emailjs.init("lqyGatNXQhoDJsu2B");
+  })();
+</script>
+
   </script>
    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
@@ -60,6 +62,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
+    const storage = getStorage(app); // also initialize storage if you upload files
 
     function getCurrentUserEmail() {
       return new Promise(resolve => {
@@ -507,8 +510,7 @@
         });
 
       break;
-
-      
+          
     case 'billing':
       mainContent.innerHTML = `
         <div class="payment-tab">
@@ -560,13 +562,16 @@
       const submitCashPaymentBtn = document.getElementById('submitCashPayment');
       const cashStatus = document.getElementById('cashStatus');
 
-      // Switch payment method UI
+      const unitPricing = { "1B": 10, "2B": 20 };
+      let computedAmount = 0;
+      let tenantUnits = [];
+
       paymentMethodRadios.forEach(radio => {
         radio.addEventListener('change', () => {
-          if (radio.value === 'cash' && radio.checked) {
+          if (radio.value === 'cash') {
             cashSection.style.display = 'block';
             paypalSection.style.display = 'none';
-          } else if (radio.value === 'paypal' && radio.checked) {
+          } else {
             cashSection.style.display = 'none';
             paypalSection.style.display = 'block';
           }
@@ -575,9 +580,19 @@
 
       async function loadInvoice() {
         const tenantEmail = await getCurrentUserEmail();
+        const uid = auth.currentUser.uid;
+        const userDoc = await getDoc(doc(db, "users", uid));
+        tenantUnits = userDoc.data()?.unitNumbers || [];
+
+        computedAmount = tenantUnits.reduce((total, unit) => {
+          const type = unit.split("-")[0];
+          return total + (unitPricing[type] || 0);
+        }, 0);
+
         invoiceDetails.innerHTML = `
           <strong>Tenant:</strong> ${tenantEmail}<br>
-          <strong>Amount Due:</strong> ₱2,500<br>
+          <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
+          <strong>Amount Due:</strong> ₱${computedAmount}<br>
           <strong>Due Date:</strong> 25th of this month
         `;
       }
@@ -587,11 +602,7 @@
         const tenantEmail = await getCurrentUserEmail();
 
         try {
-          const q = query(
-            collection(db, "payments"),
-            where("tenantEmail", "==", tenantEmail),
-            orderBy("timestamp", "desc")
-          );
+          const q = query(collection(db, "payments"), where("tenantEmail", "==", tenantEmail), orderBy("timestamp", "desc"));
           const snapshot = await getDocs(q);
 
           if (snapshot.empty) {
@@ -599,27 +610,26 @@
             return;
           }
 
-          paymentHistory.innerHTML = '';
+          paymentHistory.innerHTML = "";
           snapshot.forEach(doc => {
             const d = doc.data();
             const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
+
+            let receipt = "";
+            if (d.method === "Cash on Hand" && d.receiptUrl) {
+              receipt = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" style="max-width:150px; border-radius:6px;">`;
+            }
+
             const div = document.createElement('div');
             div.style.borderBottom = "1px solid #ccc";
             div.style.padding = "8px 0";
-
-            // Show receipt image if cash payment
-            let receiptHtml = '';
-            if (d.method === "Cash on Hand" && d.receiptUrl) {
-              receiptHtml = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" alt="Cash Receipt" style="max-width:150px; border-radius:6px; margin-top:5px;" />`;
-            }
-
             div.innerHTML = `
               <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
               <strong>Amount:</strong> ₱${d.amount}<br>
               <strong>Status:</strong> ${d.status}<br>
               <strong>Date:</strong> ${time}<br>
-              <strong>Payment Method:</strong> ${d.method}
-              ${receiptHtml}
+              <strong>Method:</strong> ${d.method}
+              ${receipt}
             `;
             paymentHistory.appendChild(div);
           });
@@ -628,114 +638,102 @@
         }
       }
 
-      // PayPal setup with EmailJS integration
+      // EmailJS receipt sender
+      async function sendEmailReceipt(paymentData) {
+        try {
+          const templateParams = {
+            from_name: "Solano Hills Admin",
+            to_email: paymentData.payerEmail,
+            invoice_id: paymentData.invoiceId,
+            amount: paymentData.amount,
+            payment_method: paymentData.method,
+            transaction_id: paymentData.transactionId,
+            payment_date: new Date().toLocaleString(),
+          };
+          await emailjs.send('service_izx63bb', 'template_asn4687', templateParams);
+          console.log("Email receipt sent successfully");
+        } catch (error) {
+          console.error("Failed to send email receipt:", error);
+        }
+      }
+
       async function setupPayPal() {
         const tenantEmail = await getCurrentUserEmail();
-        const amount = 2500;
         const invoiceId = "INV-" + Date.now();
 
         paypal.Buttons({
-          style: {
-            color: "gold",
-            shape: "rect",
-            label: "pay",
-            height: 40
-          },
+          style: { color: "gold", shape: "rect", label: "pay", height: 40 },
 
           createOrder: function(data, actions) {
             return actions.order.create({
               purchase_units: [{
                 reference_id: invoiceId,
-                description: "Monthly Dues Payment - Solano Hills",
-                amount: {
-                  currency_code: "PHP",
-                  value: amount.toString()
-                }
+                description: "Monthly Dues Payment",
+                amount: { currency_code: "PHP", value: computedAmount.toString() }
               }]
             });
           },
 
           onApprove: async function(data, actions) {
             const order = await actions.order.capture();
-            console.log("Payment successful:", order);
 
-            // Save payment record in Firestore
-            await addDoc(collection(db, "payments"), {
+            const paymentRecord = {
               tenantEmail,
               invoiceId,
-              amount,
+              amount: computedAmount,
               method: "PayPal",
               status: "Paid",
               transactionId: order.id,
-              payerName: order.payer.name.given_name + " " + order.payer.name.surname,
               payerEmail: order.payer.email_address,
               timestamp: serverTimestamp()
-            });
-
-            // Prepare EmailJS params
-            const emailParams = {
-              to_email: order.payer.email_address,
-              payer_name: order.payer.name.given_name + " " + order.payer.name.surname,
-              invoice_id: invoiceId,
-              amount: amount,
-              transaction_id: order.id,
-              payment_method: "PayPal",
-              payment_date: new Date().toLocaleString()
             };
 
-            // Send email via EmailJS
-            emailjs.send('service_u1n5d9t', 'template_qu1s2lh', emailParams)
-              .then(() => {
-                console.log('Email sent successfully!');
-                showPopup("✅ Payment successful! Receipt emailed to " + order.payer.email_address);
-                loadPaymentHistory();
-              })
-              .catch((error) => {
-                console.error('EmailJS error:', error);
-                showPopup("✅ Payment successful! But failed to send email receipt.");
-                loadPaymentHistory();
-              });
+            await addDoc(collection(db, "payments"), paymentRecord);
+
+            showPopup("✅ Payment successful!");
+            await loadPaymentHistory();
+
+            // **Send email receipt here**
+            await sendEmailReceipt(paymentRecord);
           },
 
           onCancel: async function() {
-            await showPopup("⚠️ Payment cancelled by user.");
+            showPopup("⚠️ Payment cancelled by user.");
           },
 
           onError: async function(err) {
             console.error("PayPal error:", err);
-            await showPopup("❌ Payment failed. Please try again later.");
+            showPopup("❌ Payment failed. Please try again later.");
           }
+
         }).render(paypalContainer);
       }
 
-      // Handle cash payment submission
       submitCashPaymentBtn.addEventListener('click', async () => {
         cashStatus.style.color = 'gray';
         cashStatus.textContent = '';
 
         const file = cashReceiptInput.files[0];
         if (!file) {
-          await showPopup('Please select a JPEG receipt image to upload.');
+          await showPopup("Please upload a JPEG receipt image first.");
           return;
         }
-
         if (file.type !== 'image/jpeg') {
-          await showPopup('Only JPEG images are allowed.');
+          await showPopup("Only JPEG images are allowed.");
           return;
         }
 
         cashStatus.textContent = 'Uploading receipt... Please wait.';
+
         try {
           const tenantEmail = await getCurrentUserEmail();
-          const receiptUrl = await uploadToCloudinary(file);
-          const amount = 2500; // You can adjust this if dynamic
           const invoiceId = "INV-" + Date.now();
+          const receiptUrl = await uploadToCloudinary(file);
 
-          // Save payment record with receipt URL
           await addDoc(collection(db, "payments"), {
             tenantEmail,
             invoiceId,
-            amount,
+            amount: computedAmount,
             method: "Cash on Hand",
             status: "Pending Verification",
             receiptUrl,
@@ -743,9 +741,10 @@
           });
 
           cashStatus.style.color = 'green';
-          cashStatus.textContent = "Receipt uploaded successfully! Waiting for admin verification.";
+          cashStatus.textContent = "Receipt uploaded! Waiting for admin confirmation.";
           cashReceiptInput.value = "";
-          loadPaymentHistory();
+          await loadPaymentHistory();
+
         } catch (error) {
           console.error(error);
           cashStatus.style.color = 'red';
@@ -753,9 +752,12 @@
         }
       });
 
-      loadInvoice();
-      loadPaymentHistory();
-      setupPayPal();
+      (async () => {
+        await loadInvoice();
+        await loadPaymentHistory();
+        await setupPayPal();
+      })();
+
       break;
   
     case 'feedback':
