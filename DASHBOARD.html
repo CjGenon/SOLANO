@@ -44,7 +44,7 @@
   </script>
    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, doc, getDoc, limit } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-storage.js";
 
@@ -110,820 +110,835 @@
                   <div id="calendar"></div>
                 </div>
                 <div class="inbox-card">
-                  <h3>Choose one blah</h3>
-                  <p>tab shortcuts.</p>
-                  <select id="dashboardShortcutDropdown" style="padding:8px 12px; border-radius:6px; border:1px solid #ccc; cursor:pointer; width: 100%; max-width: 280px; margin-top: 10px;">
-                    <option value="" selected disabled>Go to...</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="billing">Billing and Payments</option>
-                    <option value="feedback">Feedback</option>
-                  </select>
+                  <h3>My Unit List</h3>
+                  <p>Unit(s) you own:</p>
+                  <div id="myUnitList" style="padding:10px; border-radius:6px; border:1px solid #ccc; max-width:280px; margin-top:10px;">
+                    Loading units...
+                  </div>
                 </div>
               </div>
             </div>
           `;
 
-          // Attach event listener for dropdown navigation
-          document.getElementById('dashboardShortcutDropdown').addEventListener('change', function() {
-            const selected = this.value;
-            if (selected) {
-              loadContent(null, selected);
-            }
-          });
+        // Populate "My Unit List" from Firestore
+        async function populateMyUnits() {
+          try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
 
-          // Slider logic
-          (function () {
-            let slideIndexLocal = 1;
-            const slides = () => document.querySelectorAll(".welcome-slider .slide");
-
-            function showSlidesLocal(n) {
-              const nodeList = slides();
-              if (!nodeList || nodeList.length === 0) return;
-              if (n > nodeList.length) slideIndexLocal = 1;
-              if (n < 1) slideIndexLocal = nodeList.length;
-              nodeList.forEach(s => (s.style.display = "none"));
-              nodeList[slideIndexLocal - 1].style.display = "block";
+            const tenantDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
+            if (!tenantDocSnap.exists()) {
+              document.getElementById('myUnitList').textContent = 'No units found.';
+              return;
             }
 
-            showSlidesLocal(slideIndexLocal);
-
-            document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
-            document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
-
-            const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
-            const sliderEl = document.querySelector(".welcome-slider");
-            if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
-          })();
-
-          // Calendar generation logic
-          (function () {
-            function generateCalendar() {
-              const calendar = document.getElementById("calendar");
-              if (!calendar) return;
-
-              const today = new Date();
-              const monthName = today.toLocaleString("default", { month: "long" });
-              const year = today.getFullYear();
-              const firstDay = new Date(year, today.getMonth(), 1);
-              const lastDay = new Date(year, today.getMonth() + 1, 0);
-              const startDay = firstDay.getDay();
-
-              let html = "<table class='cal-table'>";
-              html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
-              html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
-
-              for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
-
-              for (let day = 1; day <= lastDay.getDate(); day++) {
-                const isToday = day === today.getDate();
-                html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
-                if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
-              }
-              html += "</tr></table>";
-              calendar.innerHTML = html;
+            const units = tenantDocSnap.data().unitNumbers || [];
+            if (units.length === 0) {
+              document.getElementById('myUnitList').textContent = 'No units assigned.';
+              return;
             }
-            generateCalendar();
-          })();
-          break;
 
-        case 'maintenance':
-          mainContent.innerHTML = `
-            <div class="maintenance-tab" style="display:flex; gap:20px; flex-wrap: wrap;">
-              <!-- Form Section -->
-              <div style="flex:2; min-width:300px;">
-                <h2>Maintenance Request</h2>
-                <p><strong>What issue do you want to report?</strong></p>
+            document.getElementById('myUnitList').innerHTML = units
+              .map(u => `<div style="padding:5px 0;">${u}</div>`)
+              .join('');
+          } catch (e) {
+            console.error('Error fetching units:', e);
+            document.getElementById('myUnitList').textContent = 'Failed to load units.';
+          }
+        }
+        populateMyUnits();
 
-                <label for="problem">Select issue type:</label>
-                <select id="problem" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                  <option value="">-- Select --</option>
-                  <option value="plumbing">Plumbing</option>
-                  <option value="electrical">Electrical</option>
-                  <option value="aircon">Air Conditioning</option>
-                  <option value="unit">Unit Maintenance</option>
-                  <option value="other">Others</option>
-                </select>
+        // Slider logic
+        (function () {
+          let slideIndexLocal = 1;
+          const slides = () => document.querySelectorAll(".welcome-slider .slide");
 
-                <div id="otherSection" style="display:none; margin-top:15px;">
-                  <label for="otherComment">Describe the problem:</label>
-                  <textarea id="otherComment" rows="4" placeholder="Write details here..." style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;"></textarea>
+          function showSlidesLocal(n) {
+            const nodeList = slides();
+            if (!nodeList || nodeList.length === 0) return;
+            if (n > nodeList.length) slideIndexLocal = 1;
+            if (n < 1) slideIndexLocal = nodeList.length;
+            nodeList.forEach(s => (s.style.display = "none"));
+            nodeList[slideIndexLocal - 1].style.display = "block";
+          }
 
-                  <label for="imageUpload" style="margin-top:10px; display:block;">Upload at least 2 JPEG images:</label>
-                  <input type="file" id="imageUpload" accept="image/jpeg" multiple style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                </div>
+          showSlidesLocal(slideIndexLocal);
+          document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
+          document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
+
+          const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
+          const sliderEl = document.querySelector(".welcome-slider");
+          if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
+        })();
+
+        // Calendar generation logic
+        (function () {
+          function generateCalendar() {
+            const calendar = document.getElementById("calendar");
+            if (!calendar) return;
+
+            const today = new Date();
+            const monthName = today.toLocaleString("default", { month: "long" });
+            const year = today.getFullYear();
+            const firstDay = new Date(year, today.getMonth(), 1);
+            const lastDay = new Date(year, today.getMonth() + 1, 0);
+            const startDay = firstDay.getDay();
+
+            let html = "<table class='cal-table'>";
+            html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+            html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+            for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+              const isToday = day === today.getDate();
+              html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+              if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
+            }
+            html += "</tr></table>";
+            calendar.innerHTML = html;
+          }
+          generateCalendar();
+        })();
+        break;
+
+      case 'maintenance':
+        mainContent.innerHTML = `
+          <div class="maintenance-tab" style="display:flex; gap:20px; flex-wrap: wrap;">
+            <!-- LEFT SIDE – FORM -->
+            <div style="flex:2; min-width:300px;">
+              <h2>Maintenance Request</h2>
+              <p><strong>What issue do you want to report?</strong></p>
+
+              <!-- UNIT SELECTION -->
+              <label for="unitSelect">Select Unit:</label>
+              <select id="unitSelect" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;" required>
+                <option value="">-- Select Unit --</option>
+              </select>
+
+              <!-- ISSUE SELECTION -->
+              <label for="problem" style="margin-top:10px;">Select issue type:</label>
+              <select id="problem" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                <option value="">-- Select Issue --</option>
+                <optgroup label="Handyman Works">
+                  <option>Drilling Works</option>
+                  <option>Peephole Installation</option>
+                  <option>PVC Door</option>
+                  <option>Vinyl Tiles</option>
+                  <option>Main Door Lockset</option>
+                  <option>Window Grills</option>
+                  <option>Door Repainting</option>
+                </optgroup>
+                <optgroup label="Electrical Works">
+                  <option>Chandelier Installation</option>
+                  <option>Circuit Breaker</option>
+                  <option>Outlet / Switch</option>
+                  <option>Electrical Troubleshooting</option>
+                  <option>Smoke Detector Installation</option>
+                </optgroup>
+                <optgroup label="Plumbing Works">
+                  <option>Bidet Installation</option>
+                  <option>Grease Trap Cleaning</option>
+                  <option>Shower Valve</option>
+                  <option>Angle Valve</option>
+                  <option>P-Trap Replacement</option>
+                </optgroup>
+                <optgroup label="Aircon / ACU Services">
+                  <option>ACU Installation</option>
+                  <option>ACU Re-Opening / Adjustment</option>
+                  <option>ACU Drain Pipe</option>
+                  <option>ACU Cleaning (Split Type)</option>
+                </optgroup>
+                <optgroup label="Other Services">
+                  <option>Wall Mounted TV Installation</option>
+                  <option>Sprinkler Installation</option>
+                  <option>Wall Opening</option>
+                  <option>Painting / Repainting</option>
+                </optgroup>
+                <optgroup label="Cleaning">
+                  <option>Exhaust Fan Cleaning</option>
+                  <option>Electrical Panel Cleaning</option>
+                  <option>Sweeping / General Cleaning</option>
+                </optgroup>
+                <option value="other">Other (Not Listed)</option>
+              </select>
+
+              <!-- OTHER DESCRIPTION -->
+              <div id="otherSection" style="display:none; margin-top:15px;">
+                <label for="otherComment">Describe the problem:</label>
+                <textarea id="otherComment" rows="4" placeholder="Write details here..." style="width:98%; padding:8px; border-radius:6px; border:1px solid #ccc;"></textarea>
+              </div>
+
+              <!-- DETAILS SECTION (HIDDEN UNTIL PROBLEM SELECTED) -->
+              <div id="detailsSection" style="display:none;">
+                <label for="imageUpload" style="margin-top:10px; display:block;">Upload 1 or 2 JPEG images (optional, except required for "Others"):</label>
+                <input type="file" id="imageUpload" accept="image/jpeg" multiple style="width:19%; padding:8px; border-radius:6px; border:1px solid #ccc;">
 
                 <label for="preferredDate" style="margin-top:15px; display:block;">Select preferred maintenance visit date and time:</label>
-                <input type="datetime-local" id="preferredDate" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;" min="" />
-
-                <button id="submitReport" style="margin-top:15px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">Submit</button>
-
-                <p id="statusMessage" style="margin-top:10px; color:green;"></p>
-
-                <div style="margin-top:20px; font-size:14px; padding:10px; border-radius:6px; color:#fff;">
-                  <strong>Tenant Responsibilities:</strong>
-                  <ul>
-                    <li>Be available during the scheduled visit.</li>
-                    <li>Provide access to the unit.</li>
-                    <li>Report any urgent issues immediately.</li>
-                  </ul>
-
-                  <strong>Expected Response Times:</strong>
-                  <ul>
-                    <li>Non-urgent issues: within 3 business days.</li>
-                    <li>Urgent issues (e.g. plumbing leaks): within 24 hours.</li>
-                  </ul>
-                </div>
+                <input type="datetime-local" id="preferredDate" style="width:15%; padding:8px; border-radius:6px; border:1px solid #ccc;" min="" />
               </div>
 
-              <!-- History / Status Section -->
-              <div style="flex:1; min-width:300px; border-left:1px solid #ccc; padding-left:15px; max-height:600px; overflow-y:auto; font-size:14px; color:#ffff; border-radius:6px;">
-                <h3>Request History</h3>
-                <div id="historyList" style="max-height:520px; overflow-y:auto;">
-                  <p>Loading your requests...</p>
-                </div>
-              </div>
-            </div>
-          `;
+              <button id="submitReport" style="margin-top:15px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">Submit</button>
+              <p id="statusMessage" style="margin-top:10px; color:green;"></p>
 
-          // Helper function to format date with AM/PM
-          function formatDateTimeAMPM(date) {
-            if (!(date instanceof Date)) {
-              if (date && date.toDate) {
-                date = date.toDate();
-              } else {
-                return "Invalid date";
-              }
-            }
-            let hours = date.getHours();
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12; // the hour '0' should be '12'
-            const day = date.getDate().toString().padStart(2, '0');
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const year = date.getFullYear();
-            return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-          }
+              <!-- SERVICE RATES -->
+              <div style="margin-top:30px; padding:15px; border-radius:8px; max-height:450px; overflow-y:auto; box-shadow:0 0 8px rgba(0,0,0,0.15); font-size:14px;">
+                <h3 style="margin-bottom:10px;">📌 Solano Hills Job Service Rates</h3>
 
-          // Set minimum datetime-local to current date/time (rounded up to next 15 min)
-          const preferredDateInput = document.getElementById('preferredDate');
-          const now = new Date();
-          now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15);
-          preferredDateInput.min = now.toISOString().slice(0, 16);
+                <style>
+                  .rate-table { width:100%; border-collapse:collapse; margin-bottom:25px; }
+                  .rate-table th, .rate-table td { border:1px solid #ccc; padding:6px; text-align:left; }
+                  .rate-header { background:#8d6c39; color:white; }
+                </style>
 
-          // Existing variables
-          const problemSelect = document.getElementById('problem');
-          const otherSection = document.getElementById('otherSection');
-          const submitButton = document.getElementById('submitReport');
-          const statusMessage = document.getElementById('statusMessage');
-          const imageUpload = document.getElementById('imageUpload');
-          const otherComment = document.getElementById('otherComment');
-          const historyList = document.getElementById('historyList');
+                <!-- HANDYMAN -->
+                <h4>Handyman Works</h4>
+                <table class="rate-table">
+                  <tr class="rate-header"><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+                  <tr><td>Drilling Works</td><td>Php 120.00/set</td><td>Main Door Locket</td><td>Php 250.00</td></tr>
+                  <tr><td>Peephole (provision)</td><td>Php 120.00/set</td><td>Window Grills</td><td>Php 400.00</td></tr>
+                  <tr><td>Peephole (w/ provision)</td><td>Php 350.00/set</td><td>Main Door</td><td>Php 560.00</td></tr>
+                  <tr><td>Vinyl Tiles</td><td>Php 200.00/sqmtr</td><td>Plastering of ACU sides</td><td>Php 560.00</td></tr>
+                  <tr><td>PVC door</td><td>Php 560.00/set</td><td>Repainting of window grills</td><td>Php 560.00</td></tr>
+                  <tr><td>Rangehood w/ provision</td><td>Php 650.00/set</td><td>Repainting of ACU sides</td><td>Php 400.00</td></tr>
+                </table>
 
-          problemSelect.addEventListener('change', () => {
-            otherSection.style.display = (problemSelect.value === 'other') ? 'block' : 'none';
-          });
+                <!-- ELECTRICAL -->
+                <h4>Electrical Works</h4>
+                <table class="rate-table">
+                  <tr class="rate-header"><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+                  <tr><td>Chandelier</td><td>Php 1,800.00/pc</td><td>Bulb / Receptacle</td><td>Php 120.00</td></tr>
+                  <tr><td>Circuit Breaker</td><td>Php 760.00/pc</td><td>Troubleshooting</td><td>Php 250.00/item</td></tr>
+                </table>
 
-          async function loadHistory() {
-            historyList.innerHTML = '<p>Loading your requests...</p>';
-            try {
-              const tenantEmail = await getCurrentUserEmail();
-              const q = collection(db, "maintenanceRequests");
-              const querySnapshot = await getDocs(query(q, where("tenantEmail", "==", tenantEmail), orderBy("timestamp", "desc"), limit(10)));
+                <!-- PLUMBING -->
+                <h4>Plumbing Works</h4>
+                <table class="rate-table">
+                  <tr class="rate-header"><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+                  <tr><td>Bidet</td><td>Php 395.00/set</td><td>Faucet / Shower Head</td><td>Php 250.00</td></tr>
+                  <tr><td>Grease Trap</td><td>Php 1,500.00</td><td>Shower Valve</td><td>Php 900.00</td></tr>
+                </table>
 
-              if (querySnapshot.empty) {
-                historyList.innerHTML = '<p>No maintenance requests found.</p>';
-                return;
-              }
+                <!-- OTHER SERVICES -->
+                <h4>Other Services</h4>
+                <table class="rate-table">
+                  <tr class="rate-header"><th>Service</th><th>Rate</th></tr>
+                  <tr><td>Wall Mounted TV (below 40in)</td><td>Php 460.00/set</td></tr>
+                  <tr><td>ACU Installation</td><td>Php 1,500.00</td></tr>
+                  <tr><td>Smoke Detector Cleaning</td><td>Php 120.00</td></tr>
+                </table>
 
-              historyList.innerHTML = '';
-
-              for (const doc of querySnapshot.docs) {
-                const data = doc.data();
-                const docId = doc.id;
-                const timeStamp = data.timestamp ? formatDateTimeAMPM(data.timestamp) : "N/A";
-                const status = data.status || "Pending";
-                const responseTime = data.responseTime ? formatDateTimeAMPM(data.responseTime) : "Not yet responded";
-                const maintenanceName = data.maintenanceName || "Not assigned";
-                const scheduledVisit = data.preferredVisitTime ? formatDateTimeAMPM(data.preferredVisitTime) : "Not scheduled";
-
-                const item = document.createElement('div');
-                item.style.borderBottom = "1px solid #ddd";
-                item.style.padding = "10px 0";
-
-                const responsesContainer = document.createElement('div');
-                responsesContainer.style.marginTop = '8px';
-                responsesContainer.style.paddingLeft = '10px';
-                responsesContainer.style.borderLeft = '3px solid #8d6c39';
-                responsesContainer.innerHTML = '<em>Loading admin responses...</em>';
-
-                item.innerHTML = `
-                  <strong>Issue:</strong> ${data.problem}<br/>
-                  <strong>Description:</strong> ${data.comment || "-"}<br/>
-                  <strong>Scheduled Visit:</strong> ${scheduledVisit}<br/>
-                  <strong>Status:</strong> ${status}<br/>
-                  <strong>Maintenance Personnel:</strong> ${maintenanceName}<br/>
-                  <strong>Response Time:</strong> ${responseTime}<br/>
-                  <strong>Submitted:</strong> ${timeStamp}<br/>
-                `;
-
-                // Create an images container for uploaded photos
-                const imagesContainer = document.createElement('div');
-                imagesContainer.style.marginTop = '10px';
-                imagesContainer.style.display = 'flex';
-                imagesContainer.style.flexWrap = 'wrap';
-                imagesContainer.style.gap = '8px';
-
-                if (data.imageUrls && data.imageUrls.length > 0) {
-                  const imagesLabel = document.createElement('strong');
-                  imagesLabel.textContent = 'Uploaded Images:';
-                  imagesContainer.appendChild(imagesLabel);
-                  imagesContainer.appendChild(document.createElement('br'));
-
-                  data.imageUrls.forEach(url => {
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.style.width = '100px';
-                    img.style.height = 'auto';
-                    img.style.borderRadius = '6px';
-                    img.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
-                    img.style.objectFit = 'cover';
-                    imagesContainer.appendChild(img);
-                  });
-                } else {
-                  imagesContainer.innerHTML = '<em>No images uploaded.</em>';
-                }
-
-                item.appendChild(imagesContainer);
-                item.appendChild(responsesContainer);
-                historyList.appendChild(item);
-
-                const responsesQuery = query(
-                  collection(db, "maintenanceRequests", docId, "responses"),
-                  orderBy("timestamp", "desc")
-                );
-
-                const responsesSnapshot = await getDocs(responsesQuery);
-
-                if (responsesSnapshot.empty) {
-                  responsesContainer.innerHTML = '<em>No admin responses yet.</em>';
-                } else {
-                  responsesContainer.innerHTML = '';
-                  responsesSnapshot.forEach(respDoc => {
-                    const respData = respDoc.data();
-                    const time = respData.timestamp ? formatDateTimeAMPM(respData.timestamp) : "No timestamp";
-                    const respDiv = document.createElement('div');
-                    respDiv.style.marginBottom = '6px';
-                    respDiv.innerHTML = `
-                      <strong>${respData.adminEmail}</strong> (${time}):<br/>
-                      <span>${respData.message}</span>
-                    `;
-                    responsesContainer.appendChild(respDiv);
-                  });
-                }
-              }
-            } catch (error) {
-              historyList.innerHTML = `<p style="color:red;">Failed to load history: ${error.message}</p>`;
-            }
-          }
-
-          loadHistory();
-
-          async function uploadToCloudinary(file) {
-            const url = `https://api.cloudinary.com/v1_1/dfklsyjch/upload`;
-            const preset = 'tenant_uploads';
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', preset);
-
-            const response = await fetch(url, {
-              method: 'POST',
-              body: formData
-            });
-
-            if (!response.ok) {
-              throw new Error('Cloudinary upload failed');
-            }
-
-            const data = await response.json();
-            return data.secure_url; // the uploaded image URL
-          }
-
-
-          submitButton.addEventListener('click', async () => {
-            const problem = problemSelect.value;
-            const comment = otherComment.value.trim();
-            const preferredVisitTime = preferredDateInput.value;
-
-            if (!problem) {
-              await showPopup("Please Please select an issue type");
-              return;
-            }
-
-            if (!preferredVisitTime) {
-              await showPopup('Please select your preferred maintenance visit date and time.');
-              return;
-            }
-
-            const selectedDate = new Date(preferredVisitTime);
-            const nowDate = new Date();
-            if (selectedDate < nowDate) {
-              await showPopup('Preferred visit time cannot be in the past.');
-              return;
-            }
-
-            if (problem === 'other') {
-              if (!comment) {
-                await showPopup('Please describe the problem in "Others".');
-                return;
-              }
-              if (!imageUpload.files || imageUpload.files.length < 2) {
-                await showPopup('Please upload at least 2 JPEG images.');
-                return;
-              }
-
-              for (const file of imageUpload.files) {
-                if (file.type !== "image/jpeg") {
-                  await showPopup('Only JPEG images are allowed.');
-                  return;
-                }
-              }
-            }
-
-            statusMessage.style.color = "gray";
-            statusMessage.textContent = "Submitting your request...";
-
-            try {
-              const tenantEmail = await getCurrentUserEmail();
-
-              let imageUrls = [];
-              if (problem === 'other' && imageUpload.files.length > 0) {
-                for (const file of imageUpload.files) {
-                  const url = await uploadToCloudinary(file);
-                  imageUrls.push(url);
-                }
-              }
-              await addDoc(collection(db, "maintenanceRequests"), {
-                tenantEmail,
-                problem,
-                comment: problem === 'other' ? comment : '',
-                imageUrls: imageUrls,
-                status: "Pending",
-                responseTime: "Not yet responded",
-                preferredVisitTime: new Date(preferredVisitTime),
-                timestamp: serverTimestamp()
-              });
-
-              statusMessage.style.color = "green";
-              statusMessage.textContent = "Maintenance request submitted successfully!";
-
-              problemSelect.value = "";
-              otherComment.value = "";
-              imageUpload.value = "";
-              otherSection.style.display = "none";
-              preferredDateInput.value = "";
-
-              loadHistory();
-
-            } catch (error) {
-              console.error("Error submitting request: ", error);
-              statusMessage.style.color = "red";
-              statusMessage.textContent = "Failed to submit request: " + error.message;
-            }
-          });
-          break;
-
-       case 'billing':
-          mainContent.innerHTML = `
-            <div class="payment-tab">
-              <h2>Billing and Payments</h2>
-              <p>Pay your monthly dues securely or send a cash receipt.</p>
-
-              <div id="invoiceSection" style="margin-top:20px;">
-                <h3>Your Current Invoice</h3>
-                <p id="invoiceDetails">Loading your invoice...</p>
-              </div>
-
-              <hr style="margin:25px 0;">
-
-              <h3>Choose Payment Method</h3>
-              <label>
-                <input type="radio" name="paymentMethod" value="paypal" checked /> PayPal
-              </label>
-              <label style="margin-left: 20px;">
-                <input type="radio" name="paymentMethod" value="cash" /> Cash on Hand
-              </label>
-
-              <div id="paypal-section" style="margin-top:20px;">
-                <div id="paypal-button-container"></div>
-              </div>
-
-              <div id="cash-section" style="margin-top:20px; display:none;">
-                <p>Please upload a photo of your cash payment receipt (JPEG only):</p>
-                <input type="file" id="cashReceipt" accept="image/jpeg" />
-                <button id="submitCashPayment" style="margin-top:10px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer;">Submit Cash Receipt</button>
-                <p id="cashStatus" style="margin-top:10px; color:green;"></p>
-              </div>
-
-              <hr style="margin:25px 0;">
-
-              <h3>Payment History</h3>
-              <div id="paymentHistory" style="max-height:300px; overflow-y:auto; font-size:14px;">
-                <p>Loading your payment history...</p>
+                <!-- CLEANING -->
+                <h4>Cleaning Services</h4>
+                <table class="rate-table">
+                  <tr class="rate-header"><th>Service</th><th>Rate</th></tr>
+                  <tr><td>ACU Cleaning Split Type</td><td>Php 1500.00/pc</td></tr>
+                  <tr><td>Exhaust Fan Cleaning</td><td>Php 600.00/unit</td></tr>
+                </table>
               </div>
             </div>
-          `;
 
-          const invoiceDetails = document.getElementById('invoiceDetails');
-          const paymentHistory = document.getElementById('paymentHistory');
-          const paypalContainer = document.getElementById('paypal-button-container');
-          const cashSection = document.getElementById('cash-section');
-          const paypalSection = document.getElementById('paypal-section');
-          const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
-          const cashReceiptInput = document.getElementById('cashReceipt');
-          const submitCashPaymentBtn = document.getElementById('submitCashPayment');
-          const cashStatus = document.getElementById('cashStatus');
+            <!-- RIGHT SIDE – REQUEST HISTORY -->
+            <div style="flex:1; min-width:300px; border-left:1px solid #ccc; padding-left:15px; max-height:600px; overflow-y:auto; font-size:14px; color:#ffff; border-radius:6px;">
+              <h3>Request History</h3>
+              <div id="historyList" style="max-height:520px; overflow-y:auto;">
+                <p>Loading your requests...</p>
+              </div>
+            </div>
+          </div>
+        `;
+        // Helper functions & constants
+        function formatDateTimeAMPM(date) {
+          if (!(date instanceof Date)) date = date?.toDate ? date.toDate() : null;
+          if (!date) return "Invalid date";
+          let hours = date.getHours();
+          const minutes = date.getMinutes().toString().padStart(2, '0');
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12 || 12;
+          const day = date.getDate().toString().padStart(2,'0');
+          const month = (date.getMonth()+1).toString().padStart(2,'0');
+          const year = date.getFullYear();
+          return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+        }
 
-          // Switch payment method UI
-          paymentMethodRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-              if (radio.value === 'cash' && radio.checked) {
-                cashSection.style.display = 'block';
-                paypalSection.style.display = 'none';
-              } else if (radio.value === 'paypal' && radio.checked) {
-                cashSection.style.display = 'none';
-                paypalSection.style.display = 'block';
+        const preferredDateInput = document.getElementById('preferredDate');
+        const now = new Date(); now.setMinutes(Math.ceil(now.getMinutes()/15)*15);
+        preferredDateInput.min = now.toISOString().slice(0,16);
+
+        const problemSelect = document.getElementById('problem');
+        const otherSection = document.getElementById('otherSection');
+        const detailsSection = document.getElementById('detailsSection');
+        const submitButton = document.getElementById('submitReport');
+        const statusMessage = document.getElementById('statusMessage');
+        const imageUpload = document.getElementById('imageUpload');
+        const otherComment = document.getElementById('otherComment');
+        const historyList = document.getElementById('historyList');
+        const unitSelect = document.getElementById('unitSelect');
+
+        // SHOW/HIDE "Other"
+        problemSelect.addEventListener('change', () => {
+          otherSection.style.display = (problemSelect.value === 'other') ? 'block' : 'none';
+          detailsSection.style.display = problemSelect.value !== "" ? 'block' : 'none';
+          if (problemSelect.value === "") { preferredDateInput.value = ""; imageUpload.value = ""; }
+        });
+
+        // Populate units for tenant
+        async function populateUnits() {
+          try {
+            const currentUser = auth.currentUser;
+            const tenantDocSnap = await getDoc(doc(db,'users',currentUser.uid));
+            if (tenantDocSnap.exists()) {
+              const units = tenantDocSnap.data().unitNumbers || [];
+              unitSelect.innerHTML = `<option value="">-- Select Unit --</option>` + units.map(u=>`<option value="${u}">${u}</option>`).join('');
+            }
+          } catch(e){ console.error("Error fetching tenant units:", e); }
+        }
+        populateUnits();
+
+        // Load maintenance request history
+        async function loadHistory() {
+          historyList.innerHTML = '<p>Loading your requests...</p>';
+          try {
+            const tenantEmail = await getCurrentUserEmail();
+            const q = collection(db,"maintenanceRequests");
+            const querySnapshot = await getDocs(query(q, where("tenantEmail","==",tenantEmail), orderBy("timestamp","desc"), limit(10)));
+            if (querySnapshot.empty) { historyList.innerHTML='<p>No maintenance requests found.</p>'; return; }
+
+            historyList.innerHTML = '';
+            for (const doc of querySnapshot.docs) {
+              const data = doc.data(), docId = doc.id;
+              const timeStamp = data.timestamp ? formatDateTimeAMPM(data.timestamp) : "N/A";
+              const status = data.status || "Pending";
+              const responseTime = data.responseTime ? formatDateTimeAMPM(data.responseTime) : "Not yet responded";
+              const maintenanceName = data.maintenanceName || "Not assigned";
+              const scheduledVisit = data.preferredVisitTime ? formatDateTimeAMPM(data.preferredVisitTime) : "Not scheduled";
+
+              const item = document.createElement('div');
+              item.style.borderBottom="1px solid #ddd"; item.style.padding="10px 0";
+
+              const responsesContainer = document.createElement('div');
+              responsesContainer.style.marginTop='8px'; responsesContainer.style.paddingLeft='10px'; responsesContainer.style.borderLeft='3px solid #8d6c39';
+              responsesContainer.innerHTML='<em>Loading admin responses...</em>';
+
+              item.innerHTML=`
+                <strong>Issue:</strong> ${data.problem}<br/>
+                <strong>Unit Number:</strong> ${data.unitNumber || 'N/A'}<br/>
+                <strong>Description:</strong> ${data.comment || "-"}<br/>
+                <strong>Scheduled Visit:</strong> ${scheduledVisit}<br/>
+                <strong>Status:</strong> ${status}<br/>
+                <strong>Maintenance Personnel:</strong> ${maintenanceName}<br/>
+                <strong>Response Time:</strong> ${responseTime}<br/>
+                <strong>Submitted:</strong> ${timeStamp}<br/>
+              `;
+
+              const imagesContainer = document.createElement('div');
+              imagesContainer.style.marginTop='10px'; imagesContainer.style.display='flex'; imagesContainer.style.flexWrap='wrap'; imagesContainer.style.gap='8px';
+              if(data.imageUrls && data.imageUrls.length>0){
+                const imagesLabel = document.createElement('strong'); imagesLabel.textContent='Uploaded Images:'; imagesContainer.appendChild(imagesLabel); imagesContainer.appendChild(document.createElement('br'));
+                data.imageUrls.forEach(url=>{ const img=document.createElement('img'); img.src=url; img.style.width='100px'; img.style.height='auto'; img.style.borderRadius='6px'; img.style.boxShadow='0 0 5px rgba(0,0,0,0.3)'; img.style.objectFit='cover'; imagesContainer.appendChild(img); });
+              } else { imagesContainer.innerHTML='<em>No images uploaded.</em>'; }
+
+              item.appendChild(imagesContainer); item.appendChild(responsesContainer); historyList.appendChild(item);
+
+              const responsesQuery = query(collection(db,"maintenanceRequests",docId,"responses"), orderBy("timestamp","desc"));
+              const responsesSnapshot = await getDocs(responsesQuery);
+              if(responsesSnapshot.empty){ responsesContainer.innerHTML='<em>No admin responses yet.</em>'; }
+              else{
+                responsesContainer.innerHTML='';
+                responsesSnapshot.forEach(respDoc=>{
+                  const respData = respDoc.data();
+                  const time = respData.timestamp ? formatDateTimeAMPM(respData.timestamp) : "No timestamp";
+                  const respDiv = document.createElement('div'); respDiv.style.marginBottom='6px';
+                  respDiv.innerHTML=`<strong>${respData.adminEmail}</strong> (${time}):<br/><span>${respData.message}</span>`;
+                  responsesContainer.appendChild(respDiv);
+                });
               }
+            }
+          } catch(error){ historyList.innerHTML=`<p style="color:red;">Failed to load history: ${error.message}</p>`; }
+        }
+        loadHistory();
+
+        async function uploadToCloudinary(file){
+          const url='https://api.cloudinary.com/v1_1/dfklsyjch/upload';
+          const preset='tenant_uploads';
+          const formData=new FormData(); formData.append('file',file); formData.append('upload_preset',preset);
+          const response=await fetch(url,{method:'POST',body:formData});
+          if(!response.ok) throw new Error('Cloudinary upload failed');
+          return (await response.json()).secure_url;
+        }
+
+        submitButton.addEventListener('click', async ()=>{
+          const unitNumber = unitSelect.value;
+          const problem = problemSelect.value;
+          const comment = otherComment.value.trim();
+          const preferredVisitTime = preferredDateInput.value;
+          const files = imageUpload.files;
+
+          if(!unitNumber){ await showPopup("Please select the unit for maintenance."); return; }
+          if(!problem){ await showPopup("Please select an issue type"); return; }
+          if(!preferredVisitTime){ await showPopup("Please select your preferred maintenance visit date and time."); return; }
+          if(new Date(preferredVisitTime)<new Date()){ await showPopup("Preferred visit time cannot be in the past."); return; }
+          if(problem==='other'){ if(!comment){ await showPopup('Please describe the problem in "Others".'); return; } if(!files || files.length<2){ await showPopup('Please upload at least 2 JPEG images for "Others".'); return; } }
+          if(files && files.length>0){ for(const file of files){ if(file.type!=="image/jpeg"){ await showPopup('Only JPEG images are allowed.'); return; } } }
+
+          statusMessage.style.color="gray"; statusMessage.textContent="Submitting your request...";
+
+          try{
+            const tenantEmail = await getCurrentUserEmail();
+            let imageUrls = [];
+            if(files && files.length>0){ for(const file of files){ imageUrls.push(await uploadToCloudinary(file)); } }
+
+            await addDoc(collection(db,"maintenanceRequests"),{
+              tenantEmail,
+              unitNumber,
+              problem,
+              comment: problem==='other'? comment : '',
+              imageUrls,
+              status:"Pending",
+              responseTime:"Not yet responded",
+              preferredVisitTime:new Date(preferredVisitTime),
+              timestamp: serverTimestamp()
             });
-          });
 
-          async function loadInvoice() {
-            const tenantEmail = await getCurrentUserEmail();
-            invoiceDetails.innerHTML = `
-              <strong>Tenant:</strong> ${tenantEmail}<br>
-              <strong>Amount Due:</strong> ₱2,500<br>
-              <strong>Due Date:</strong> 25th of this month
-            `;
-          }
+            statusMessage.style.color="green"; statusMessage.textContent="Maintenance request submitted successfully!";
+            problemSelect.value=""; otherComment.value=""; imageUpload.value=""; otherSection.style.display="none"; detailsSection.style.display="none"; preferredDateInput.value=""; unitSelect.value="";
+            loadHistory();
+          } catch(error){ statusMessage.style.color="red"; statusMessage.textContent="Failed to submit request: "+error.message; console.error(error); }
+        });
 
-          async function loadPaymentHistory() {
-            paymentHistory.innerHTML = '<p>Loading your payment history...</p>';
-            const tenantEmail = await getCurrentUserEmail();
+      break;
 
-            try {
-              const q = query(
-                collection(db, "payments"),
-                where("tenantEmail", "==", tenantEmail),
-                orderBy("timestamp", "desc")
-              );
-              const snapshot = await getDocs(q);
-
-              if (snapshot.empty) {
-                paymentHistory.innerHTML = '<p>No payment records found.</p>';
-                return;
-              }
-
-              paymentHistory.innerHTML = '';
-              snapshot.forEach(doc => {
-                const d = doc.data();
-                const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
-                const div = document.createElement('div');
-                div.style.borderBottom = "1px solid #ccc";
-                div.style.padding = "8px 0";
-
-                // Show receipt image if cash payment
-                let receiptHtml = '';
-                if (d.method === "Cash on Hand" && d.receiptUrl) {
-                  receiptHtml = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" alt="Cash Receipt" style="max-width:150px; border-radius:6px; margin-top:5px;" />`;
-                }
-
-                div.innerHTML = `
-                  <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
-                  <strong>Amount:</strong> ₱${d.amount}<br>
-                  <strong>Status:</strong> ${d.status}<br>
-                  <strong>Date:</strong> ${time}<br>
-                  <strong>Payment Method:</strong> ${d.method}
-                  ${receiptHtml}
-                `;
-                paymentHistory.appendChild(div);
-              });
-            } catch (error) {
-              paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
-            }
-          }
-
-          // PayPal setup with EmailJS integration
-          async function setupPayPal() {
-            const tenantEmail = await getCurrentUserEmail();
-            const amount = 10;
-            const invoiceId = "INV-" + Date.now();
-
-            paypal.Buttons({
-              style: {
-                color: "gold",
-                shape: "rect",
-                label: "pay",
-                height: 40
-              },
-
-              createOrder: function(data, actions) {
-                return actions.order.create({
-                  purchase_units: [{
-                    reference_id: invoiceId,
-                    description: "Monthly Dues Payment - Solano Hills",
-                    amount: {
-                      currency_code: "PHP",
-                      value: amount.toString()
-                    }
-                  }]
-                });
-              },
-
-              onApprove: async function(data, actions) {
-                const order = await actions.order.capture();
-                console.log("Payment successful:", order);
-
-                // Save payment record in Firestore
-                await addDoc(collection(db, "payments"), {
-                  tenantEmail,
-                  invoiceId,
-                  amount,
-                  method: "PayPal",
-                  status: "Paid",
-                  transactionId: order.id,
-                  payerName: order.payer.name.given_name + " " + order.payer.name.surname,
-                  payerEmail: order.payer.email_address,
-                  timestamp: serverTimestamp()
-                });
-
-                // Prepare EmailJS params
-                const emailParams = {
-                  to_email: order.payer.email_address,
-                  payer_name: order.payer.name.given_name + " " + order.payer.name.surname,
-                  invoice_id: invoiceId,
-                  amount: amount,
-                  transaction_id: order.id,
-                  payment_method: "PayPal",
-                  payment_date: new Date().toLocaleString()
-                };
-
-                // Send email via EmailJS
-                emailjs.send('service_u1n5d9t', 'template_qu1s2lh', emailParams)
-                  .then(() => {
-                    console.log('Email sent successfully!');
-                    showPopup("✅ Payment successful! Receipt emailed to " + order.payer.email_address);
-                    loadPaymentHistory();
-                  })
-                  .catch((error) => {
-                    console.error('EmailJS error:', error);
-                    showPopup("✅ Payment successful! But failed to send email receipt.");
-                    loadPaymentHistory();
-                  });
-              },
-
-              onCancel: async function() {
-                await showPopup("⚠️ Payment cancelled by user.");
-              },
-
-              onError: async function(err) {
-                console.error("PayPal error:", err);
-                await showPopup("❌ Payment failed. Please try again later.");
-              }
-            }).render(paypalContainer);
-          }
-
-          // Handle cash payment submission
-          submitCashPaymentBtn.addEventListener('click', async () => {
-            cashStatus.style.color = 'gray';
-            cashStatus.textContent = '';
-
-            const file = cashReceiptInput.files[0];
-            if (!file) {
-              await showPopup('Please select a JPEG receipt image to upload.');
-              return;
-            }
-
-            if (file.type !== 'image/jpeg') {
-              await showPopup('Only JPEG images are allowed.');
-              return;
-            }
-
-            cashStatus.textContent = 'Uploading receipt... Please wait.';
-            try {
-              const tenantEmail = await getCurrentUserEmail();
-              const receiptUrl = await uploadToCloudinary(file);
-              const amount = 10; // You can adjust this if dynamic
-              const invoiceId = "INV-" + Date.now();
-
-              // Save payment record with receipt URL
-              await addDoc(collection(db, "payments"), {
-                tenantEmail,
-                invoiceId,
-                amount,
-                method: "Cash on Hand",
-                status: "Pending Verification",
-                receiptUrl,
-                timestamp: serverTimestamp()
-              });
-
-              cashStatus.style.color = 'green';
-              cashStatus.textContent = "Receipt uploaded successfully! Waiting for admin verification.";
-              cashReceiptInput.value = "";
-              loadPaymentHistory();
-            } catch (error) {
-              console.error(error);
-              cashStatus.style.color = 'red';
-              cashStatus.textContent = "Failed to upload receipt: " + error.message;
-            }
-          });
-
-          loadInvoice();
-          loadPaymentHistory();
-          setupPayPal();
-          break;
-  
-        case 'feedback':
-          loadFeedbackForm();
-          break;
-
-        default:
-          mainContent.innerHTML = '<p>Section not found.</p>';
-      }
-    }
-
-    function loadFeedbackForm() {
+      
+    case 'billing':
       mainContent.innerHTML = `
-        <div class="feedback-container">
-          <h2>Send Feedback to Admin</h2>
-          <form id="feedbackForm">
-            <label for="question1">1. How satisfied are you with our services?</label>
-            <div id="rating" style="font-size: 2rem; margin: 8px 0; user-select:none;">
-              <span data-value="1" style="cursor:pointer;">⭐️</span>
-              <span data-value="2" style="cursor:pointer;">⭐️</span>
-              <span data-value="3" style="cursor:pointer;">⭐️</span>
-              <span data-value="4" style="cursor:pointer;">⭐️</span>
-              <span data-value="5" style="cursor:pointer;">⭐️</span>
-            </div>
-            <input type="hidden" id="ratingValue" name="ratingValue" required />
+        <div class="payment-tab">
+          <h2>Billing and Payments</h2>
+          <p>Pay your monthly dues securely or send a cash receipt.</p>
 
-            <label for="question2" style="margin-top:15px;">2. What do you like about our community?</label>
-            <textarea id="question2" name="question2" placeholder="Your answer..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
+          <div id="invoiceSection" style="margin-top:20px;">
+            <h3>Your Current Invoice</h3>
+            <p id="invoiceDetails">Loading your invoice...</p>
+          </div>
 
-            <label for="question3" style="margin-top:15px;">3. What can we improve?</label>
-            <textarea id="question3" name="question3" placeholder="Your suggestions..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
+          <hr style="margin:25px 0;">
 
-            <button id="sendFeedbackBtn" type="submit" style="margin-top:15px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">Send Feedback</button>
-          </form>
-          <p id="statusMessage" style="margin-top:10px; color:green;"></p>
+          <h3>Choose Payment Method</h3>
+          <label>
+            <input type="radio" name="paymentMethod" value="paypal" checked /> PayPal
+          </label>
+          <label style="margin-left: 20px;">
+            <input type="radio" name="paymentMethod" value="cash" /> Cash on Hand
+          </label>
+
+          <div id="paypal-section" style="margin-top:20px;">
+            <div id="paypal-button-container"></div>
+          </div>
+
+          <div id="cash-section" style="margin-top:20px; display:none;">
+            <p>Please upload a photo of your cash payment receipt (JPEG only):</p>
+            <input type="file" id="cashReceipt" accept="image/jpeg" />
+            <button id="submitCashPayment" style="margin-top:10px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer;">Submit Cash Receipt</button>
+            <p id="cashStatus" style="margin-top:10px; color:green;"></p>
+          </div>
+
+          <hr style="margin:25px 0;">
+
+          <h3>Payment History</h3>
+          <div id="paymentHistory" style="max-height:300px; overflow-y:auto; font-size:14px;">
+            <p>Loading your payment history...</p>
+          </div>
         </div>
       `;
 
-      const form = document.getElementById("feedbackForm");
-      const ratingStars = document.querySelectorAll("#rating span");
-      const ratingValueInput = document.getElementById("ratingValue");
-      const statusMessage = document.getElementById("statusMessage");
-      const sendBtn = document.getElementById("sendFeedbackBtn");
+      const invoiceDetails = document.getElementById('invoiceDetails');
+      const paymentHistory = document.getElementById('paymentHistory');
+      const paypalContainer = document.getElementById('paypal-button-container');
+      const cashSection = document.getElementById('cash-section');
+      const paypalSection = document.getElementById('paypal-section');
+      const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+      const cashReceiptInput = document.getElementById('cashReceipt');
+      const submitCashPaymentBtn = document.getElementById('submitCashPayment');
+      const cashStatus = document.getElementById('cashStatus');
 
-      // Rating star click handler
-      ratingStars.forEach(star => {
-        star.style.opacity = "0.3";
-        star.addEventListener("click", () => {
-          const val = star.getAttribute("data-value");
-          ratingValueInput.value = val;
-          // Highlight selected stars
-          ratingStars.forEach(s => {
-            s.style.opacity = s.getAttribute("data-value") <= val ? "1" : "0.3";
-          });
+      // Switch payment method UI
+      paymentMethodRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.value === 'cash' && radio.checked) {
+            cashSection.style.display = 'block';
+            paypalSection.style.display = 'none';
+          } else if (radio.value === 'paypal' && radio.checked) {
+            cashSection.style.display = 'none';
+            paypalSection.style.display = 'block';
+          }
         });
       });
 
-      // Disable send button during cooldown
-      function disableButtonForCooldown() {
-        sendBtn.disabled = true;
-        sendBtn.style.background = "gray";
-        sendBtn.style.cursor = "not-allowed";
+      async function loadInvoice() {
+        const tenantEmail = await getCurrentUserEmail();
+        invoiceDetails.innerHTML = `
+          <strong>Tenant:</strong> ${tenantEmail}<br>
+          <strong>Amount Due:</strong> ₱2,500<br>
+          <strong>Due Date:</strong> 25th of this month
+        `;
       }
 
-      function enableButton() {
-        sendBtn.disabled = false;
-        sendBtn.style.background = "#8d6c39";
-        sendBtn.style.cursor = "pointer";
-      }
+      async function loadPaymentHistory() {
+        paymentHistory.innerHTML = '<p>Loading your payment history...</p>';
+        const tenantEmail = await getCurrentUserEmail();
 
-      const cooldownEnd = localStorage.getItem("feedbackCooldownEnd");
-      if (cooldownEnd && Date.now() < cooldownEnd) {
-        disableButtonForCooldown();
-        const remaining = Math.round((cooldownEnd - Date.now()) / 1000);
-        statusMessage.textContent = `You can send feedback again in ${remaining}s`;
+        try {
+          const q = query(
+            collection(db, "payments"),
+            where("tenantEmail", "==", tenantEmail),
+            orderBy("timestamp", "desc")
+          );
+          const snapshot = await getDocs(q);
 
-        const countdown = setInterval(() => {
-          const timeLeft = Math.round((cooldownEnd - Date.now()) / 1000);
-          if (timeLeft <= 0) {
-            clearInterval(countdown);
-            enableButton();
-            statusMessage.textContent = "";
-            localStorage.removeItem("feedbackCooldownEnd");
-          } else {
-            statusMessage.textContent = `You can send feedback again in ${timeLeft}s`;
+          if (snapshot.empty) {
+            paymentHistory.innerHTML = '<p>No payment records found.</p>';
+            return;
           }
-        }, 1000);
-      }
 
-      onAuthStateChanged(auth, (user) => {
-        if (!user) {
-          statusMessage.textContent = "Please log in to send feedback.";
-          form.style.display = "none";
-        } else {
-          form.addEventListener("submit", async (e) => {
-            e.preventDefault();
+          paymentHistory.innerHTML = '';
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
+            const div = document.createElement('div');
+            div.style.borderBottom = "1px solid #ccc";
+            div.style.padding = "8px 0";
 
-            // Validate rating selected
-            if (!ratingValueInput.value) {
-              await showPopup("Please select a rating.");
-              return;
+            // Show receipt image if cash payment
+            let receiptHtml = '';
+            if (d.method === "Cash on Hand" && d.receiptUrl) {
+              receiptHtml = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" alt="Cash Receipt" style="max-width:150px; border-radius:6px; margin-top:5px;" />`;
             }
 
-            disableButtonForCooldown();
-            statusMessage.style.color = "gray";
-            statusMessage.textContent = "Sending feedback...";
-
-            try {
-              await addDoc(collection(db, "feedback"), {
-                tenantEmail: user.email,
-                rating: Number(ratingValueInput.value),
-                question2: form.question2.value.trim(),
-                question3: form.question3.value.trim(),
-                timestamp: serverTimestamp()
-              });
-
-              statusMessage.style.color = "green";
-              statusMessage.textContent = "Feedback sent successfully!";
-
-              // Reset form
-              form.reset();
-              ratingStars.forEach(s => s.style.opacity = "1");
-              ratingValueInput.value = "";
-
-              const cooldownTime = Date.now() + 60000; // 1 minute cooldown
-              localStorage.setItem("feedbackCooldownEnd", cooldownTime);
-
-              let countdown = setInterval(() => {
-                const timeLeft = Math.round((cooldownTime - Date.now()) / 1000);
-                if (timeLeft <= 0) {
-                  clearInterval(countdown);
-                  enableButton();
-                  statusMessage.textContent = "";
-                  localStorage.removeItem("feedbackCooldownEnd");
-                } else {
-                  statusMessage.textContent = `You can send feedback again in ${timeLeft}s`;
-                }
-              }, 1000);
-
-            } catch (error) {
-              console.error("Error sending feedback: ", error);
-              statusMessage.style.color = "red";
-              statusMessage.textContent = "Error sending feedback.";
-              enableButton();
-            }
+            div.innerHTML = `
+              <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
+              <strong>Amount:</strong> ₱${d.amount}<br>
+              <strong>Status:</strong> ${d.status}<br>
+              <strong>Date:</strong> ${time}<br>
+              <strong>Payment Method:</strong> ${d.method}
+              ${receiptHtml}
+            `;
+            paymentHistory.appendChild(div);
           });
+        } catch (error) {
+          paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
         }
-      });
-    }
+      }
 
+      // PayPal setup with EmailJS integration
+      async function setupPayPal() {
+        const tenantEmail = await getCurrentUserEmail();
+        const amount = 2500;
+        const invoiceId = "INV-" + Date.now();
 
-    function updateGreeting() {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          // use tenantGreeting (the dashboard default) or tenantGreeting1 (older id) if present
-          const greeting = document.getElementById('tenantGreeting') || document.getElementById('tenantGreeting1');
-          const nameToShow = user.displayName || user.email;
-          if (greeting) {
-            greeting.textContent = `Welcome back, ${nameToShow}`;
+        paypal.Buttons({
+          style: {
+            color: "gold",
+            shape: "rect",
+            label: "pay",
+            height: 40
+          },
+
+          createOrder: function(data, actions) {
+            return actions.order.create({
+              purchase_units: [{
+                reference_id: invoiceId,
+                description: "Monthly Dues Payment - Solano Hills",
+                amount: {
+                  currency_code: "PHP",
+                  value: amount.toString()
+                }
+              }]
+            });
+          },
+
+          onApprove: async function(data, actions) {
+            const order = await actions.order.capture();
+            console.log("Payment successful:", order);
+
+            // Save payment record in Firestore
+            await addDoc(collection(db, "payments"), {
+              tenantEmail,
+              invoiceId,
+              amount,
+              method: "PayPal",
+              status: "Paid",
+              transactionId: order.id,
+              payerName: order.payer.name.given_name + " " + order.payer.name.surname,
+              payerEmail: order.payer.email_address,
+              timestamp: serverTimestamp()
+            });
+
+            // Prepare EmailJS params
+            const emailParams = {
+              to_email: order.payer.email_address,
+              payer_name: order.payer.name.given_name + " " + order.payer.name.surname,
+              invoice_id: invoiceId,
+              amount: amount,
+              transaction_id: order.id,
+              payment_method: "PayPal",
+              payment_date: new Date().toLocaleString()
+            };
+
+            // Send email via EmailJS
+            emailjs.send('service_u1n5d9t', 'template_qu1s2lh', emailParams)
+              .then(() => {
+                console.log('Email sent successfully!');
+                showPopup("✅ Payment successful! Receipt emailed to " + order.payer.email_address);
+                loadPaymentHistory();
+              })
+              .catch((error) => {
+                console.error('EmailJS error:', error);
+                showPopup("✅ Payment successful! But failed to send email receipt.");
+                loadPaymentHistory();
+              });
+          },
+
+          onCancel: async function() {
+            await showPopup("⚠️ Payment cancelled by user.");
+          },
+
+          onError: async function(err) {
+            console.error("PayPal error:", err);
+            await showPopup("❌ Payment failed. Please try again later.");
           }
+        }).render(paypalContainer);
+      }
+
+      // Handle cash payment submission
+      submitCashPaymentBtn.addEventListener('click', async () => {
+        cashStatus.style.color = 'gray';
+        cashStatus.textContent = '';
+
+        const file = cashReceiptInput.files[0];
+        if (!file) {
+          await showPopup('Please select a JPEG receipt image to upload.');
+          return;
+        }
+
+        if (file.type !== 'image/jpeg') {
+          await showPopup('Only JPEG images are allowed.');
+          return;
+        }
+
+        cashStatus.textContent = 'Uploading receipt... Please wait.';
+        try {
+          const tenantEmail = await getCurrentUserEmail();
+          const receiptUrl = await uploadToCloudinary(file);
+          const amount = 2500; // You can adjust this if dynamic
+          const invoiceId = "INV-" + Date.now();
+
+          // Save payment record with receipt URL
+          await addDoc(collection(db, "payments"), {
+            tenantEmail,
+            invoiceId,
+            amount,
+            method: "Cash on Hand",
+            status: "Pending Verification",
+            receiptUrl,
+            timestamp: serverTimestamp()
+          });
+
+          cashStatus.style.color = 'green';
+          cashStatus.textContent = "Receipt uploaded successfully! Waiting for admin verification.";
+          cashReceiptInput.value = "";
+          loadPaymentHistory();
+        } catch (error) {
+          console.error(error);
+          cashStatus.style.color = 'red';
+          cashStatus.textContent = "Failed to upload receipt: " + error.message;
         }
       });
-    }
 
-    function showWelcomeBack() {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          const greeting = document.getElementById('tenantGreeting');
-          const nameToShow = user.displayName || user.email;
-          if (greeting) {
-            greeting.textContent = `Welcome back, ${nameToShow}`;
-          }
-        }
+      loadInvoice();
+      loadPaymentHistory();
+      setupPayPal();
+      break;
+  
+    case 'feedback':
+      loadFeedbackForm();
+      break;
+
+    default:
+      mainContent.innerHTML = '<p>Section not found.</p>';
+  }
+}
+
+  function loadFeedbackForm() {
+    mainContent.innerHTML = `
+      <div class="feedback-container">
+        <h2>Send Feedback to Admin</h2>
+        <form id="feedbackForm">
+          <label for="question1">1. How satisfied are you with our services?</label>
+          <div id="rating" style="font-size: 2rem; margin: 8px 0; user-select:none;">
+            <span data-value="1" style="cursor:pointer;">⭐️</span>
+            <span data-value="2" style="cursor:pointer;">⭐️</span>
+            <span data-value="3" style="cursor:pointer;">⭐️</span>
+            <span data-value="4" style="cursor:pointer;">⭐️</span>
+            <span data-value="5" style="cursor:pointer;">⭐️</span>
+          </div>
+          <input type="hidden" id="ratingValue" name="ratingValue" required />
+
+          <label for="question2" style="margin-top:15px;">2. What do you like about our community?</label>
+          <textarea id="question2" name="question2" placeholder="Your answer..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
+
+          <label for="question3" style="margin-top:15px;">3. What can we improve?</label>
+          <textarea id="question3" name="question3" placeholder="Your suggestions..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
+
+          <button id="sendFeedbackBtn" type="submit" style="margin-top:15px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">Send Feedback</button>
+        </form>
+        <p id="statusMessage" style="margin-top:10px; color:green;"></p>
+      </div>
+    `;
+
+    const form = document.getElementById("feedbackForm");
+    const ratingStars = document.querySelectorAll("#rating span");
+    const ratingValueInput = document.getElementById("ratingValue");
+    const statusMessage = document.getElementById("statusMessage");
+    const sendBtn = document.getElementById("sendFeedbackBtn");
+
+    // Rating star click handler
+    ratingStars.forEach(star => {
+      star.style.opacity = "0.3";
+      star.addEventListener("click", () => {
+        const val = star.getAttribute("data-value");
+        ratingValueInput.value = val;
+        // Highlight selected stars
+        ratingStars.forEach(s => {
+          s.style.opacity = s.getAttribute("data-value") <= val ? "1" : "0.3";
+        });
       });
-    }
-
-    showWelcomeBack();
-
-    // load dashboard by default after DOM is ready
-    window.addEventListener('DOMContentLoaded', () => {
-      // call without an event so loadContent will mark the dashboard link active automatically
-      loadContent(null, 'dashboard');
     });
+
+    // Disable send button during cooldown
+    function disableButtonForCooldown() {
+      sendBtn.disabled = true;
+      sendBtn.style.background = "gray";
+      sendBtn.style.cursor = "not-allowed";
+    }
+
+    function enableButton() {
+      sendBtn.disabled = false;
+      sendBtn.style.background = "#8d6c39";
+      sendBtn.style.cursor = "pointer";
+    }
+
+    const cooldownEnd = localStorage.getItem("feedbackCooldownEnd");
+    if (cooldownEnd && Date.now() < cooldownEnd) {
+      disableButtonForCooldown();
+      const remaining = Math.round((cooldownEnd - Date.now()) / 1000);
+      statusMessage.textContent = `You can send feedback again in ${remaining}s`;
+
+      const countdown = setInterval(() => {
+        const timeLeft = Math.round((cooldownEnd - Date.now()) / 1000);
+        if (timeLeft <= 0) {
+          clearInterval(countdown);
+          enableButton();
+          statusMessage.textContent = "";
+          localStorage.removeItem("feedbackCooldownEnd");
+        } else {
+          statusMessage.textContent = `You can send feedback again in ${timeLeft}s`;
+        }
+      }, 1000);
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        statusMessage.textContent = "Please log in to send feedback.";
+        form.style.display = "none";
+      } else {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          // Validate rating selected
+          if (!ratingValueInput.value) {
+            await showPopup("Please select a rating.");
+            return;
+          }
+
+          disableButtonForCooldown();
+          statusMessage.style.color = "gray";
+          statusMessage.textContent = "Sending feedback...";
+
+          try {
+            await addDoc(collection(db, "feedback"), {
+              tenantEmail: user.email,
+              rating: Number(ratingValueInput.value),
+              question2: form.question2.value.trim(),
+              question3: form.question3.value.trim(),
+              timestamp: serverTimestamp()
+            });
+
+            statusMessage.style.color = "green";
+            statusMessage.textContent = "Feedback sent successfully!";
+
+            // Reset form
+            form.reset();
+            ratingStars.forEach(s => s.style.opacity = "1");
+            ratingValueInput.value = "";
+
+            const cooldownTime = Date.now() + 60000; // 1 minute cooldown
+            localStorage.setItem("feedbackCooldownEnd", cooldownTime);
+
+            let countdown = setInterval(() => {
+              const timeLeft = Math.round((cooldownTime - Date.now()) / 1000);
+              if (timeLeft <= 0) {
+                clearInterval(countdown);
+                enableButton();
+                statusMessage.textContent = "";
+                localStorage.removeItem("feedbackCooldownEnd");
+              } else {
+                statusMessage.textContent = `You can send feedback again in ${timeLeft}s`;
+              }
+            }, 1000);
+
+          } catch (error) {
+            console.error("Error sending feedback: ", error);
+            statusMessage.style.color = "red";
+            statusMessage.textContent = "Error sending feedback.";
+            enableButton();
+          }
+        });
+      }
+    });
+  }
+
+
+  function updateGreeting() {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // use tenantGreeting (the dashboard default) or tenantGreeting1 (older id) if present
+        const greeting = document.getElementById('tenantGreeting') || document.getElementById('tenantGreeting1');
+        const nameToShow = user.displayName || user.email;
+        if (greeting) {
+          greeting.textContent = `Welcome back, ${nameToShow}`;
+        }
+      }
+    });
+  }
+
+  function showWelcomeBack() {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const greeting = document.getElementById('tenantGreeting');
+        const nameToShow = user.displayName || user.email;
+        if (greeting) {
+          greeting.textContent = `Welcome back, ${nameToShow}`;
+        }
+      }
+    });
+  }
+
+  showWelcomeBack();
+
+  // load dashboard by default after DOM is ready
+  window.addEventListener('DOMContentLoaded', () => {
+    // call without an event so loadContent will mark the dashboard link active automatically
+    loadContent(null, 'dashboard');
+  });
 
   window.showPopup = function(message) {
     document.getElementById("popupMessage").innerHTML = message;
@@ -946,5 +961,3 @@
 </div>
 </body>
 </html>
-
-
