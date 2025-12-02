@@ -4,7 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Our Team – Solano Hills</title>
-  <link rel="stylesheet" href="CONTACT.css" />
+  <link rel="stylesheet" href="contact.css" />
+  <style>
+    /* Hide message textarea by default */
+    #message {
+      display: none;
+    }
+  </style>
 </head>
 <body>
   <!-- ======================== NAVBAR ======================== -->
@@ -79,7 +85,7 @@
   <!-- POPUP -->
   <div id="popup" class="popup hidden">
     <div class="popup-content">
-      <p>Form Submitted.<br>Wait for our team to reach out to you within 24 hours.</p>
+      <p>Form Submitted.<br>Wait for our PM to reach you out please standby.</p>
       <button onclick="closePopup()">Close</button>
     </div>
   </div>
@@ -137,17 +143,16 @@
     const inquiryTopic = document.getElementById('inquiry_topic');
     const paymentSection = document.getElementById('paymentSection');
     const paymentSelect = document.getElementById('payment_info');
-    const chatToggleBtn = document.getElementById('chatToggleBtn');
-    const chatBox = document.getElementById('chatBox');
-    const chatCloseBtn = document.getElementById('chatCloseBtn');
-    const messagesContainerChat = document.getElementById('messagesContainerChat');
-    const chatMessageInput = document.getElementById('chatMessageInput');
-    const sendChatBtn = document.getElementById('sendChatBtn');
+    const messageTextarea = document.getElementById('message');
 
-    // Hide payment section initially
+    // Hide payment section and textarea initially
     function hideAllConditionalSections() {
       paymentSection.classList.add('hidden');
       paymentSelect.removeAttribute('required');
+
+      messageTextarea.style.display = 'none';
+      messageTextarea.required = false;
+      messageTextarea.value = '';
     }
     hideAllConditionalSections();
 
@@ -158,6 +163,27 @@
       if (val === 'payment') {
         paymentSection.classList.remove('hidden');
         paymentSelect.setAttribute('required', 'required');
+      }
+
+      if (val === 'other') {
+        messageTextarea.style.display = 'block';
+        messageTextarea.required = true;
+      }
+    });
+
+    paymentSelect.addEventListener('change', () => {
+      const val = paymentSelect.value;
+
+      if (val === 'other_payment') {
+        messageTextarea.style.display = 'block';
+        messageTextarea.required = true;
+      } else {
+        // Only hide if inquiry topic isn't 'other'
+        if (inquiryTopic.value !== 'other') {
+          messageTextarea.style.display = 'none';
+          messageTextarea.required = false;
+          messageTextarea.value = '';
+        }
       }
     });
 
@@ -181,7 +207,7 @@
       const Employement_Type = document.getElementById('Employement_Type').value;
       const inquiry_topic = document.getElementById('inquiry_topic').value;
       const payment_info = paymentSelect.value || null;
-      const message = document.getElementById('message').value.trim();
+      const message = messageTextarea.value.trim();
 
       const anonId = getAnonymousId();
 
@@ -215,11 +241,6 @@
         e.target.reset();
         hideAllConditionalSections();
 
-        // Refresh chat messages if chat is open
-        if(chatBox.classList.contains('open')) {
-          startListeningToMessages(); // restart listener to get latest data
-        }
-
       } catch (error) {
         document.getElementById("status").innerText = "Error: " + error.message;
       }
@@ -229,20 +250,15 @@
       document.getElementById("popup").classList.add("hidden");
     };
 
-    // Function to clear message box
-    function clearMessageBox() {
-      // Use a small timeout to ensure it happens after Firebase operations
-      setTimeout(() => {
-        const input = document.getElementById('chatMessageInput');
-        if (input) {
-          input.value = '';
-          input.innerText = '';
-          input.innerHTML = '';
-          // Force DOM update
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }, 100);
-    }
+    // The chat and real-time message listener code (unchanged from your original script) below:
+
+    // UI elements for chat
+    const chatToggleBtn = document.getElementById('chatToggleBtn');
+    const chatBox = document.getElementById('chatBox');
+    const chatCloseBtn = document.getElementById('chatCloseBtn');
+    const messagesContainerChat = document.getElementById('messagesContainerChat');
+    const chatMessageInput = document.getElementById('chatMessageInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
 
     // Real-time listener unsubscribe handle
     let unsubscribeMessages = null;
@@ -353,7 +369,7 @@
       }
 
       sendChatBtn.disabled = true;
-      
+
       // Clear the input immediately
       chatMessageInput.value = '';
       chatMessageInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -372,8 +388,6 @@
         // Try to update inquiry status (may fail if no permission)
         await updateDoc(doc(db, "inquiries", currentInquiryId), { status: "user replied" });
 
-        // Messages update automatically via real-time listener, no manual reload needed
-
       } catch (error) {
         console.error("Error sending message:", error.message);
         sendChatBtn.disabled = false;
@@ -383,4 +397,3 @@
   </script>
 </body>
 </html>
-
