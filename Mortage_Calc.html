@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Personalized Mortgage Calculator | PHINMA Properties</title>
+    <link rel="stylesheet" href="Mortage_Calc.css" />
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="logo">PHINMA PROPERTIES</div>
+            <h1>Your Personalized Mortgage Calculator</h1>
+            <p>Calculate your investment in Solano Hillside Residences</p>
+        </div>
+        
+        <div class="content">
+            <div class="intro">
+                <h2>Hello! 👋</h2>
+                <p>Thank you for your interest in Solano Hillside Residences. Use this interactive calculator to see how affordable your dream home can be. Adjust the sliders to customize based on your budget.</p>
+            </div>
+            
+            <div class="calculator-section">
+                <h3 class="section-title">Customize Your Investment</h3>
+                
+                <div class="input-group">
+                    <div class="input-row">
+                        <div class="input-label">Property Price</div>
+                        <div class="input-controls">
+                            <span style="font-weight: 600; color: #cfa85b;">₱</span>
+                            <input type="number" id="propertyPrice" class="number-input" value="3868900" min="1000000" max="10000000" step="10000">
+                            <input type="range" id="propertyPriceSlider" class="slider" min="1000000" max="10000000" step="10000" value="3868900">
+                        </div>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="input-label">Your Downpayment</div>
+                        <div class="input-controls">
+                            <input type="number" id="downpaymentPercent" class="number-input" value="10" min="0" max="100" step="1">
+                            <span style="font-weight: 600; color: #cfa85b;">%</span>
+                            <input type="range" id="downpaymentSlider" class="slider" min="0" max="100" step="1" value="10">
+                        </div>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="input-label">Loan Term</div>
+                        <div class="input-controls">
+                            <input type="number" id="loanTerm" class="number-input" value="25" min="5" max="30" step="1">
+                            <span style="font-weight: 600; color: #cfa85b;">years</span>
+                            <input type="range" id="loanTermSlider" class="slider" min="5" max="30" step="1" value="25">
+                        </div>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="input-label">Interest Rate</div>
+                        <div class="input-controls">
+                            <input type="number" id="interestRate" class="number-input" value="6.5" min="0" max="15" step="0.1">
+                            <span style="font-weight: 600; color: #cfa85b;">%</span>
+                            <input type="range" id="interestRateSlider" class="slider" min="0" max="15" step="0.1" value="6.5">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="result-section">
+                <h3 class="section-title">Your Payment Plan</h3>
+                
+                <div class="monthly-payment">
+                    <div class="payment-label">Estimated Monthly Payment</div>
+                    <div class="payment-amount" id="monthlyPayment">₱ 14,003</div>
+                    <div style="color: #666; font-size: 14px; margin-top: 5px;">for <span id="termYears">25</span> years</div>
+                </div>
+                
+                <div class="breakdown">
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Property Price</div>
+                        <div class="breakdown-value" id="breakdownPrice">₱ 3,868,900</div>
+                    </div>
+                    
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Your Downpayment</div>
+                        <div class="breakdown-value" id="breakdownDownpayment">₱ 386,890</div>
+                    </div>
+                    
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Loan Amount</div>
+                        <div class="breakdown-value" id="breakdownLoan">₱ 3,482,010</div>
+                    </div>
+                    
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Total Interest</div>
+                        <div class="breakdown-value" id="breakdownInterest">₱ 1,718,083</div>
+                    </div>
+                </div>
+                
+                <div class="schedule-preview">
+                    <div class="schedule-title">First Year Payment Preview</div>
+                    <table class="schedule-table" id="previewTable">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Principal</th>
+                                <th>Interest</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewBody">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="cta-section">
+                <h3 class="cta-title">Get Your Full Amortization Schedule</h3>
+                <p style="margin-bottom: 20px; color: #666;">Enter your email to receive a detailed payment schedule and connect with our property specialist.</p>
+                
+                <div class="email-form">
+                    <input type="email" id="clientEmail" class="email-input" placeholder="Your email address" required>
+                    <input type="text" id="clientName" class="email-input" placeholder="Your name (optional)">
+                    <input type="tel" id="clientPhone" class="email-input" placeholder="Your phone number (optional)">
+                    <button class="btn" id="sendScheduleBtn">Send My Schedule & Contact Specialist</button>
+                </div>
+                
+                <p style="margin-top: 15px; font-size: 14px; color: #666;">Please contact us again through our contact website or visit our site to discuss your options.</p>
+            </div>
+            
+            <div class="disclaimer">
+                <strong>Important Notes:</strong> This calculator provides estimates only. Final loan amounts, interest rates, and terms are subject to bank/HDMF approval based on your financial documents. Prices and promotions are subject to change without prior notice. All computations exclude processing fees, insurance, and other charges.
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>PHINMA PRISM PROPERTY DEVELOPMENT CORPORATION</p>
+            <p>Solano Hillside Residences | Finca Tower</p>
+            <div class="contact-info">
+                <p>📍 Solano, Paranaque | 📞 (078) 123-4567 | ✉️ info@phinmaproperties.com</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+        // Add your Firebase config here
+        apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+        authDomain: "solanodb-a4f65.firebaseapp.com",
+        projectId: "solanodb-a4f65",
+        storageBucket: "solanodb-a4f65.firebasestorage.app",
+        messagingSenderId: "98081894649",
+        appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // DOM Elements
+        const propertyPriceInput = document.getElementById('propertyPrice');
+        const propertyPriceSlider = document.getElementById('propertyPriceSlider');
+        const downpaymentPercentInput = document.getElementById('downpaymentPercent');
+        const downpaymentSlider = document.getElementById('downpaymentSlider');
+        const loanTermInput = document.getElementById('loanTerm');
+        const loanTermSlider = document.getElementById('loanTermSlider');
+        const interestRateInput = document.getElementById('interestRate');
+        const interestRateSlider = document.getElementById('interestRateSlider');
+        
+        // Result elements
+        const monthlyPaymentEl = document.getElementById('monthlyPayment');
+        const termYearsEl = document.getElementById('termYears');
+        const breakdownPriceEl = document.getElementById('breakdownPrice');
+        const breakdownDownpaymentEl = document.getElementById('breakdownDownpayment');
+        const breakdownLoanEl = document.getElementById('breakdownLoan');
+        const breakdownInterestEl = document.getElementById('breakdownInterest');
+        const previewBody = document.getElementById('previewBody');
+        
+        // Email button
+        const sendScheduleBtn = document.getElementById('sendScheduleBtn');
+        
+        // Format currency in PHP
+        function formatCurrency(amount) {
+            return '₱ ' + amount.toLocaleString('en-PH', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        }
+        
+        // Format currency with decimals
+        function formatCurrencyDecimal(amount) {
+            return '₱ ' + amount.toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        // Sync inputs and sliders
+        function setupInputSync(input, slider) {
+            input.addEventListener('input', function() {
+                slider.value = this.value;
+                calculate();
+            });
+            
+            slider.addEventListener('input', function() {
+                input.value = this.value;
+                calculate();
+            });
+        }
+        
+        // Setup all input syncs
+        setupInputSync(propertyPriceInput, propertyPriceSlider);
+        setupInputSync(downpaymentPercentInput, downpaymentSlider);
+        setupInputSync(loanTermInput, loanTermSlider);
+        setupInputSync(interestRateInput, interestRateSlider);
+        
+        // Calculate everything
+        function calculate() {
+            // Get input values
+            const propertyPrice = parseFloat(propertyPriceInput.value);
+            const downpaymentPercent = parseFloat(downpaymentPercentInput.value) / 100;
+            const loanTermYears = parseFloat(loanTermInput.value);
+            const interestRate = parseFloat(interestRateInput.value) / 100;
+            
+            // Update term years display
+            termYearsEl.textContent = loanTermYears;
+            
+            // Calculate downpayment and loan amount
+            const downpaymentAmount = propertyPrice * downpaymentPercent;
+            const loanAmount = propertyPrice - downpaymentAmount;
+            
+            // Calculate monthly payment
+            const monthlyInterestRate = interestRate / 12;
+            const loanTermMonths = loanTermYears * 12;
+            
+            let monthlyPayment;
+            if (interestRate === 0) {
+                monthlyPayment = loanAmount / loanTermMonths;
+            } else {
+                monthlyPayment = loanAmount * 
+                    (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) / 
+                    (Math.pow(1 + monthlyInterestRate, loanTermMonths) - 1);
+            }
+            
+            // Calculate total interest
+            const totalPayment = monthlyPayment * loanTermMonths;
+            const totalInterest = totalPayment - loanAmount;
+            
+            // Update displays
+            monthlyPaymentEl.textContent = formatCurrencyDecimal(monthlyPayment);
+            breakdownPriceEl.textContent = formatCurrency(propertyPrice);
+            breakdownDownpaymentEl.textContent = formatCurrency(downpaymentAmount);
+            breakdownLoanEl.textContent = formatCurrency(loanAmount);
+            breakdownInterestEl.textContent = formatCurrency(totalInterest);
+            
+            // Generate first year preview
+            generateFirstYearPreview(loanAmount, monthlyInterestRate, monthlyPayment);
+        }
+        
+        // Generate first year amortization preview
+        function generateFirstYearPreview(loanAmount, monthlyInterestRate, monthlyPayment) {
+            previewBody.innerHTML = '';
+            let balance = loanAmount;
+            
+            for (let month = 1; month <= 12; month++) {
+                const interestPayment = balance * monthlyInterestRate;
+                const principalPayment = monthlyPayment - interestPayment;
+                balance -= principalPayment;
+                
+                const row = document.createElement('tr');
+                
+                // Highlight first and last month
+                if (month === 1 || month === 12) {
+                    row.style.backgroundColor = '#f0f7ff';
+                }
+                
+                row.innerHTML = `
+                    <td>Month ${month}</td>
+                    <td>${formatCurrencyDecimal(principalPayment)}</td>
+                    <td>${formatCurrencyDecimal(interestPayment)}</td>
+                    <td>${formatCurrency(balance)}</td>
+                `;
+                
+                previewBody.appendChild(row);
+            }
+        }
+        
+        // Save mortgage calculation to Firebase
+        async function saveMortgageCalculation(data) {
+            try {
+                const docRef = await db.collection('mortgage_calculations').add({
+                    ...data,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    source: 'mortgage_calculator',
+                    status: 'new'
+                });
+                console.log('Mortgage calculation saved with ID:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('Error saving mortgage calculation:', error);
+                throw error;
+            }
+        }
+        
+        // Check if email already exists in inquiries
+        async function checkExistingInquiry(email) {
+            try {
+                const querySnapshot = await db.collection('inquiries')
+                    .where('email', '==', email)
+                    .limit(1)
+                    .get();
+                
+                return !querySnapshot.empty;
+            } catch (error) {
+                console.error('Error checking existing inquiry:', error);
+                return false;
+            }
+        }
+        
+        // Handle email submission
+        sendScheduleBtn.addEventListener('click', async function() {
+            const clientEmail = document.getElementById('clientEmail').value.trim();
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+            
+            // Simple email validation
+            if (!clientEmail || !clientEmail.includes('@') || !clientEmail.includes('.')) {
+                alert('Please enter a valid email address.');
+                return;
+            }
+            
+            // Get current calculation values
+            const propertyPrice = parseFloat(propertyPriceInput.value);
+            const downpaymentPercent = parseFloat(downpaymentPercentInput.value);
+            const loanTermYears = parseFloat(loanTermInput.value);
+            const interestRate = parseFloat(interestRateInput.value);
+            
+            // Calculate values
+            const downpaymentAmount = propertyPrice * (downpaymentPercent / 100);
+            const loanAmount = propertyPrice - downpaymentAmount;
+            const monthlyInterestRate = interestRate / 100 / 12;
+            const loanTermMonths = loanTermYears * 12;
+            
+            let monthlyPayment;
+            if (interestRate === 0) {
+                monthlyPayment = loanAmount / loanTermMonths;
+            } else {
+                monthlyPayment = loanAmount * 
+                    (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) / 
+                    (Math.pow(1 + monthlyInterestRate, loanTermMonths) - 1);
+            }
+            
+            const totalInterest = monthlyPayment * loanTermMonths - loanAmount;
+            const totalPayment = monthlyPayment * loanTermMonths;
+            
+            // Check if email already exists
+            const isExistingClient = await checkExistingInquiry(clientEmail);
+            
+            // Prepare data for Firebase
+            const calculationData = {
+                email: clientEmail,
+                name: clientName || 'Not provided',
+                phone: clientPhone || 'Not provided',
+                propertyPrice: propertyPrice,
+                downpaymentPercent: downpaymentPercent,
+                downpaymentAmount: downpaymentAmount,
+                loanAmount: loanAmount,
+                loanTermYears: loanTermYears,
+                interestRate: interestRate,
+                monthlyPayment: monthlyPayment,
+                totalInterest: totalInterest,
+                totalPayment: totalPayment,
+                calculationDate: new Date().toISOString(),
+                isExistingClient: isExistingClient,
+                // Store calculation summary for display
+                calculationSummary: {
+                    monthlyPayment: formatCurrencyDecimal(monthlyPayment),
+                    downpayment: formatCurrency(downpaymentAmount),
+                    loanAmount: formatCurrency(loanAmount),
+                    totalInterest: formatCurrency(totalInterest),
+                    term: `${loanTermYears} years`
+                }
+            };
+            
+            try {
+                // Save to Firebase
+                await saveMortgageCalculation(calculationData);
+                
+                // Show success message
+                let successMessage = `Thank you ${clientName || ''}! Your mortgage calculation has been saved.`;
+                
+                if (isExistingClient) {
+                    successMessage += '\n\nWe found your previous inquiry. Our project manager will review your new calculation alongside your previous inquiry.';
+                } else {
+                    successMessage += '\n\nA detailed schedule has been sent to your email. Our property specialist will contact you within 24 hours.';
+                }
+                
+                alert(successMessage);
+                
+                // Clear the form
+                document.getElementById('clientEmail').value = '';
+                document.getElementById('clientName').value = '';
+                document.getElementById('clientPhone').value = '';
+                
+                // Update button text
+                sendScheduleBtn.textContent = 'Calculation Saved!';
+                sendScheduleBtn.style.backgroundColor = '#28a745';
+                
+                setTimeout(() => {
+                    sendScheduleBtn.textContent = 'Send My Schedule & Contact Specialist';
+                    sendScheduleBtn.style.backgroundColor = '#cfa85b';
+                }, 3000);
+                
+            } catch (error) {
+                alert('There was an error saving your calculation. Please try again or contact us directly.');
+                console.error('Error:', error);
+            }
+        });
+        
+        // Calculate on page load
+        calculate();
+        
+        // Also calculate on any input change
+        const allInputs = document.querySelectorAll('.number-input, .slider');
+        allInputs.forEach(input => {
+            input.addEventListener('input', calculate);
+        });
+    </script>
+</body>
+</html>

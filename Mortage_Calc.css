@@ -1,0 +1,315 @@
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #f8fafc;
+            color: #333;
+            line-height: 1.6;
+            padding: 0;
+        }
+        
+        .email-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #d19f4e 0%, #574522 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffcc00;
+            margin-bottom: 15px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .intro {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .intro h2 {
+            color: #a57934;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        
+        .intro p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .calculator-section {
+            background-color: #f0f7ff;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            color: #a57934;
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+            font-weight: 600;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .input-label {
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .input-controls {
+            flex: 2;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .number-input {
+            width: 120px;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #a57934;
+            text-align: center;
+        }
+        
+        .slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #a57934;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .result-section {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            border: 2px solid #e6f0ff;
+            margin-bottom: 30px;
+        }
+        
+        .monthly-payment {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .payment-label {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .payment-amount {
+            font-size: 42px;
+            font-weight: 800;
+            color: #a57934;
+        }
+        
+        .breakdown {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .breakdown-item {
+            background-color: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #a57934;
+        }
+        
+        .breakdown-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .breakdown-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #a57934;
+        }
+        
+        .schedule-preview {
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .schedule-title {
+            font-size: 16px;
+            color: #a57934;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .schedule-table {
+            width: 100%;
+            font-size: 14px;
+            border-collapse: collapse;
+        }
+        
+        .schedule-table th {
+            background-color: #e6f0ff;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #a57934;
+        }
+        
+        .schedule-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .cta-section {
+            text-align: center;
+            padding: 25px;
+            background-color: #f0f7ff;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .cta-title {
+            color: #a57934;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .email-form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .email-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #a57934;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            background-color: #002244;
+        }
+        
+        .disclaimer {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+            padding: 20px;
+            border-top: 1px solid #eee;
+            background-color: #f9f9f9;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+            background-color: #a57934;
+            color: white;
+        }
+        
+        .contact-info {
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .input-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .input-controls {
+                width: 100%;
+                margin-top: 10px;
+            }
+            
+            .breakdown {
+                grid-template-columns: 1fr;
+            }
+            
+            .payment-amount {
+                font-size: 32px;
+            }
+        }
