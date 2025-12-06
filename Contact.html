@@ -4,14 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Our Team – Solano Hills</title>
-  <link rel="stylesheet" href="CONTACT.css"/>
-  <style>
-    /* Hide message textarea by default */
-    #message {
-      display: none;
-    }
-  </style>
-</head>
+  <link rel="stylesheet" href="contact.css" />
+  </head>
 <body>
   <!-- ======================== NAVBAR ======================== -->
   <div class="navbar" id="navbar">
@@ -93,11 +87,13 @@
   <div id="status" style="color:red; margin-top:10px;"></div>
 
   <!-- ======================== CHAT TOGGLE BUTTON & CHAT BOX ======================== -->
-  <div id="chatToggleBtn">Chat</div>
+  <button id="chatToggleBtn">
+    <span style="font-size: 18px;">💬</span> Live Chat
+  </button>
   <div id="chatBox" aria-hidden="true">
     <div id="chatHeader">
-      Live Chat
-      <button id="chatCloseBtn" aria-label="Close chat">&times;</button>
+      Solano Hills Support
+      <button id="chatCloseBtn" aria-label="Close chat">×</button>
     </div>
     <div id="messagesContainerChat">
       Loading chat messages...
@@ -139,13 +135,27 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Mortgage Calculator Link
+    const MORTGAGE_CALCULATOR_LINK = "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
+
+    // ======================= PERSISTENT GUEST ID ==========================
+    function getGuestId() {
+      let guestId = localStorage.getItem("guestId");
+
+      if (!guestId) {
+        guestId = crypto.randomUUID();
+        localStorage.setItem("guestId", guestId);
+      }
+
+      return guestId;
+    }
+
     // UI elements
     const inquiryTopic = document.getElementById('inquiry_topic');
     const paymentSection = document.getElementById('paymentSection');
     const paymentSelect = document.getElementById('payment_info');
     const messageTextarea = document.getElementById('message');
 
-    // Hide payment section and textarea initially
     function hideAllConditionalSections() {
       paymentSection.classList.add('hidden');
       paymentSelect.removeAttribute('required');
@@ -178,7 +188,6 @@
         messageTextarea.style.display = 'block';
         messageTextarea.required = true;
       } else {
-        // Only hide if inquiry topic isn't 'other'
         if (inquiryTopic.value !== 'other') {
           messageTextarea.style.display = 'none';
           messageTextarea.required = false;
@@ -187,17 +196,7 @@
       }
     });
 
-    // Get or create anonymous ID for session
-    function getAnonymousId() {
-      let anonId = sessionStorage.getItem('anonId');
-      if (!anonId) {
-        anonId = crypto.randomUUID();
-        sessionStorage.setItem('anonId', anonId);
-      }
-      return anonId;
-    }
-
-    // Form submit for new inquiry
+    // ========================= FORM SUBMIT ==========================
     document.getElementById('contactForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -209,7 +208,18 @@
       const payment_info = paymentSelect.value || null;
       const message = messageTextarea.value.trim();
 
-      const anonId = getAnonymousId();
+      const anonId = getGuestId();
+
+      // Map inquiry topic to readable text for first message
+      const inquiryTopicMap = {
+        payment: "Payment / Price",
+        interested_1b: "I'm interested in 1 Bedroom unit",
+        interested_2b: "I'm interested in 2 Bedroom unit",
+        interested_both: "I'm interested in both bedroom unit",
+        other: "Other (explain in message)"
+      };
+
+      const firstMessageContent = message || `${inquiryTopicMap[inquiry_topic] || inquiry_topic}`;
 
       const payload = {
         name,
@@ -218,20 +228,19 @@
         Employement_Type,
         inquiry_topic,
         payment_info: inquiry_topic === 'payment' ? payment_info : null,
-        anonymousId: anonId,
+        ownerId: anonId,            // updated field for Firestore rule matching
         status: "new",
         createdAt: serverTimestamp()
       };
 
       try {
-        // Create inquiry document
         const inquiryRef = await addDoc(collection(db, "inquiries"), payload);
 
-        // Add first message inside subcollection "messages"
         await addDoc(collection(db, "inquiries", inquiryRef.id, "messages"), {
           sender: "user",
           senderName: name,
-          content: message,
+          senderId: anonId,          // added senderId for message subcollection
+          content: firstMessageContent,
           timestamp: serverTimestamp(),
           readByPM: false,
           readByUser: true
@@ -250,9 +259,7 @@
       document.getElementById("popup").classList.add("hidden");
     };
 
-    // The chat and real-time message listener code (unchanged from your original script) below:
-
-    // UI elements for chat
+    // ========================= CHAT SYSTEM ==========================
     const chatToggleBtn = document.getElementById('chatToggleBtn');
     const chatBox = document.getElementById('chatBox');
     const chatCloseBtn = document.getElementById('chatCloseBtn');
@@ -260,86 +267,110 @@
     const chatMessageInput = document.getElementById('chatMessageInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
 
-    // Real-time listener unsubscribe handle
     let unsubscribeMessages = null;
     let currentInquiryId = null;
 
-    // Real-time listener function for chat messages
-    async function startListeningToMessages() {
-      const anonId = getAnonymousId();
+    // Function to format message content with proper formatting
+    function formatMessageContent(content) {
+      // Check if it's a price list message
+      if (content.includes('🏠') || content.includes('Calculate your personalized payments')) {
+        // Replace the calculator link with a clickable one
+        const linkMatch = content.match(/https:\/\/[^\s]+/);
+        if (linkMatch) {
+          const link = linkMatch[0];
+          const linkHtml = `<a href="${link}" target="_blank" class="calculator-link">Open Mortgage Calculator</a>`;
+          content = content.replace(link, '') + '\n\n' + linkHtml;
+        }
+        
+        // Wrap in a div with monospace font for formatting
+        return `<div class="message-content">${content.replace(/\n/g, '<br>')}</div>`;
+      }
+      
+      // Regular message
+      return content.replace(/\n/g, '<br>');
+    }
 
-      // Query inquiries by anonymousId, get the latest one (by createdAt desc)
+    async function startListeningToMessages() {
+      const anonId = getGuestId();
+
       const inquiriesQuery = query(
         collection(db, "inquiries"),
-        where("anonymousId", "==", anonId),
+        where("ownerId", "==", anonId),    // updated field for query
         orderBy("createdAt", "desc")
       );
 
       const inquiriesSnapshot = await getDocs(inquiriesQuery);
       if (inquiriesSnapshot.empty) {
-        messagesContainerChat.innerHTML = "<p>No inquiries found. Use the contact form above to send a message first.</p>";
+        messagesContainerChat.innerHTML = "<div class='system-message'>No inquiries found. Use the contact form above to send a message first.</div>";
         chatMessageInput.disabled = true;
         sendChatBtn.disabled = true;
         currentInquiryId = null;
         return;
       }
 
-      // Take the latest inquiry
       const latestInquiryDoc = inquiriesSnapshot.docs[0];
       currentInquiryId = latestInquiryDoc.id;
       const inquiryData = latestInquiryDoc.data();
 
-      // Map inquiry topic codes to readable text
       const inquiryTopicMap = {
         payment: "Payment / Price",
-        interested_1b: "I'm interested in 1 Bedroom unit",
-        interested_2b: "I'm interested in 2 Bedroom unit",
-        interested_both: "I'm interested in both bedroom unit",
-        other: "Other (explain in message)"
+        interested_1b: "1-Bedroom Unit",
+        interested_2b: "2-Bedroom Unit",
+        interested_both: "Both Unit Types",
+        other: "Other"
       };
 
-      const inquiryTopicText = inquiryTopicMap[inquiryData.inquiry_topic] || inquiryData.inquiry_topic || "N/A";
+      const inquiryTopicText = inquiryTopicMap[inquiryData.inquiry_topic] || inquiryData.inquiry_topic || "General Inquiry";
 
-      // Unsubscribe previous listener if any
       if (unsubscribeMessages) unsubscribeMessages();
 
-      // Query messages subcollection ordered by timestamp asc
       const messagesQuery = query(
         collection(db, "inquiries", currentInquiryId, "messages"),
         orderBy("timestamp", "asc")
       );
 
       unsubscribeMessages = onSnapshot(messagesQuery, (messagesSnapshot) => {
-        let html = `<div class="system-message"><strong>Your Inquiry Topic:</strong> ${inquiryTopicText}</div>`;
+        let html = `<div class="system-message"><strong>Your Inquiry:</strong> ${inquiryTopicText}</div>`;
+        
         if (messagesSnapshot.empty) {
-          html += "<p>No messages yet.</p>";
+          html += "<div class='system-message'>No messages yet. Send a message to start the conversation.</div>";
         } else {
           messagesSnapshot.forEach(msgDoc => {
             const msg = msgDoc.data();
             const senderClass = msg.sender === "user" ? "sender-user" : "sender-pm";
+            const senderName = msg.sender === "user" ? "You" : "Project Manager";
+            const messageTime = msg.timestamp?.toDate 
+              ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : "";
+            
             html += `
               <div class="message-block ${senderClass}">
-                <strong>${msg.sender === "user" ? "You" : "Project Manager"}:</strong><br />
-                <span>${msg.content}</span><br />
-                <small>${msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ""}</small>
+                <strong>${senderName}</strong>
+                <div>${formatMessageContent(msg.content)}</div>
+                <small>${messageTime}</small>
               </div>
             `;
           });
         }
+        
         messagesContainerChat.innerHTML = html;
         chatMessageInput.disabled = false;
-        sendChatBtn.disabled = true; // disable send initially until input
+        sendChatBtn.disabled = true;
+        
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          messagesContainerChat.scrollTop = messagesContainerChat.scrollHeight;
+        }, 100);
       });
     }
 
-    // Toggle chat box open/close
     chatToggleBtn.addEventListener('click', () => {
       chatBox.classList.add('open');
       chatBox.setAttribute('aria-hidden', 'false');
       chatToggleBtn.style.opacity = '0';
       chatToggleBtn.style.pointerEvents = 'none';
       startListeningToMessages();
-      chatMessageInput.focus();
+      setTimeout(() => chatMessageInput.focus(), 100);
     });
 
     chatCloseBtn.addEventListener('click', () => {
@@ -353,12 +384,23 @@
       currentInquiryId = null;
     });
 
-    // Enable send button only when input has text
     chatMessageInput.addEventListener('input', () => {
       sendChatBtn.disabled = chatMessageInput.value.trim() === '';
+      // Auto-resize textarea
+      chatMessageInput.style.height = 'auto';
+      chatMessageInput.style.height = Math.min(chatMessageInput.scrollHeight, 120) + 'px';
     });
 
-    // Send a chat message to the latest inquiry
+    // Allow Enter to send (Shift+Enter for new line)
+    chatMessageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!sendChatBtn.disabled) {
+          sendChatBtn.click();
+        }
+      }
+    });
+
     sendChatBtn.addEventListener('click', async () => {
       const content = chatMessageInput.value.trim();
       if (!content) return;
@@ -370,32 +412,62 @@
 
       sendChatBtn.disabled = true;
 
-      // Clear the input immediately
       chatMessageInput.value = '';
+      chatMessageInput.style.height = 'auto';
       chatMessageInput.dispatchEvent(new Event('input', { bubbles: true }));
 
+      const anonId = getGuestId();
+
       try {
-        // Add message in messages subcollection
         await addDoc(collection(db, "inquiries", currentInquiryId, "messages"), {
           sender: "user",
           senderName: "Anonymous",
+          senderId: anonId,         // added senderId for message subcollection
           content,
           timestamp: serverTimestamp(),
           readByPM: false,
           readByUser: true
         });
 
-        // Try to update inquiry status (may fail if no permission)
-        await updateDoc(doc(db, "inquiries", currentInquiryId), { status: "user replied" });
+        await updateDoc(doc(db, "inquiries", currentInquiryId), { 
+          status: "user replied",
+          lastUpdated: serverTimestamp()
+        });
 
       } catch (error) {
         console.error("Error sending message:", error.message);
         sendChatBtn.disabled = false;
+        
+        // Show error in chat
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'message-block sender-pm';
+        errorMsg.innerHTML = '<strong>System</strong><div>Failed to send message. Please try again.</div>';
+        messagesContainerChat.appendChild(errorMsg);
       }
+    });
+
+    // Initialize chat with welcome message if no inquiry exists
+    window.addEventListener('DOMContentLoaded', () => {
+      const anonId = getGuestId();
+      const inquiriesQuery = query(
+        collection(db, "inquiries"),
+        where("ownerId", "==", anonId),
+        orderBy("createdAt", "desc")
+      );
+
+      getDocs(inquiriesQuery).then(snapshot => {
+        if (snapshot.empty) {
+          // Show welcome message in chat preview
+          messagesContainerChat.innerHTML = `
+            <div class="system-message">
+              <strong>Welcome to Solano Hills!</strong><br>
+              Start by submitting the contact form above, then you can chat with our Project Manager here.
+            </div>
+          `;
+        }
+      });
     });
 
   </script>
 </body>
 </html>
-
-
