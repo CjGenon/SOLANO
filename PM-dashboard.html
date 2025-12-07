@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Project Manager Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Manager Dashboard – Solano Hills</title>
   <link rel="stylesheet" href="PM-dasboard.css" />
+  <!-- Charts for dashboard KPIs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <!-- ======================== SIDEBAR ======================== -->
@@ -25,7 +28,7 @@
   <main class="main-content">
     <div id="mainContent">
       <h1 id="Greeting">Welcome Back!</h1>
-      <p>Select a sidebar to start managing.</p>
+      <p>Select a sidebar option to start managing.</p>
     </div>
   </main>
 
@@ -37,11 +40,23 @@
     })();
   </script>
 
-  <!-- ======================== FIREBASE & INBOX ======================== -->
+  <!-- ======================== FIREBASE & APP LOGIC ======================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-    import { getFirestore, collection, query, orderBy, getDocs, addDoc,writeBatch, serverTimestamp, updateDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      getDocs,
+      addDoc,
+      writeBatch,
+      serverTimestamp,
+      updateDoc,
+      doc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
     import { deleteDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
     // ================= FIREBASE CONFIG =================
@@ -59,12 +74,13 @@
     const db = getFirestore(app);
 
     const mainContent = document.getElementById("mainContent");
+    window.pmInboxStartView = null; // for dashboard KPI drill-down
 
     // ================= CONTENT LOADER =================
     window.loadContent = function (event, section) {
-      if(event) event.preventDefault();
+      if (event) event.preventDefault();
 
-      // Remove active class and add to clicked
+      // Remove active class and add to clicked link
       document.querySelectorAll(".sidebar nav ul li a").forEach(link => link.classList.remove("active"));
       if (event?.target?.tagName === "A") event.target.classList.add("active");
 
@@ -74,1057 +90,1537 @@
         /* ================= DASHBOARD ================= */
         case "dashboard":
           mainContent.innerHTML = `
-            <h1 id="Greeting1">Dashboard</h1>
-            <div class="dashboard-container">
-              
-              <!-- ======== LEFT: WELCOME SLIDER ======== -->
-              <div class="welcome-slider">
-                <div class="slide fade"><img src="1Entertainment room.jpg" alt="Welcome Slide 1"></div>
-                <div class="slide fade"><img src="1Fitness Gym.jpg" alt="Welcome Slide 2"></div>
-                <div class="slide fade"><img src="1Roof Garden.jpg" alt="Welcome Slide 3"></div>
-                <button class="prev" id="sliderPrev">&#10094;</button>
-                <button class="next" id="sliderNext">&#10095;</button>
+            <div class="pm-dashboard">
+              <div class="pm-dashboard-header">
+                <h1 class="pm-page-title">Project Manager Dashboard</h1>
+                <p class="pm-page-subtitle">
+                  High-level overview of inquiries, mortgage calculations, and client documents.
+                </p>
               </div>
 
-              <!-- ======== RIGHT: CALENDAR + INBOX ======== -->
-              <div class="right-side">
-                <div class="calendar-card">
-                  <h3>📅 Calendar</h3>
-                  <div id="calendar"></div>
+              <!-- KPI row -->
+              <div class="pm-kpi-row">
+                <div class="card pm-kpi-card" id="kpiInquiries">
+                  <div class="pm-kpi-label">Inquiries</div>
+                  <div class="pm-kpi-value" id="kpiInquiriesTotal">0</div>
+                  <div class="pm-kpi-sub" id="kpiInquiriesSub">Loading...</div>
+                  <div class="pm-kpi-pill">Click to view inbox</div>
+                </div>
+
+                <div class="card pm-kpi-card" id="kpiCalcs">
+                  <div class="pm-kpi-label">Mortgage Calculations</div>
+                  <div class="pm-kpi-value" id="kpiCalcsTotal">0</div>
+                  <div class="pm-kpi-sub" id="kpiCalcsSub">Loading...</div>
+                  <div class="pm-kpi-pill">Click to view calculations</div>
+                </div>
+
+                <div class="card pm-kpi-card" id="kpiDocs">
+                  <div class="pm-kpi-label">Client Documents</div>
+                  <div class="pm-kpi-value" id="kpiDocsTotal">0</div>
+                  <div class="pm-kpi-sub" id="kpiDocsSub">Based on local upload history</div>
+                  <div class="pm-kpi-pill">Click to view documents</div>
+                </div>
+              </div>
+
+              <div class="pm-main-grid">
+                <div class="pm-main-left">
+                  <div class="card pm-chart-card">
+                    <div class="pm-card-header">
+                      <span>Inquiries – last 6 months</span>
+                      <span>Created date from inquiry form</span>
+                    </div>
+                    <div class="pm-chart-wrapper">
+                      <canvas id="inquiriesTrendChart"></canvas>
+                    </div>
+                  </div>
+
+                  <div class="card pm-chart-card">
+                    <div class="pm-card-header">
+                      <span>Client types from document uploads</span>
+                      <span>Employed vs Self‑Employed vs Business Owner</span>
+                    </div>
+                    <div class="pm-chart-wrapper">
+                      <canvas id="clientTypeChart"></canvas>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pm-main-right">
+                  <div class="card calendar-card">
+                    <h3>📅 Calendar</h3>
+                    <div id="calendar"></div>
+                  </div>
+
+                  <div class="card pm-recent-card">
+                    <div class="pm-card-header">
+                      <span>Recent activity</span>
+                      <span>Latest inquiries & calculations</span>
+                    </div>
+                    <div class="pm-recent-list" id="dashboardRecentList">
+                      <p class="pm-muted">Loading recent activity...</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           `;
 
-          // Image slider logic
-          (function () {
-            let slideIndexLocal = 1;
-            const slides = () => document.querySelectorAll(".welcome-slider .slide");
+          // --- Drill-down behaviour from KPI cards ---
+          const kpiInquiriesCard = document.getElementById("kpiInquiries");
+          const kpiCalcsCard = document.getElementById("kpiCalcs");
+          const kpiDocsCard = document.getElementById("kpiDocs");
 
-            function showSlidesLocal(n) {
-              const nodeList = slides();
-              if (!nodeList || nodeList.length === 0) return;
-              if (n > nodeList.length) slideIndexLocal = 1;
-              if (n < 1) slideIndexLocal = nodeList.length;
-              nodeList.forEach(s => (s.style.display = "none"));
-              nodeList[slideIndexLocal - 1].style.display = "block";
+          kpiInquiriesCard.addEventListener("click", () => {
+            window.pmInboxStartView = "inquiries";
+            loadContent(null, "inbox");
+          });
+
+          kpiCalcsCard.addEventListener("click", () => {
+            window.pmInboxStartView = "calculations";
+            loadContent(null, "inbox");
+          });
+
+          kpiDocsCard.addEventListener("click", () => {
+            loadContent(null, "document");
+          });
+
+          // --- Calendar render ---
+          const renderCalendar = () => {
+            const calendar = document.getElementById("calendar");
+            if (!calendar) return;
+
+            const today = new Date();
+            const monthName = today.toLocaleString("default", { month: "long" });
+            const year = today.getFullYear();
+            const firstDay = new Date(year, today.getMonth(), 1);
+            const lastDay = new Date(year, today.getMonth() + 1, 0);
+            const startDay = firstDay.getDay();
+
+            let html = "<table class='cal-table'>";
+            html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+            html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+            for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+              const isToday = day === today.getDate();
+              html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+              if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) {
+                html += "</tr><tr>";
+              }
             }
+            html += "</tr></table>";
+            calendar.innerHTML = html;
+          };
 
-            showSlidesLocal(slideIndexLocal);
+          // --- Dashboard metrics + charts ---
+          const inquiriesTrendCtx = document.getElementById("inquiriesTrendChart").getContext("2d");
+          const clientTypeCtx = document.getElementById("clientTypeChart").getContext("2d");
+          let inquiriesTrendChart;
+          let clientTypeChart;
 
-            document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
-            document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
-
-            const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
-            const sliderEl = document.querySelector(".welcome-slider");
-            if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
+          const monthLabels = (() => {
+            const labels = [];
+            const now = new Date();
+            for (let i = 5; i >= 0; i--) {
+              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              labels.push(d.toLocaleString("default", { month: "short" }));
+            }
+            return labels;
           })();
 
-          // Calendar logic
-          (function () {
-            function generateCalendar() {
-              const calendar = document.getElementById("calendar");
-              if (!calendar) return;
+          const getClientTypeCounts = () => {
+            const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+            const counts = {
+              employed: 0,
+              "self-employed": 0,
+              "business-owner": 0,
+              other: 0
+            };
 
-              const today = new Date();
-              const monthName = today.toLocaleString("default", { month: "long" });
-              const year = today.getFullYear();
-              const firstDay = new Date(year, today.getMonth(), 1);
-              const lastDay = new Date(year, today.getMonth() + 1, 0);
-              const startDay = firstDay.getDay();
+            history.forEach(entry => {
+              switch (entry.clientType) {
+                case "employed":
+                  counts.employed++;
+                  break;
+                case "self-employed":
+                  counts["self-employed"]++;
+                  break;
+                case "business-owner":
+                  counts["business-owner"]++;
+                  break;
+                default:
+                  counts.other++;
+                  break;
+              }
+            });
 
-              let html = "<table class='cal-table'>";
-              html += "<tr><th class='cal-header' colspan='7'>" + monthName + " " + year + "</th></tr>";
-              html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+            return { counts, total: history.length };
+          };
 
-              for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+          const loadDashboardMetrics = async () => {
+            const now = new Date();
+            const msPerDay = 1000 * 60 * 60 * 24;
 
-              for (let day = 1; day <= lastDay.getDate(); day++) {
-                const isToday = day === today.getDate();
-                html += "<td" + (isToday ? " class='today'" : "") + ">" + day + "</td>";
-                if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
+            // Inquiries
+            const inquiriesRef = collection(db, "inquiries");
+            const inquiriesSnap = await getDocs(
+              query(inquiriesRef, orderBy("createdAt", "desc"))
+            );
+
+            let totalInquiries = 0;
+            let inquiriesLast7 = 0;
+            const inquiriesPerMonth = new Array(6).fill(0);
+            const recentEvents = [];
+
+            const topicMap = {
+              payment: "Payment / Price",
+              interested_1b: "Interested in 1BR",
+              interested_2b: "Interested in 2BR",
+              interested_both: "Interested in both",
+              other: "Other"
+            };
+
+            inquiriesSnap.forEach(docSnap => {
+              const data = docSnap.data();
+              const ts = data.createdAt;
+              let dt = null;
+              if (ts?.toDate) dt = ts.toDate();
+
+              totalInquiries++;
+
+              if (dt) {
+                const diffDays = (now - dt) / msPerDay;
+                if (diffDays <= 7) inquiriesLast7++;
+
+                const monthsAgo =
+                  (now.getFullYear() - dt.getFullYear()) * 12 +
+                  (now.getMonth() - dt.getMonth());
+                if (monthsAgo >= 0 && monthsAgo < 6) {
+                  const idx = 5 - monthsAgo; // 0 = oldest, 5 = current month
+                  inquiriesPerMonth[idx]++;
+                }
+
+                recentEvents.push({
+                  type: "inquiry",
+                  date: dt,
+                  primary: data.name || data.email || "Inquiry",
+                  secondary:
+                    topicMap[data.inquiry_topic] || "Property inquiry"
+                });
+              }
+            });
+
+            // Mortgage calculations
+            const calcsRef = collection(db, "mortgage_calculations");
+            const calcsSnap = await getDocs(
+              query(calcsRef, orderBy("createdAt", "desc"))
+            );
+
+            let totalCalcs = 0;
+            let calcsLast30 = 0;
+
+            calcsSnap.forEach(docSnap => {
+              const data = docSnap.data();
+              let dt = null;
+              if (data.createdAt?.toDate) {
+                dt = data.createdAt.toDate();
+              } else if (data.calculationDate) {
+                dt = new Date(data.calculationDate);
               }
 
-              html += "</tr></table>";
-              calendar.innerHTML = html;
-            }
-            generateCalendar();
-          })();
+              totalCalcs++;
 
+              if (dt) {
+                const diffDays = (now - dt) / msPerDay;
+                if (diffDays <= 30) calcsLast30++;
+
+                recentEvents.push({
+                  type: "calc",
+                  date: dt,
+                  primary: data.name || data.email || "Mortgage calc",
+                  secondary: data.formatted?.propertyPrice
+                    ? `Property ${data.formatted.propertyPrice}`
+                    : "Mortgage calculation"
+                });
+              }
+            });
+
+            // Document / client-type metrics (from localStorage)
+            const { counts, total } = getClientTypeCounts();
+
+            // --- Update KPI cards text ---
+            document.getElementById("kpiInquiriesTotal").textContent =
+              totalInquiries;
+            document.getElementById(
+              "kpiInquiriesSub"
+            ).textContent = `${inquiriesLast7} in the last 7 days`;
+
+            document.getElementById("kpiCalcsTotal").textContent = totalCalcs;
+            document.getElementById(
+              "kpiCalcsSub"
+            ).textContent = `${calcsLast30} in the last 30 days`;
+
+            document.getElementById("kpiDocsTotal").textContent = total;
+            document.getElementById(
+              "kpiDocsSub"
+            ).textContent = total
+              ? `Employed: ${counts.employed} • Self‑Employed: ${
+                  counts["self-employed"]
+                } • Business: ${counts["business-owner"]}`
+              : "No document sets uploaded yet";
+
+            // --- Build Inquiries trend chart ---
+            if (inquiriesTrendChart) inquiriesTrendChart.destroy();
+            inquiriesTrendChart = new Chart(inquiriesTrendCtx, {
+              type: "line",
+              data: {
+                labels: monthLabels,
+                datasets: [
+                  {
+                    label: "Inquiries",
+                    data: inquiriesPerMonth,
+                    tension: 0.35,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    borderColor: "#c0933c",
+                    backgroundColor: "rgba(192, 147, 60, 0.25)",
+                    fill: true
+                  }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false }
+                },
+                scales: {
+                  x: {
+                    grid: { display: false },
+                    ticks: { color: "#cccccc" }
+                  },
+                  y: {
+                    grid: { color: "rgba(255,255,255,0.06)" },
+                    ticks: { color: "#cccccc", precision: 0 }
+                  }
+                },
+                animation: {
+                  duration: 900,
+                  easing: "easeOutQuart"
+                }
+              }
+            });
+
+            // --- Build Client types doughnut chart ---
+            if (clientTypeChart) clientTypeChart.destroy();
+            clientTypeChart = new Chart(clientTypeCtx, {
+              type: "doughnut",
+              data: {
+                labels: [
+                  "Employed",
+                  "Self‑Employed",
+                  "Business Owner",
+                  "Other / Unspecified"
+                ],
+                datasets: [
+                  {
+                    data: [
+                      counts.employed,
+                      counts["self-employed"],
+                      counts["business-owner"],
+                      counts.other
+                    ],
+                    backgroundColor: [
+                      "#66bb6a",
+                      "#29b6f6",
+                      "#ffb74d",
+                      "#757575"
+                    ],
+                    borderWidth: 0
+                  }
+                ]
+              },
+              options: {
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "bottom",
+                    labels: { color: "#f7f7f7", boxWidth: 12, font: { size: 11 } }
+                  }
+                },
+                cutout: "65%",
+                animation: {
+                  duration: 900,
+                  easing: "easeOutQuart"
+                }
+              }
+            });
+
+            // --- Recent activity list ---
+            const recentList = document.getElementById("dashboardRecentList");
+            if (!recentEvents.length) {
+              recentList.innerHTML =
+                '<p class="pm-muted">No recent activity yet.</p>';
+            } else {
+              recentEvents.sort((a, b) => b.date - a.date);
+              const top = recentEvents.slice(0, 5);
+
+              recentList.innerHTML = top
+                .map(ev => {
+                  const badgeClass = ev.type === "calc" ? "calc" : "inquiry";
+                  return `
+                    <div class="pm-recent-item">
+                      <div>
+                        <div class="pm-recent-main">${ev.primary}</div>
+                        <div class="pm-recent-meta">${ev.secondary}</div>
+                        <div class="pm-recent-time">
+                          ${ev.date.toLocaleString()}
+                        </div>
+                      </div>
+                      <div class="pm-recent-badge ${badgeClass}">
+                        ${ev.type === "calc" ? "MORTGAGE" : "INQUIRY"}
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("");
+            }
+          };
+
+          renderCalendar();
+          loadDashboardMetrics();
           break;
 
         /* ================= INBOX ================= */
-case "inbox":
-  mainContent.innerHTML = `
-    <h3 style="color: #ffff;">Inquiries & Mortgage Calculations</h3>
-    <div style="margin-bottom: 20px;">
-      <button id="toggleViewBtn" style="padding: 8px 16px; margin-right: 10px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        Show: All
-      </button>
-      <button id="showInquiriesBtn" style="padding: 8px 16px; margin-right: 10px; background-color: #a57934; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        Show Inquiries Only
-      </button>
-      <button id="showCalculationsBtn" style="padding: 8px 16px; background-color: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        Show Calculations Only
-      </button>
-    </div>
-    
-    <!-- Messages Popup Panel -->
-    <div id="messagesPopupPanel" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-      <div style="background: white; width: 80%; max-width: 800px; max-height: 80%; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;">
-        <div style="background: #003366; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-          <h3 id="messagesPanelTitle" style="margin: 0; font-size: 18px; color: white;">Messages</h3>
-          <button id="closeMessagesPanelBtn" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">×</button>
-        </div>
-        
-        <div style="flex: 1; padding: 20px; overflow-y: auto; background: #f5f5f5;">
-          <div id="messagesContainer" style="margin-bottom: 20px;">
-            <!-- Messages will be loaded here -->
-          </div>
-          
-          <!-- Reply Section -->
-          <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-            <h4 style="margin-top: 0; color: #003366;">Send Reply</h4>
-            <textarea id="replyMessage" 
-                      placeholder="Type your reply here..." 
-                      rows="6" 
-                      style="width: 100%; 
-                             padding: 10px; 
-                             border: 1px solid #ccc; 
-                             border-radius: 4px; 
-                             margin-bottom: 10px; 
-                             background: white; 
-                             color: #333; 
-                             white-space: pre-wrap;
-                             line-height: 1.5;"></textarea>
-            
-            <!-- Quick Reply Templates -->
-            <div style="margin-bottom: 15px;">
-              <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">Quick Replies:</p>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="quickReplyBtn" data-template="thankyou" style="padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  Thank You
-                </button>
-                <button class="quickReplyBtn" data-template="followup" style="padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  Follow Up
-                </button>
-                <button class="quickReplyBtn" data-template="pricelist_1bed" style="padding: 6px 12px; background: #fff3e0; color: #a57934; border: 1px solid #ffe0b2; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  Send 1-Bed Pricelist
-                </button>
-                <button class="quickReplyBtn" data-template="pricelist_2bed" style="padding: 6px 12px; background: #e3f2fd; color: #1976D2; border: 1px solid #bbdefb; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  Send 2-Bed Pricelist
-                </button>
-                <button class="quickReplyBtn" data-template="appointment" style="padding: 6px 12px; background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                  Schedule Appointment
-                </button>
-              </div>
-            </div>
-            
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-              <button id="sendReplyBtn" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                Send Reply
+        case "inbox":
+          mainContent.innerHTML = `
+            <h3 style="color: #f3efe9; margin-top: 0;">Inquiries &amp; Mortgage Calculations</h3>
+            <div style="margin-bottom: 20px;">
+              <button id="toggleViewBtn" style="padding: 8px 16px; margin-right: 10px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Show: All
               </button>
-              <button id="cancelReplyBtn" style="padding: 8px 16px; background-color: #999; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                Cancel
+              <button id="showInquiriesBtn" style="padding: 8px 16px; margin-right: 10px; background-color: #a57934; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Show Inquiries Only
+              </button>
+              <button id="showCalculationsBtn" style="padding: 8px 16px; background-color: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Show Calculations Only
               </button>
             </div>
-            <div id="replyStatus" style="margin-top: 10px;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div id="dataContainer"></div>
-    
-    <style>
-      .email-group {
-      }
-      
-      .toast {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        padding: 12px 20px;
-        border-radius: 6px;
-        color: white;
-        font-weight: 500;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      }
-      
-      .toast-success {
-        background-color: #4CAF50;
-      }
-      
-      .toast-error {
-        background-color: #f44336;
-      }
-      
-      .toast-info {
-        background-color: #2196F3;
-      }
-    </style>
-  `;
 
-  const dataContainer = document.getElementById("dataContainer");
-  let currentView = 'all'; // 'all', 'inquiries', 'calculations'
-  
-  // Mortgage Calculator Link
-  const MORTGAGE_CALCULATOR_LINK = "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
-  
-  // Helper maps
-  const inquiryTopicMap = {
-    payment: "Payment / Price",
-    interested_1b: "I'm interested in 1 Bedroom unit",
-    interested_2b: "I'm interested in 2 Bedroom unit",
-    interested_both: "I'm interested in both bedroom unit",
-    other: "Other (explain in message)"
-  };
-
-  const paymentInfoMap = {
-    downpayment: "Downpayment",
-    monthly_amortization: "Monthly Amortization",
-    total_price: "Total Price",
-    payment_terms: "Payment Terms",
-    other_payment: "Other (explain in message)"
-  };
-
-  // ========== UTILITY FUNCTIONS ==========
-
-  // Toast notification system
-  const Toast = {
-    show: (message, type = 'info', duration = 3000) => {
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.textContent = message;
-      document.body.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.remove();
-      }, duration);
-    }
-  };
-
-  // Currency formatting
-  const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return '₱ 0';
-    return '₱ ' + amount.toLocaleString('en-PH', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-  };
-
-  const formatCurrencyDecimal = (amount) => {
-    if (!amount && amount !== 0) return '₱ 0.00';
-    return '₱ ' + amount.toLocaleString('en-PH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
-  // ========== VIEW TOGGLE FUNCTIONALITY ==========
-
-  document.getElementById('toggleViewBtn').addEventListener('click', () => {
-    currentView = 'all';
-    loadData();
-  });
-
-  document.getElementById('showInquiriesBtn').addEventListener('click', () => {
-    currentView = 'inquiries';
-    loadData();
-  });
-
-  document.getElementById('showCalculationsBtn').addEventListener('click', () => {
-    currentView = 'calculations';
-    loadData();
-  });
-
-  // ========== MESSAGES PANEL ==========
-
-  function setupMessagesPanel() {
-    const messagesPanel = document.getElementById('messagesPopupPanel');
-    const closeMessagesPanelBtn = document.getElementById('closeMessagesPanelBtn');
-    const sendReplyBtn = document.getElementById('sendReplyBtn');
-    const cancelReplyBtn = document.getElementById('cancelReplyBtn');
-    const quickReplyBtns = document.querySelectorAll('.quickReplyBtn');
-    
-    // Close messages panel
-    closeMessagesPanelBtn.addEventListener('click', () => {
-      messagesPanel.style.display = 'none';
-    });
-    
-    cancelReplyBtn.addEventListener('click', () => {
-      document.getElementById('replyMessage').value = '';
-    });
-    
-    // Send reply function
-    sendReplyBtn.addEventListener('click', async () => {
-      const replyMessage = document.getElementById('replyMessage').value.trim();
-      const currentInquiryId = messagesPanel.dataset.inquiryId;
-
-      if (!replyMessage) {
-        Toast.show('Please enter a reply message', 'error');
-        return;
-      }
-
-      const originalText = sendReplyBtn.textContent;
-      sendReplyBtn.textContent = 'Sending...';
-      sendReplyBtn.disabled = true;
-      
-      const replyStatus = document.getElementById('replyStatus');
-      replyStatus.textContent = '';
-      
-      try {
-        // Save reply to messages subcollection WITH senderId
-        await addDoc(collection(db, "inquiries", currentInquiryId, "messages"), {
-          sender: "admin",
-          senderName: "Project Manager",
-          senderId: "admin_pm", // Required for Firestore rules
-          content: replyMessage,
-          timestamp: serverTimestamp(),
-          readByPM: true,
-          readByUser: false
-        });
-
-        // Update inquiry status
-        await updateDoc(doc(db, "inquiries", currentInquiryId), {
-          status: "responded"
-        });
-
-        // Clear reply field
-        document.getElementById('replyMessage').value = '';
-
-        // Reload messages
-        await loadInquiryMessages(currentInquiryId);
-
-        Toast.show('Reply sent successfully!', 'success');
-        replyStatus.textContent = '✓ Reply sent successfully!';
-        replyStatus.style.color = '#4CAF50';
-        
-      } catch (error) {
-        Toast.show(`Error: ${error.message}`, 'error');
-        replyStatus.textContent = `✗ Error: ${error.message}`;
-        replyStatus.style.color = '#f44336';
-      } finally {
-        sendReplyBtn.textContent = originalText;
-        sendReplyBtn.disabled = false;
-      }
-    });
-    
-    // Quick reply templates
-    quickReplyBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const template = btn.dataset.template;
-        let message = '';
-        
-        switch(template) {
-          case 'thankyou':
-            message = `Thank you for your inquiry about Solano Hillside Residences. We appreciate your interest in our properties and would be happy to assist you further with any questions you may have.`;
-            break;
-          case 'followup':
-            message = `I'm following up on your recent inquiry about our properties. Are you still interested in learning more about our available units or would you like to schedule a site viewing?`;
-            break;
-          case 'pricelist_1bed':
-            message = `Here are the details for our 1-Bedroom units:\n\n🏠 1-BEDROOM UNIT DETAILS:\n• Floor Area: 24-28 sqm\n• Total Price: ₱2.8M - ₱3.2M\n• Downpayment: ₱150,000 (spot cash)\n• Monthly: ₱12,500 - ₱14,000 (24-36 months)\n\n💡 FINANCING OPTIONS:\n• Bank Financing: 80% Loan-to-value ratio\n• In-house: Flexible payment terms\n• Pag-IBIG: Qualified units and buyers\n\n🔗 Calculate your personalized payments here:${MORTGAGE_CALCULATOR_LINK}\n`;
-            break;
-          case 'pricelist_2bed':
-            message = `Here are the details for our 2-Bedroom units:\n\n🏠 2-BEDROOM UNIT DETAILS:\n• Floor Area: 36-42 sqm\n• Total Price: ₱3.8M - ₱4.2M\n• Downpayment: ₱200,000 (spot cash)\n• Monthly: ₱16,800 - ₱18,500 (24-36 months)\n\n💡 FINANCING OPTIONS:\n• Bank Financing: 80% Loan-to-value ratio\n• In-house: Flexible payment terms\n• Pag-IBIG: Qualified units and buyers\n\n🔗 Calculate your personalized payments here:${MORTGAGE_CALCULATOR_LINK}\n`;
-            break;
-          case 'appointment':
-            message = `Want more details? schedule a site viewing this week, Please let me know your preferred date and time, and I'll arrange everything for you.\n\n📅 Available Viewing Slots:\nMonday - Friday: 9:00 AM - 5:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: By special arrangement\n\n📍 Location: Solano, Muntinlupa Paranaque\n\nLooking forward to showing you around!`;
-            break;
-        }
-        
-        document.getElementById('replyMessage').value = message;
-        
-        // Scroll to textarea
-        document.getElementById('replyMessage').focus();
-      });
-    });
-    
-    // Close panel when clicking outside
-    messagesPanel.addEventListener('click', (e) => {
-      if (e.target === messagesPanel) {
-        messagesPanel.style.display = 'none';
-      }
-    });
-  }
-
-  // ========== INQUIRY MESSAGES ==========
-
-  window.viewInquiryMessages = async function(inquiryId) {
-    try {
-      const messagesPanel = document.getElementById('messagesPopupPanel');
-      const messagesContainer = document.getElementById('messagesContainer');
-      const panelTitle = document.getElementById('messagesPanelTitle');
-      
-      messagesContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">Loading messages...</div>';
-      messagesPanel.style.display = 'flex';
-      
-      const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
-      
-      if (!inquiryDoc.exists()) {
-        Toast.show('Inquiry not found', 'error');
-        messagesContainer.innerHTML = '<div style="color: #f44336; text-align: center; padding: 40px;">Inquiry not found</div>';
-        return;
-      }
-      
-      const inquiryData = inquiryDoc.data();
-      panelTitle.textContent = `Messages with ${inquiryData.name || 'Client'}`;
-      
-      messagesPanel.dataset.inquiryId = inquiryId;
-      
-      await loadInquiryMessages(inquiryId);
-      
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      Toast.show(`Failed to load messages: ${error.message}`, 'error');
-      document.getElementById('messagesContainer').innerHTML = 
-        `<div style="color: #f44336; padding: 40px; text-align: center;">
-          Failed to load messages. Please try again.
-        </div>`;
-    }
-  };
-
-  async function loadInquiryMessages(inquiryId) {
-    const messagesContainer = document.getElementById('messagesContainer');
-    
-    try {
-      const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
-      const inquiryData = inquiryDoc.data();
-      
-      const messagesSnapshot = await getDocs(
-        query(collection(db, "inquiries", inquiryId, "messages"), 
-              orderBy("timestamp", "asc"))
-      );
-      
-      let messagesHTML = '';
-      
-      // Display original inquiry
-      const inquiryTopicText = inquiryTopicMap[inquiryData.inquiry_topic] || "No topic selected";
-      const paymentInfoText = paymentInfoMap[inquiryData.payment_info] || "";
-      const inquiryDate = inquiryData.createdAt?.toDate 
-        ? inquiryData.createdAt.toDate().toLocaleString() 
-        : 'Not available';
-      
-      messagesHTML += `
-        <div style="margin-bottom: 20px;">
-          <div style="background: #e8d4a6; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-              <strong style="color: #2e7d32;">${inquiryData.name || 'Client'}</strong>
-              <small style="color: #666;">${inquiryDate}</small>
-            </div>
-            <div style="margin-bottom: 10px; color: #333;">
-              <strong style="color: #003366;">Inquiry Topic:</strong> ${inquiryTopicText}<br/>
-              ${paymentInfoText ? `<strong style="color: #003366;">Payment Info:</strong> ${paymentInfoText}<br/>` : ""}
-              <strong style="color: #003366;">Email:</strong> ${inquiryData.email}<br/>
-              <strong style="color: #003366;">Phone:</strong> ${inquiryData.number || 'Not provided'}<br/>
-              <strong style="color: #003366;">Employment:</strong> ${inquiryData.Employement_Type || 'Not provided'}
-            </div>
-            <div style="background: #d4b97a; padding: 10px; border-radius: 4px; margin-top: 10px; color: #333;">
-              <strong style="color: #003366;">Original Message:</strong><br/>
-              ${inquiryData.inquiry_topic === 'other' && inquiryData.other_inquiry 
-                ? inquiryData.other_inquiry 
-                : 'Client expressed interest in our properties.'}
-            </div>
-            <div style="margin-top: 10px; font-size: 12px; color: #666;">
-              Status: <span style="color: ${inquiryData.status === 'responded' ? '#4CAF50' : '#ff9800'}; font-weight: bold;">
-                ${inquiryData.status || 'new'}
-              </span>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Display chat messages
-      if (!messagesSnapshot.empty) {
-        messagesHTML += '<h4 style="color: #003366; margin: 20px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Chat History</h4>';
-        
-        messagesSnapshot.forEach(doc => {
-          const message = doc.data();
-          const messageDate = message.timestamp?.toDate 
-            ? message.timestamp.toDate().toLocaleString() 
-            : 'Not available';
-          
-          const isAdmin = message.sender === "admin";
-          const senderName = isAdmin ? "You (Admin)" : (inquiryData.name || 'Client');
-          const bgColor = isAdmin ? '#d4e6f1' : '#f8f4e9';
-          const borderColor = isAdmin ? '#2196F3' : '#a57934';
-          const textColor = isAdmin ? '#1565c0' : '#333';
-          
-          messagesHTML += `
-            <div style="margin-bottom: 15px;">
-              <div style="background: ${bgColor}; 
-                         padding: 12px; border-radius: 8px; 
-                         border-left: 4px solid ${borderColor};
-                         margin-left: ${isAdmin ? '40px' : '0'};">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <strong style="color: ${textColor}">
-                    ${senderName}
-                  </strong>
-                  <small style="color: #666;">${messageDate}</small>
+            <!-- Messages Popup Panel -->
+            <div id="messagesPopupPanel" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+              <div style="background: #262626; width: 80%; max-width: 800px; max-height: 80%; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.12);">
+                <div style="background: #003366; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 id="messagesPanelTitle" style="margin: 0; font-size: 18px; color: white;">Messages</h3>
+                  <button id="closeMessagesPanelBtn" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">×</button>
                 </div>
-                <div style="color: #333; white-space: pre-wrap; word-wrap: break-word;">
-                  ${message.content}
+
+                <div style="flex: 1; padding: 20px; overflow-y: auto; background: #181818;">
+                  <div id="messagesContainer" style="margin-bottom: 20px;">
+                    <!-- Messages will be loaded here -->
+                  </div>
+
+                  <!-- Reply Section -->
+                  <div style="background: #202020; padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);">
+                    <h4 style="margin-top: 0; color: #ffffff;">Send Reply</h4>
+                    <textarea id="replyMessage"
+                              placeholder="Type your reply here..."
+                              rows="6"
+                              style="width: 100%;
+                                     padding: 10px;
+                                     border: 1px solid rgba(255,255,255,0.1);
+                                     border-radius: 4px;
+                                     margin-bottom: 10px;
+                                     background: #181818;
+                                     color: #f7f7f7;
+                                     white-space: pre-wrap;
+                                     line-height: 1.5;"></textarea>
+
+                    <!-- Quick Reply Templates -->
+                    <div style="margin-bottom: 15px;">
+                      <p style="margin: 0 0 8px 0; color: #b3b3b3; font-size: 14px;">Quick Replies:</p>
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="quickReplyBtn" data-template="thankyou" style="padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                          Thank You
+                        </button>
+                        <button class="quickReplyBtn" data-template="followup" style="padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                          Follow Up
+                        </button>
+                        <button class="quickReplyBtn" data-template="pricelist_1bed" style="padding: 6px 12px; background: #fff3e0; color: #a57934; border: 1px solid #ffe0b2; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                          Send 1-Bed Pricelist
+                        </button>
+                        <button class="quickReplyBtn" data-template="pricelist_2bed" style="padding: 6px 12px; background: #e3f2fd; color: #1976D2; border: 1px solid #bbdefb; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                          Send 2-Bed Pricelist
+                        </button>
+                        <button class="quickReplyBtn" data-template="appointment" style="padding: 6px 12px; background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                          Schedule Appointment
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                      <button id="sendReplyBtn" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        Send Reply
+                      </button>
+                      <button id="cancelReplyBtn" style="padding: 8px 16px; background-color: #999; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        Cancel
+                      </button>
+                    </div>
+                    <div id="replyStatus" style="margin-top: 10px;"></div>
+                  </div>
                 </div>
-                ${message.senderName ? `<div style="font-size: 11px; color: #666; margin-top: 5px;">Sent by: ${message.senderName}</div>` : ''}
               </div>
             </div>
+
+            <div id="dataContainer"></div>
           `;
-        });
-      } else {
-        messagesHTML += `
-          <div style="text-align: center; padding: 20px; color: #666; background: #f5f5f5; border-radius: 8px; margin: 20px 0;">
-            No messages yet. Send the first message to start the conversation.
-          </div>
-        `;
-      }
-      
-      messagesContainer.innerHTML = messagesHTML;
-      
-      // Scroll to bottom
-      setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }, 100);
-      
-    } catch (error) {
-      messagesContainer.innerHTML = `
-        <div style="color: #f44336; padding: 40px; text-align: center;">
-          Failed to load messages. Please try again.
-        </div>
-      `;
-    }
-  }
 
-  // ========== OPTIMIZED DATA LOADING ==========
+          const dataContainer = document.getElementById("dataContainer");
+          let currentView = window.pmInboxStartView || "all"; // 'all', 'inquiries', 'calculations'
+          window.pmInboxStartView = null;
 
-  async function loadData() {
-    try {
-      // Show loading indicator
-      dataContainer.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: #666;">
-          <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #003366; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          <p style="margin-top: 10px;">Loading data...</p>
-        </div>
-        <style>
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        </style>
-      `;
-      
-      // Load data in parallel
-      const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
-        getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
-      ]);
+          // Mortgage Calculator Link (for templates)
+          const MORTGAGE_CALCULATOR_LINK = "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
 
-      // Process data
-      const inquiriesData = inquiriesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'inquiry',
-        data: doc.data()
-      }));
+          // Helper maps
+          const inquiryTopicMap = {
+            payment: "Payment / Price",
+            interested_1b: "I'm interested in 1 Bedroom unit",
+            interested_2b: "I'm interested in 2 Bedroom unit",
+            interested_both: "I'm interested in both bedroom unit",
+            other: "Other (explain in message)"
+          };
 
-      const calculationsData = calculationsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'calculation',
-        data: doc.data()
-      }));
+          const paymentInfoMap = {
+            downpayment: "Downpayment",
+            monthly_amortization: "Monthly Amortization",
+            total_price: "Total Price",
+            payment_terms: "Payment Terms",
+            other_payment: "Other (explain in message)"
+          };
 
-      // Filter based on current view
-      let filteredData;
-      if (currentView === 'inquiries') {
-        filteredData = inquiriesData;
-        document.getElementById('toggleViewBtn').textContent = 'Show: Inquiries Only';
-      } else if (currentView === 'calculations') {
-        filteredData = calculationsData;
-        document.getElementById('toggleViewBtn').textContent = 'Show: Calculations Only';
-      } else {
-        filteredData = [...inquiriesData, ...calculationsData];
-        document.getElementById('toggleViewBtn').textContent = 'Show: All';
-      }
+          // Toast notification system
+          const Toast = {
+            show: (message, type = "info", duration = 3000) => {
+              const toast = document.createElement("div");
+              toast.className = `toast toast-${type}`;
+              toast.textContent = message;
+              document.body.appendChild(toast);
 
-      // Sort by date
-      filteredData.sort((a, b) => {
-        const dateA = a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
-        const dateB = b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
-        return dateB - dateA;
-      });
-
-      if (filteredData.length === 0) {
-        dataContainer.innerHTML = `
-          <div style="text-align: center; padding: 40px; color: #666;">
-            <p style="font-size: 16px; margin-bottom: 10px;">No ${currentView === 'all' ? 'data' : currentView} yet.</p>
-            <p style="font-size: 14px; color: #999;">Check back later for new inquiries and calculations.</p>
-          </div>
-        `;
-        return;
-      }
-
-      // Create a map to group by email
-      const emailGroups = new Map();
-      
-      filteredData.forEach(item => {
-        const email = item.data.email;
-        if (!emailGroups.has(email)) {
-          emailGroups.set(email, {
-            email: email,
-            name: item.data.name || 'Not provided',
-            inquiries: [],
-            calculations: []
-          });
-        }
-        
-        const group = emailGroups.get(email);
-        if (item.type === 'inquiry') {
-          group.inquiries.push(item);
-        } else if (item.type === 'calculation') {
-          group.calculations.push(item);
-        }
-      });
-
-      // Create document fragments for faster DOM manipulation
-      const fragment = document.createDocumentFragment();
-      
-      // Process each email group
-      for (const [email, group] of emailGroups) {
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'email-group';
-        groupDiv.style.cssText = 'border: 2px solid #ffffff; padding: 15px; margin-bottom: 20px; border-radius: 8px; background-color: #cfa85b;';
-        
-        let groupHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <div>
-              <strong style="color: #003366; font-size: 16px;">${group.name}</strong><br/>
-              <strong style="color: #333;">Email:</strong> <span style="color: #333;">${group.email}</span><br/>
-            </div>
-            <div style="text-align: right;">
-              <span class="badge" style="background-color: #a57934; color: white; padding: 4px 8px; border-radius: 4px; margin-right: 5px;">
-                ${group.inquiries.length} Inquiry${group.inquiries.length !== 1 ? 'ies' : ''}
-              </span>
-              <span class="badge" style="background-color: #2e7d32; color: white; padding: 4px 8px; border-radius: 4px;">
-                ${group.calculations.length} Calculation${group.calculations.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
-        `;
-
-        // Show inquiries for this email
-        if (group.inquiries.length > 0) {
-          groupHTML += `<h4 style="color: #a57934; margin-top: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Inquiries</h4>`;
-          
-          for (const inquiry of group.inquiries) {
-            const inquiryTopicText = inquiryTopicMap[inquiry.data.inquiry_topic] || "No topic selected";
-            const paymentInfoText = paymentInfoMap[inquiry.data.payment_info] || "";
-            const inquiryDate = inquiry.data.createdAt?.toDate 
-              ? inquiry.data.createdAt.toDate().toLocaleString() 
-              : 'Not available';
-            
-            const statusColor = inquiry.data.status === 'responded' ? '#4CAF50' : 
-                              inquiry.data.status === 'pending' ? '#ff9800' : '#f44336';
-            
-            groupHTML += `
-              <div style="background: #ffffff; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #a57934; border: 1px solid #ddd;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                  <div style="flex: 1; color: #333;">
-                    <strong style="color: #003366;">Inquiry Topic:</strong> ${inquiryTopicText}<br/>
-                    ${paymentInfoText ? `<strong style="color: #003366;">Payment Info:</strong> ${paymentInfoText}<br/>` : ""}
-                    <strong style="color: #003366;">Date:</strong> ${inquiryDate}<br/>
-                    <strong style="color: #003366;">Status:</strong> 
-                    <span style="color: ${statusColor}; font-weight: bold;">
-                      ${inquiry.data.status || 'new'}
-                    </span>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 5px;">
-                    <button onclick="viewInquiryMessages('${inquiry.id}')" style="padding: 6px 12px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">
-                      View Chat
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `;
-          }
-        }
-
-        // Show mortgage calculations for this email
-        if (group.calculations.length > 0) {
-          groupHTML += `<h4 style="color: #2e7d32; margin-top: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Mortgage Calculations</h4>`;
-          
-          group.calculations.forEach(calc => {
-            const calcData = calc.data;
-            const calcSummary = calcData.formatted || {};
-            
-            groupHTML += `
-              <div style="background: #ffffff; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #2e7d32; border: 1px solid #ddd;">
-                <div style="display: flex; justify-content: space-between; color: #333; flex-wrap: wrap;">
-                  <div style="flex: 1; min-width: 200px;">
-                    <strong style="color: #003366;">Property Price:</strong> ${calcSummary.propertyPrice || formatCurrency(calcData.propertyPrice)}<br/>
-                    <strong style="color: #003366;">Downpayment:</strong> ${calcData.downpaymentPercent}% (${calcSummary.downpayment || formatCurrency(calcData.downpaymentAmount)})<br/>
-                    <strong style="color: #003366;">Loan Amount:</strong> ${calcSummary.loanAmount || formatCurrency(calcData.loanAmount)}<br/>
-                  </div>
-                  <div style="flex: 1; min-width: 200px;">
-                    <strong style="color: #003366;">Monthly Payment:</strong> ${calcSummary.monthlyPayment || formatCurrencyDecimal(calcData.monthlyPayment)}<br/>
-                    <strong style="color: #003366;">Term:</strong> ${calcData.loanTermYears} years @ ${calcData.interestRate}%<br/>
-                    <strong style="color: #003366;">Total Interest:</strong> ${calcSummary.totalInterest || formatCurrency(calcData.totalInterest)}<br/>
-                  </div>
-                </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                  <strong>Calculation Date:</strong> ${calcData.calculationDate ? new Date(calcData.calculationDate).toLocaleString() : 'Not available'}<br/>
-                  <strong>Phone:</strong> ${calcData.phone || 'Not provided'}<br/>
-                  ${calcData.isExistingClient ? '<span style="color: #a57934; font-weight: bold;">★ Existing Client</span>' : ''}
-                </div>
-                <div style="margin-top: 10px;">
-                  <button onclick="deleteCalculation('${calc.id}')" style="padding: 6px 12px; background-color: #d9534f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            `;
-          });
-        }
-
-        groupDiv.innerHTML = groupHTML;
-        fragment.appendChild(groupDiv);
-      }
-
-      // Clear and append in one operation
-      dataContainer.innerHTML = '';
-      dataContainer.appendChild(fragment);
-
-      Toast.show(`Loaded ${filteredData.length} items`, 'info', 1500);
-      
-    } catch (error) {
-      console.error('Error loading data:', error);
-      Toast.show(`Failed to load data: ${error.message}`, 'error');
-      dataContainer.innerHTML = `
-        <div style="text-align: center; padding: 40px; color: #f44336;">
-          <p style="font-size: 16px; margin-bottom: 10px;">Failed to load data</p>
-          <p style="font-size: 14px; color: #999; margin-bottom: 20px;">${error.message}</p>
-          <button onclick="loadData()" style="padding: 8px 16px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            Retry Loading
-          </button>
-        </div>
-      `;
-    }
-  }
-
-  // ========== HELPER FUNCTIONS ==========
-
-  // Delete calculation
-  window.deleteCalculation = async function(calcId) {
-    if (confirm('Are you sure you want to delete this mortgage calculation?')) {
-      try {
-        await deleteDoc(doc(db, "mortgage_calculations", calcId));
-        
-        Toast.show('Calculation deleted successfully', 'success');
-        
-        setTimeout(() => {
-          loadData();
-        }, 500);
-        
-      } catch (error) {
-        Toast.show(`Error: ${error.message}`, 'error');
-      }
-    }
-  };
-
-  // ========== INITIALIZATION ==========
-
-  // Initialize panels
-  setupMessagesPanel();
-
-  // Load data initially
-  loadData();
-
-  break; 
-     
-  case "document":
-  mainContent.innerHTML = `
-    <h1>Upload Client Documents</h1>
-    <p>Type your name/description, input quantity of required bedroom units, select payment terms, and attach exactly 8 files below:</p>
-
-    <form id="uploadForm" style="display:flex; flex-direction:column; gap:10px; max-width: 400px;">
-      <input type="text" id="name" placeholder="Client Name" required style="padding:8px; width: 80%;" />
-
-      <!-- Number of 1 Bedroom units -->
-      <label style="font-weight:600;">Number of 1 Bedroom Units:</label>
-      <input type="number" id="num1Bedroom" min="0" value="0" style="padding:8px; width: 80%;" />
-
-      <!-- Number of 2 Bedroom units -->
-      <label style="font-weight:600;">Number of 2 Bedroom Units:</label>
-      <input type="number" id="num2Bedroom" min="0" value="0" style="padding:8px; width: 80%;" />
-
-      <!-- Payment Terms Dropdown -->
-      <label style="font-weight:600;">Select Payment Terms:</label>
-      <select id="paymentTerms" required style="padding:8px; width: 80%; margin-bottom:10px;">
-        <option value="" disabled selected>-- Select Payment Terms --</option>
-        <option value="Monthly">Monthly</option>
-        <option value="Cash">Cash</option>
-      </select>
-
-      <!-- File inputs -->
-      ${[...Array(8)].map((_, i) => `
-        <input type="file" id="file${i+1}" required style="padding:8px; width:80%;" />
-      `).join('')}
-
-      <button type="submit" style="
-        padding: 12px 20px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 16px;
-        cursor: pointer;
-        width: fit-content;
-      ">Upload</button>
-    </form>
-
-    <div id="status" style="margin-top:10px;"></div>
-    <h2>Upload History</h2>
-    <div id="uploadHistory" style="margin-top:10px; max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
-  `;
-
-  const form = document.getElementById("uploadForm");
-  const uploadHistory = document.getElementById("uploadHistory");
-  const statusDiv = document.getElementById("status");
-  const nameInput = document.getElementById("name");
-  const paymentTermsSelect = document.getElementById("paymentTerms");
-  const num1BedroomInput = document.getElementById("num1Bedroom");
-  const num2BedroomInput = document.getElementById("num2Bedroom");
-  const fileInputs = [...Array(8)].map((_, i) => document.getElementById(`file${i+1}`));
-
-  const circumference = 2 * Math.PI * 45;
-
-  function createProgressCircle() {
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("width", "100");
-    svg.setAttribute("height", "100");
-    svg.setAttribute("viewBox", "0 0 100 100");
-    svg.style.flexShrink = "0";
-
-    const bgCircle = document.createElementNS(svgNS, "circle");
-    bgCircle.setAttribute("cx", "50");
-    bgCircle.setAttribute("cy", "50");
-    bgCircle.setAttribute("r", "45");
-    bgCircle.setAttribute("stroke", "#eee");
-    bgCircle.setAttribute("stroke-width", "10");
-    bgCircle.setAttribute("fill", "none");
-    svg.appendChild(bgCircle);
-
-    const progressCircle = document.createElementNS(svgNS, "circle");
-    progressCircle.setAttribute("cx", "50");
-    progressCircle.setAttribute("cy", "50");
-    progressCircle.setAttribute("r", "45");
-    progressCircle.setAttribute("stroke", "#4CAF50");
-    progressCircle.setAttribute("stroke-width", "10");
-    progressCircle.setAttribute("fill", "none");
-    progressCircle.setAttribute("stroke-linecap", "round");
-    progressCircle.setAttribute("stroke-dasharray", circumference);
-    progressCircle.setAttribute("stroke-dashoffset", circumference);
-    progressCircle.setAttribute("transform", "rotate(-90 50 50)");
-    svg.appendChild(progressCircle);
-
-    const progressText = document.createElementNS(svgNS, "text");
-    progressText.setAttribute("x", "50");
-    progressText.setAttribute("y", "55");
-    progressText.setAttribute("font-size", "20");
-    progressText.setAttribute("text-anchor", "middle");
-    progressText.setAttribute("fill", "white");
-    progressText.textContent = "0%";
-    svg.appendChild(progressText);
-
-    return { svg, progressCircle, progressText };
-  }
-
-  function setCircleProgress(circle, text, percent) {
-    const offset = circumference - (percent / 100) * circumference;
-    circle.style.strokeDashoffset = offset;
-    text.textContent = `${Math.round(percent)}%`;
-  }
-
-  function loadHistory() {
-    const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
-    uploadHistory.innerHTML = "";
-    if (!history.length) {
-      uploadHistory.innerHTML = "<p>No upload history yet.</p>";
-      return;
-    }
-
-    history.forEach(entry => {
-      const div = document.createElement("div");
-      div.style.borderBottom = "1px solid #ddd";
-      div.style.marginBottom = "12px";
-      div.style.paddingBottom = "12px";
-      div.style.display = "flex";
-      div.style.alignItems = "center";
-      div.style.gap = "12px";
-      div.style.justifyContent = "space-between";
-
-      const contentDiv = document.createElement("div");
-      contentDiv.innerHTML = `
-        <strong>${entry.name}</strong><br/>
-        <small><em>1 Bedroom Units: ${entry.num1Bedroom}</em></small><br/>
-        <small><em>2 Bedroom Units: ${entry.num2Bedroom}</em></small><br/>
-        <small><em>${entry.paymentTerms}</em></small><br/>
-        <small><em>Uploaded at ${entry.time}</em></small>
-        <ul style="margin: 8px 0 0 20px; padding-left: 0; list-style: disc;">
-          ${entry.files.map(f => `<li>${f}</li>`).join("")}
-        </ul>
-        <p style="margin-top:8px; font-weight:600; color:#2e7d32;">
-          The client is ready for account creation.
-        </p>
-      `;
-
-      const { svg, progressCircle, progressText } = createProgressCircle();
-      setCircleProgress(progressCircle, progressText, 100);
-
-      div.appendChild(contentDiv);
-      div.appendChild(svg);
-      uploadHistory.appendChild(div);
-    });
-  }
-
-  loadHistory();
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const name = nameInput.value.trim();
-    const paymentTerms = paymentTermsSelect.value;
-    const num1Bedroom = Number(num1BedroomInput.value);
-    const num2Bedroom = Number(num2BedroomInput.value);
-
-    if (num1Bedroom < 0 || num2Bedroom < 0) {
-      alert("Bedroom unit counts cannot be negative.");
-      return;
-    }
-
-    if (!paymentTerms) {
-      alert("Please select a payment term.");
-      return;
-    }
-
-    statusDiv.textContent = "Uploading files to Cloudinary...";
-
-    let totalSize = 0;
-    const files = fileInputs.map(f => f.files[0]);
-    for (let i = 0; i < files.length; i++) {
-      if (!files[i]) {
-        alert(`Missing file #${i+1}`);
-        return;
-      }
-      totalSize += files[i].size;
-    }
-
-    let uploadedSize = 0;
-    const uploadedUrls = [];
-    const uploadedFileNames = [];
-
-    const tempDiv = document.createElement("div");
-    tempDiv.style.display = "flex";
-    tempDiv.style.justifyContent = "space-between";
-    tempDiv.style.alignItems = "center";
-    tempDiv.style.borderBottom = "1px solid #ddd";
-    tempDiv.style.paddingBottom = "12px";
-    tempDiv.style.marginBottom = "12px";
-
-    const tempContentDiv = document.createElement("div");
-    tempContentDiv.innerHTML = `<strong>${name}</strong><br/><small>Uploading...</small>`;
-    const { svg, progressCircle, progressText } = createProgressCircle();
-
-    tempDiv.appendChild(tempContentDiv);
-    tempDiv.appendChild(svg);
-    uploadHistory.prepend(tempDiv);
-
-    // Upload
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", "upload_preset");
-
-      try {
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", "https://api.cloudinary.com/v1_1/dfklsyjch/upload");
-
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const percent = ((uploadedSize + event.loaded) / totalSize) * 100;
-              setCircleProgress(progressCircle, progressText, percent);
+              setTimeout(() => {
+                toast.remove();
+              }, duration);
             }
           };
 
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              const data = JSON.parse(xhr.responseText);
-              uploadedUrls.push(data.secure_url);
-              uploadedFileNames.push(file.name);
-              uploadedSize += file.size;
-              resolve();
-            } else reject();
+          const formatCurrency = amount => {
+            if (!amount && amount !== 0) return "₱ 0";
+            return (
+              "₱ " +
+              amount.toLocaleString("en-PH", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              })
+            );
           };
 
-          xhr.onerror = () => reject();
-          xhr.send(formData);
-        });
-      } catch {
-        statusDiv.textContent = "Upload failed.";
-        return;
-      }
-    }
+          const formatCurrencyDecimal = amount => {
+            if (!amount && amount !== 0) return "₱ 0.00";
+            return (
+              "₱ " +
+              amount.toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })
+            );
+          };
 
-    statusDiv.textContent = "Sending email...";
+          // View toggle buttons
+          document.getElementById("toggleViewBtn").addEventListener("click", () => {
+            currentView = "all";
+            loadData();
+          });
 
-    // Prepare download URLs with fl_attachment to force download
-    const downloadUrls = uploadedUrls.map(url => url.replace('/upload/', '/upload/fl_attachment/'));
+          document.getElementById("showInquiriesBtn").addEventListener("click", () => {
+            currentView = "inquiries";
+            loadData();
+          });
 
-    // Prepare email
-    const templateParams = {
-      name,
-      paymentTerms,
-      num1Bedroom,
-      num2Bedroom,
-      time: new Date().toLocaleString(),
-      message: `
-        <p>1 Bedroom Units: ${num1Bedroom}</p>
-        <p>2 Bedroom Units: ${num2Bedroom}</p>
-        <p>Payment Terms: ${paymentTerms}</p>
-        <p>Files:</p>
-        ${downloadUrls.map((u, i) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${uploadedFileNames[i]}</a>`).join("<br>")}
-      `
-    };
+          document.getElementById("showCalculationsBtn").addEventListener("click", () => {
+            currentView = "calculations";
+            loadData();
+          });
 
-    try {
-      await emailjs.send("service_u1n5d9t", "template_qu1s2lh", templateParams);
+          // Messages panel setup
+          function setupMessagesPanel() {
+            const messagesPanel = document.getElementById("messagesPopupPanel");
+            const closeMessagesPanelBtn = document.getElementById("closeMessagesPanelBtn");
+            const sendReplyBtn = document.getElementById("sendReplyBtn");
+            const cancelReplyBtn = document.getElementById("cancelReplyBtn");
+            const quickReplyBtns = document.querySelectorAll(".quickReplyBtn");
 
-      statusDiv.textContent = "Email sent!";
-      uploadHistory.removeChild(tempDiv);
+            closeMessagesPanelBtn.addEventListener("click", () => {
+              messagesPanel.style.display = "none";
+            });
 
-      // Save history
-      const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
-      history.unshift({
-        name,
-        paymentTerms,
-        num1Bedroom,
-        num2Bedroom,
-        time: new Date().toLocaleString(),
-        files: uploadedFileNames
-      });
+            cancelReplyBtn.addEventListener("click", () => {
+              document.getElementById("replyMessage").value = "";
+            });
 
-      if (history.length > 10) history.pop();
-      localStorage.setItem("uploadHistory", JSON.stringify(history));
-      loadHistory();
+            // Send reply
+            sendReplyBtn.addEventListener("click", async () => {
+              const replyMessage = document.getElementById("replyMessage").value.trim();
+              const currentInquiryId = messagesPanel.dataset.inquiryId;
 
-      form.reset();
-    } catch {
-      statusDiv.textContent = "Email sending failed.";
-    }
-  });
-  break;
+              if (!replyMessage) {
+                Toast.show("Please enter a reply message", "error");
+                return;
+              }
+
+              const originalText = sendReplyBtn.textContent;
+              sendReplyBtn.textContent = "Sending...";
+              sendReplyBtn.disabled = true;
+
+              const replyStatus = document.getElementById("replyStatus");
+              replyStatus.textContent = "";
+
+              try {
+                await addDoc(collection(db, "inquiries", currentInquiryId, "messages"), {
+                  sender: "admin",
+                  senderName: "Project Manager",
+                  senderId: "admin_pm",
+                  content: replyMessage,
+                  timestamp: serverTimestamp(),
+                  readByPM: true,
+                  readByUser: false
+                });
+
+                await updateDoc(doc(db, "inquiries", currentInquiryId), {
+                  status: "responded"
+                });
+
+                document.getElementById("replyMessage").value = "";
+                await loadInquiryMessages(currentInquiryId);
+
+                Toast.show("Reply sent successfully!", "success");
+                replyStatus.textContent = "✓ Reply sent successfully!";
+                replyStatus.style.color = "#4CAF50";
+              } catch (error) {
+                Toast.show(`Error: ${error.message}`, "error");
+                replyStatus.textContent = `✗ Error: ${error.message}`;
+                replyStatus.style.color = "#f44336";
+              } finally {
+                sendReplyBtn.textContent = originalText;
+                sendReplyBtn.disabled = false;
+              }
+            });
+
+            // Quick reply templates
+            quickReplyBtns.forEach(btn => {
+              btn.addEventListener("click", () => {
+                const template = btn.dataset.template;
+                let message = "";
+
+                switch (template) {
+                  case "thankyou":
+                    message =
+                      "Thank you for your inquiry about Solano Hillside Residences. We appreciate your interest in our properties and would be happy to assist you further with any questions you may have.";
+                    break;
+                  case "followup":
+                    message =
+                      "I'm following up on your recent inquiry about our properties. Are you still interested in learning more about our available units or would you like to schedule a site viewing?";
+                    break;
+                  case "pricelist_1bed":
+                    message = `Here are the details for our 1-Bedroom units:\n\n🏠 1-BEDROOM UNIT DETAILS:\n• Floor Area: 24-28 sqm\n• Total Price: ₱2.8M - ₱3.2M\n• Downpayment: ₱150,000 (spot cash)\n• Monthly: ₱12,500 - ₱14,000 (24-36 months)\n\n💡 FINANCING OPTIONS:\n• Bank Financing: 80% Loan-to-value ratio\n• In-house: Flexible payment terms\n• Pag-IBIG: Qualified units and buyers\n\n🔗 Calculate your personalized payments here: ${MORTGAGE_CALCULATOR_LINK}\n`;
+                    break;
+                  case "pricelist_2bed":
+                    message = `Here are the details for our 2-Bedroom units:\n\n🏠 2-BEDROOM UNIT DETAILS:\n• Floor Area: 36-42 sqm\n• Total Price: ₱3.8M - ₱4.2M\n• Downpayment: ₱200,000 (spot cash)\n• Monthly: ₱16,800 - ₱18,500 (24-36 months)\n\n💡 FINANCING OPTIONS:\n• Bank Financing: 80% Loan-to-value ratio\n• In-house: Flexible payment terms\n• Pag-IBIG: Qualified units and buyers\n\n🔗 Calculate your personalized payments here: ${MORTGAGE_CALCULATOR_LINK}\n`;
+                    break;
+                  case "appointment":
+                    message =
+                      "Want more details? We can schedule a site viewing this week. Please let me know your preferred date and time, and I'll arrange everything for you.\n\n📅 Available Viewing Slots:\nMonday - Friday: 9:00 AM - 5:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: By special arrangement\n\n📍 Location: Solano, Muntinlupa Paranaque\n\nLooking forward to showing you around!";
+                    break;
+                }
+
+                document.getElementById("replyMessage").value = message;
+                document.getElementById("replyMessage").focus();
+              });
+            });
+
+            messagesPanel.addEventListener("click", e => {
+              if (e.target === messagesPanel) {
+                messagesPanel.style.display = "none";
+              }
+            });
+          }
+
+          // View messages of an inquiry
+          window.viewInquiryMessages = async function (inquiryId) {
+            try {
+              const messagesPanel = document.getElementById("messagesPopupPanel");
+              const messagesContainer = document.getElementById("messagesContainer");
+              const panelTitle = document.getElementById("messagesPanelTitle");
+
+              messagesContainer.innerHTML =
+                '<div style="text-align: center; padding: 40px; color: #666;">Loading messages...</div>';
+              messagesPanel.style.display = "flex";
+
+              const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+
+              if (!inquiryDoc.exists()) {
+                Toast.show("Inquiry not found", "error");
+                messagesContainer.innerHTML =
+                  '<div style="color: #f44336; text-align: center; padding: 40px;">Inquiry not found</div>';
+                return;
+              }
+
+              const inquiryData = inquiryDoc.data();
+              panelTitle.textContent = `Messages with ${inquiryData.name || "Client"}`;
+
+              messagesPanel.dataset.inquiryId = inquiryId;
+
+              await loadInquiryMessages(inquiryId);
+            } catch (error) {
+              console.error("Error loading messages:", error);
+              Toast.show(`Failed to load messages: ${error.message}`, "error");
+              document.getElementById("messagesContainer").innerHTML =
+                '<div style="color: #f44336; padding: 40px; text-align: center;">Failed to load messages. Please try again.</div>';
+            }
+          };
+
+          async function loadInquiryMessages(inquiryId) {
+            const messagesContainer = document.getElementById("messagesContainer");
+
+            try {
+              const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+              const inquiryData = inquiryDoc.data();
+
+              const messagesSnapshot = await getDocs(
+                query(collection(db, "inquiries", inquiryId, "messages"), orderBy("timestamp", "asc"))
+              );
+
+              let messagesHTML = "";
+
+              const inquiryTopicText =
+                inquiryTopicMap[inquiryData.inquiry_topic] || "No topic selected";
+              const paymentInfoText = paymentInfoMap[inquiryData.payment_info] || "";
+              const inquiryDate = inquiryData.createdAt?.toDate
+                ? inquiryData.createdAt.toDate().toLocaleString()
+                : "Not available";
+
+              messagesHTML += `
+                <div style="margin-bottom: 20px;">
+                  <div style="background: #3a2f1b; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                      <strong style="color: #ffffff;">${inquiryData.name || "Client"}</strong>
+                      <small style="color: #cccccc;">${inquiryDate}</small>
+                    </div>
+                    <div style="margin-bottom: 10px; color: #f7f7f7; font-size:13px;">
+                      <strong>Inquiry Topic:</strong> ${inquiryTopicText}<br/>
+                      ${
+                        paymentInfoText
+                          ? `<strong>Payment Info:</strong> ${paymentInfoText}<br/>`
+                          : ""
+                      }
+                      <strong>Email:</strong> ${inquiryData.email}<br/>
+                      <strong>Phone:</strong> ${inquiryData.number || "Not provided"}<br/>
+                      <strong>Employment:</strong> ${
+                        inquiryData.Employement_Type || "Not provided"
+                      }
+                    </div>
+                    <div style="background: #5a4625; padding: 10px; border-radius: 4px; margin-top: 10px; color: #f7f7f7; font-size:13px;">
+                      <strong>Original Message:</strong><br/>
+                      ${
+                        inquiryData.inquiry_topic === "other" && inquiryData.other_inquiry
+                          ? inquiryData.other_inquiry
+                          : "Client expressed interest in our properties."
+                      }
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #cccccc;">
+                      Status:
+                      <span style="color: ${
+                        inquiryData.status === "responded" ? "#4CAF50" : "#ff9800"
+                      }; font-weight: bold;">
+                        ${inquiryData.status || "new"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              `;
+
+              if (!messagesSnapshot.empty) {
+                messagesHTML +=
+                  '<h4 style="color: #ffffff; margin: 20px 0 10px 0; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 5px; font-size:14px;">Chat History</h4>';
+
+                messagesSnapshot.forEach(docSnap => {
+                  const message = docSnap.data();
+                  const messageDate = message.timestamp?.toDate
+                    ? message.timestamp.toDate().toLocaleString()
+                    : "Not available";
+
+                  const isAdmin = message.sender === "admin";
+                  const senderName = isAdmin ? "You (Admin)" : inquiryData.name || "Client";
+                  const bgColor = isAdmin ? "#28384a" : "#3b3326";
+                  const borderColor = isAdmin ? "#2196F3" : "#c0933c";
+                  const textColor = "#f7f7f7";
+
+                  messagesHTML += `
+                    <div style="margin-bottom: 15px;">
+                      <div style="
+                        background: ${bgColor};
+                        padding: 12px;
+                        border-radius: 8px;
+                        border-left: 4px solid ${borderColor};
+                        margin-left: ${isAdmin ? "40px" : "0"};
+                      ">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                          <strong style="color: ${textColor}; font-size:13px;">
+                            ${senderName}
+                          </strong>
+                          <small style="color: #cccccc;">${messageDate}</small>
+                        </div>
+                        <div style="color: #f7f7f7; white-space: pre-wrap; word-wrap: break-word; font-size:13px;">
+                          ${message.content}
+                        </div>
+                        ${
+                          message.senderName
+                            ? `<div style="font-size: 11px; color: #b3b3b3; margin-top: 5px;">Sent by: ${message.senderName}</div>`
+                            : ""
+                        }
+                      </div>
+                    </div>
+                  `;
+                });
+              } else {
+                messagesHTML += `
+                  <div style="text-align: center; padding: 20px; color: #b3b3b3; background: #202020; border-radius: 8px; margin: 20px 0; font-size:13px;">
+                    No messages yet. Send the first message to start the conversation.
+                  </div>
+                `;
+              }
+
+              messagesContainer.innerHTML = messagesHTML;
+
+              setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              }, 100);
+            } catch (error) {
+              console.error(error);
+              messagesContainer.innerHTML =
+                '<div style="color: #f44336; padding: 40px; text-align: center;">Failed to load messages. Please try again.</div>';
+            }
+          }
+
+          // Optimized data loading
+          async function loadData() {
+            try {
+              dataContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #b3b3b3;">
+                  <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #555; border-top: 3px solid #c0933c; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                  <p style="margin-top: 10px; font-size:13px;">Loading data...</p>
+                  <style>
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  </style>
+                </div>
+              `;
+
+              const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
+                getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
+                getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
+              ]);
+
+              const inquiriesData = inquiriesSnapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                type: "inquiry",
+                data: docSnap.data()
+              }));
+
+              const calculationsData = calculationsSnapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                type: "calculation",
+                data: docSnap.data()
+              }));
+
+              let filteredData;
+              if (currentView === "inquiries") {
+                filteredData = inquiriesData;
+                document.getElementById("toggleViewBtn").textContent = "Show: Inquiries Only";
+              } else if (currentView === "calculations") {
+                filteredData = calculationsData;
+                document.getElementById("toggleViewBtn").textContent = "Show: Calculations Only";
+              } else {
+                filteredData = [...inquiriesData, ...calculationsData];
+                document.getElementById("toggleViewBtn").textContent = "Show: All";
+              }
+
+              filteredData.sort((a, b) => {
+                const dateA =
+                  a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
+                const dateB =
+                  b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
+                return dateB - dateA;
+              });
+
+              if (!filteredData.length) {
+                dataContainer.innerHTML = `
+                  <div style="text-align: center; padding: 40px; color: #b3b3b3;">
+                    <p style="font-size: 16px; margin-bottom: 10px;">No ${
+                      currentView === "all" ? "data" : currentView
+                    } yet.</p>
+                    <p style="font-size: 14px; color: #777;">Check back later for new inquiries and calculations.</p>
+                  </div>
+                `;
+                return;
+              }
+
+              const emailGroups = new Map();
+
+              filteredData.forEach(item => {
+                const email = item.data.email;
+                if (!emailGroups.has(email)) {
+                  emailGroups.set(email, {
+                    email,
+                    name: item.data.name || "Not provided",
+                    inquiries: [],
+                    calculations: []
+                  });
+                }
+
+                const group = emailGroups.get(email);
+                if (item.type === "inquiry") {
+                  group.inquiries.push(item);
+                } else if (item.type === "calculation") {
+                  group.calculations.push(item);
+                }
+              });
+
+              const fragment = document.createDocumentFragment();
+
+              for (const [email, group] of emailGroups) {
+                const groupDiv = document.createElement("div");
+                groupDiv.className = "email-group";
+
+                let groupHTML = `
+                  <div class="email-group-header">
+                    <div>
+                      <div class="email-group-name">${group.name}</div>
+                      <div style="font-size: 13px; color: #b3b3b3;">
+                        Email: <span>${group.email}</span>
+                      </div>
+                    </div>
+                    <div style="text-align: right;">
+                      <span class="badge">
+                        ${group.inquiries.length} Inquiry${
+                          group.inquiries.length !== 1 ? "ies" : ""
+                        }
+                      </span>
+                      <span class="badge">
+                        ${group.calculations.length} Calculation${
+                          group.calculations.length !== 1 ? "s" : ""
+                        }
+                      </span>
+                    </div>
+                  </div>
+                `;
+
+                if (group.inquiries.length > 0) {
+                  groupHTML += `<h4 style="color: #f7f7f7; margin-top: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; font-size:14px;">Inquiries</h4>`;
+
+                  for (const inquiry of group.inquiries) {
+                    const inquiryTopicText =
+                      inquiryTopicMap[inquiry.data.inquiry_topic] || "No topic selected";
+                    const paymentInfoText =
+                      paymentInfoMap[inquiry.data.payment_info] || "";
+                    const inquiryDate = inquiry.data.createdAt?.toDate
+                      ? inquiry.data.createdAt.toDate().toLocaleString()
+                      : "Not available";
+
+                    const statusColor =
+                      inquiry.data.status === "responded"
+                        ? "#4CAF50"
+                        : inquiry.data.status === "pending"
+                        ? "#ff9800"
+                        : "#f44336";
+
+                    groupHTML += `
+                      <div class="inquiry-item">
+                        <div style="display:flex; justify-content: space-between; align-items:flex-start; gap:12px;">
+                          <div style="flex:1; color:#f7f7f7; font-size:13px;">
+                            <strong>Inquiry Topic:</strong> ${inquiryTopicText}<br/>
+                            ${
+                              paymentInfoText
+                                ? `<strong>Payment Info:</strong> ${paymentInfoText}<br/>`
+                                : ""
+                            }
+                            <strong>Date:</strong> ${inquiryDate}<br/>
+                            <strong>Status:</strong>
+                            <span style="color: ${statusColor}; font-weight:bold;">
+                              ${inquiry.data.status || "new"}
+                            </span>
+                          </div>
+                          <div style="display:flex; flex-direction:column; gap:5px;">
+                            <button onclick="viewInquiryMessages('${
+                              inquiry.id
+                            }')" style="padding: 6px 12px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                              View Chat
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  }
+                }
+
+                if (group.calculations.length > 0) {
+                  groupHTML += `<h4 style="color: #a5d6a7; margin-top: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; font-size:14px;">Mortgage Calculations</h4>`;
+
+                  group.calculations.forEach(calc => {
+                    const calcData = calc.data;
+                    const calcSummary = calcData.formatted || {};
+
+                    groupHTML += `
+                      <div class="calculation-item">
+                        <div style="display:flex; justify-content:space-between; color:#f7f7f7; flex-wrap:wrap; gap:10px; font-size:13px;">
+                          <div style="flex:1; min-width:200px;">
+                            <strong>Property Price:</strong> ${
+                              calcSummary.propertyPrice ||
+                              formatCurrency(calcData.propertyPrice)
+                            }<br/>
+                            <strong>Downpayment:</strong> ${calcData.downpaymentPercent}% (${
+                      calcSummary.downpayment || formatCurrency(calcData.downpaymentAmount)
+                    })<br/>
+                            <strong>Loan Amount:</strong> ${
+                              calcSummary.loanAmount || formatCurrency(calcData.loanAmount)
+                            }<br/>
+                          </div>
+                          <div style="flex:1; min-width:200px;">
+                            <strong>Monthly Payment:</strong> ${
+                              calcSummary.monthlyPayment ||
+                              formatCurrencyDecimal(calcData.monthlyPayment)
+                            }<br/>
+                            <strong>Term:</strong> ${calcData.loanTermYears} years @ ${
+                      calcData.interestRate
+                    }%<br/>
+                            <strong>Total Interest:</strong> ${
+                              calcSummary.totalInterest ||
+                              formatCurrency(calcData.totalInterest)
+                            }<br/>
+                          </div>
+                        </div>
+                        <div style="margin-top: 8px; font-size:12px; color:#cccccc;">
+                          <strong>Calculation Date:</strong> ${
+                            calcData.calculationDate
+                              ? new Date(calcData.calculationDate).toLocaleString()
+                              : "Not available"
+                          }<br/>
+                          <strong>Phone:</strong> ${calcData.phone || "Not provided"}<br/>
+                          ${
+                            calcData.isExistingClient
+                              ? '<span style="color: #f6d7a0; font-weight:bold;">★ Existing Client</span>'
+                              : ""
+                          }
+                        </div>
+                        <div style="margin-top: 8px;">
+                          <button onclick="deleteCalculation('${
+                            calc.id
+                          }')" style="padding: 6px 12px; background-color: #d9534f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    `;
+                  });
+                }
+
+                groupDiv.innerHTML = groupHTML;
+                fragment.appendChild(groupDiv);
+              }
+
+              dataContainer.innerHTML = "";
+              dataContainer.appendChild(fragment);
+
+              Toast.show(`Loaded ${filteredData.length} items`, "info", 1500);
+            } catch (error) {
+              console.error("Error loading data:", error);
+              Toast.show(`Failed to load data: ${error.message}`, "error");
+              dataContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #f44336;">
+                  <p style="font-size: 16px; margin-bottom: 10px;">Failed to load data</p>
+                  <p style="font-size: 14px; color: #999; margin-bottom: 20px;">${
+                    error.message
+                  }</p>
+                  <button onclick="loadContent(null, 'inbox')" style="padding: 8px 16px; background-color: #003366; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Retry Loading
+                  </button>
+                </div>
+              `;
+            }
+          }
+
+          // Delete calculation
+          window.deleteCalculation = async function (calcId) {
+            if (confirm("Are you sure you want to delete this mortgage calculation?")) {
+              try {
+                await deleteDoc(doc(db, "mortgage_calculations", calcId));
+                Toast.show("Calculation deleted successfully", "success");
+                setTimeout(() => {
+                  loadData();
+                }, 500);
+              } catch (error) {
+                Toast.show(`Error: ${error.message}`, "error");
+              }
+            }
+          };
+
+          setupMessagesPanel();
+          loadData();
+          break;
+
+        /* ================= DOCUMENT ================= */
+        case "document":
+          mainContent.innerHTML = `
+            <div class="pm-doc">
+              <div class="pm-doc-header">
+                <h1 class="pm-page-title">Client Documents</h1>
+                <p class="pm-page-subtitle">
+                  Upload and track document sets, categorized by client type.
+                </p>
+              </div>
+
+              <div class="pm-doc-layout">
+                <!-- LEFT: form + history -->
+                <div class="pm-doc-left">
+                  <div class="card pm-doc-form-card">
+                    <h2 class="pm-section-title">Upload document set</h2>
+                    <form id="uploadForm" class="pm-doc-form">
+                      <div class="pm-form-row">
+                        <label class="pm-label" for="name">Client name</label>
+                        <input type="text" id="name" class="pm-input" placeholder="Full name" required />
+                      </div>
+
+                      <div class="pm-form-row">
+                        <label class="pm-label" for="clientType">Client type</label>
+                        <select id="clientType" class="pm-input" required>
+                          <option value="">-- Select client type --</option>
+                          <option value="employed">Employed</option>
+                          <option value="self-employed">Self‑Employed / Freelancer</option>
+                          <option value="business-owner">Business Owner</option>
+                        </select>
+                      </div>
+
+                      <div class="pm-form-row-inline">
+                        <div class="pm-form-row">
+                          <label class="pm-label" for="num1Bedroom"># of 1BR units</label>
+                          <input type="number" id="num1Bedroom" min="0" value="0" class="pm-input" />
+                        </div>
+                        <div class="pm-form-row">
+                          <label class="pm-label" for="num2Bedroom"># of 2BR units</label>
+                          <input type="number" id="num2Bedroom" min="0" value="0" class="pm-input" />
+                        </div>
+                      </div>
+
+                      <div class="pm-form-row">
+                        <label class="pm-label" for="paymentTerms">Payment terms</label>
+                        <select id="paymentTerms" class="pm-input" required>
+                          <option value="" disabled selected>-- Select payment terms --</option>
+                          <option value="Monthly">Monthly</option>
+                          <option value="Cash">Cash</option>
+                        </select>
+                      </div>
+
+                      <div class="pm-form-row">
+                        <label class="pm-label">Attach 8 files (scans / PDFs)</label>
+                        <div class="pm-file-grid">
+                          ${[...Array(8)]
+                            .map(
+                              (_, i) =>
+                                `<input type="file" id="file${i + 1}" class="pm-input pm-file-input" required />`
+                            )
+                            .join("")}
+                        </div>
+                      </div>
+
+                      <div class="pm-form-row">
+                        <button type="submit" class="pm-btn pm-btn-primary">
+                          Upload &amp; send to admin
+                        </button>
+                      </div>
+
+                      <p id="status" class="pm-status-text"></p>
+                    </form>
+                  </div>
+
+                  <div class="card pm-doc-history-card">
+                    <h2 class="pm-section-title">Upload history</h2>
+                    <p class="pm-muted" style="margin-bottom:8px;">
+                      Local summary of recent document sets (for this browser).
+                    </p>
+                    <div id="uploadHistory"></div>
+                  </div>
+                </div>
+
+                <!-- RIGHT: requirements panel -->
+                <div class="pm-doc-right">
+                  <div class="card pm-doc-req-card">
+                    <h2 class="pm-section-title">Requirements per client type</h2>
+                    <p class="pm-doc-req-note">
+                      General requirements apply to all buyers. Specific requirements depend on the selected client type.
+                    </p>
+
+                    <div class="pm-req-group">
+                      <h4>General requirements (all buyers)</h4>
+                      <ul>
+                        <li>Photocopy of at least two valid government IDs</li>
+                        <li>Tax Identification Number (TIN) and BIR verification slip (if applicable)</li>
+                        <li>Proof of billing under the buyer’s name</li>
+                        <li>Marriage certificate (if married)</li>
+                        <li>Community Tax Certificate (Cedula, if required)</li>
+                        <li>Reservation agreement &amp; reservation fee (for pre‑selling units)</li>
+                        <li>Passport / ACR for foreign nationals residing in the Philippines</li>
+                      </ul>
+                    </div>
+
+                    <div class="pm-req-group doc-type-requirements" data-type="employed">
+                      <h4>Employed individuals</h4>
+                      <ul>
+                        <li>Certificate of Employment and Compensation (COEC)</li>
+                        <li>Latest payslips (last 3 months)</li>
+                        <li>OFW employment contract (for overseas workers)</li>
+                      </ul>
+                    </div>
+
+                    <div class="pm-req-group doc-type-requirements" data-type="self-employed">
+                      <h4>Self‑employed / freelancers / commission‑based</h4>
+                      <ul>
+                        <li>Certificate of Engagement from client / business owner</li>
+                        <li>Commission vouchers for the last 12 months</li>
+                        <li>Bank statements (3–12 months) showing consistent income</li>
+                        <li>Lease contract &amp; tax declaration (for rental income)</li>
+                        <li>Certified true copy of transport franchise (for PUV operators)</li>
+                      </ul>
+                    </div>
+
+                    <div class="pm-req-group doc-type-requirements" data-type="business-owner">
+                      <h4>Business owners</h4>
+                      <ul>
+                        <li>DTI registration (sole proprietors)</li>
+                        <li>SEC registration &amp; Articles of Incorporation / By‑laws</li>
+                        <li>Business or Mayor’s Permit</li>
+                        <li>ITR (BIR 1701 for sole props, 1702 for corporations)</li>
+                        <li>Audited financial statements for the last 2–3 years</li>
+                        <li>Bank statements / passbook (3–12 months, original or CTC)</li>
+                        <li>Trade references (key suppliers &amp; customers w/ contact details)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          // === Document tab logic ===
+          const form = document.getElementById("uploadForm");
+          const uploadHistory = document.getElementById("uploadHistory");
+          const statusDiv = document.getElementById("status");
+          const nameInput = document.getElementById("name");
+          const clientTypeSelect = document.getElementById("clientType");
+          const paymentTermsSelect = document.getElementById("paymentTerms");
+          const num1BedroomInput = document.getElementById("num1Bedroom");
+          const num2BedroomInput = document.getElementById("num2Bedroom");
+          const fileInputs = [...Array(8)].map((_, i) =>
+            document.getElementById(`file${i + 1}`)
+          );
+
+          const reqBlocks = document.querySelectorAll(".doc-type-requirements");
+          const syncRequirementBlocks = () => {
+            const type = clientTypeSelect.value;
+            reqBlocks.forEach(block => {
+              if (block.dataset.type === type) {
+                block.classList.add("active");
+              } else {
+                block.classList.remove("active");
+              }
+            });
+          };
+          clientTypeSelect.addEventListener("change", syncRequirementBlocks);
+
+          const circumference = 2 * Math.PI * 45;
+
+          const createProgressCircle = () => {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "80");
+            svg.setAttribute("height", "80");
+            svg.setAttribute("viewBox", "0 0 100 100");
+
+            const bgCircle = document.createElementNS(svgNS, "circle");
+            bgCircle.setAttribute("cx", "50");
+            bgCircle.setAttribute("cy", "50");
+            bgCircle.setAttribute("r", "45");
+            bgCircle.setAttribute("stroke", "#444");
+            bgCircle.setAttribute("stroke-width", "10");
+            bgCircle.setAttribute("fill", "none");
+            svg.appendChild(bgCircle);
+
+            const progressCircle = document.createElementNS(svgNS, "circle");
+            progressCircle.setAttribute("cx", "50");
+            progressCircle.setAttribute("cy", "50");
+            progressCircle.setAttribute("r", "45");
+            progressCircle.setAttribute("stroke", "#4CAF50");
+            progressCircle.setAttribute("stroke-width", "10");
+            progressCircle.setAttribute("fill", "none");
+            progressCircle.setAttribute("stroke-linecap", "round");
+            progressCircle.setAttribute("stroke-dasharray", circumference);
+            progressCircle.setAttribute("stroke-dashoffset", circumference);
+            progressCircle.setAttribute("transform", "rotate(-90 50 50)");
+            svg.appendChild(progressCircle);
+
+            const progressText = document.createElementNS(svgNS, "text");
+            progressText.setAttribute("x", "50");
+            progressText.setAttribute("y", "55");
+            progressText.setAttribute("font-size", "18");
+            progressText.setAttribute("text-anchor", "middle");
+            progressText.setAttribute("fill", "#ffffff");
+            progressText.textContent = "0%";
+            svg.appendChild(progressText);
+
+            return { svg, progressCircle, progressText };
+          };
+
+          const setCircleProgress = (circle, text, percent) => {
+            const offset = circumference - (percent / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+            text.textContent = `${Math.round(percent)}%`;
+          };
+
+          const clientTypeLabel = type => {
+            switch (type) {
+              case "employed":
+                return "Employed";
+              case "self-employed":
+                return "Self‑Employed / Freelancer";
+              case "business-owner":
+                return "Business Owner";
+              default:
+                return "Unspecified";
+            }
+          };
+
+          const loadHistory = () => {
+            const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+            uploadHistory.innerHTML = "";
+            if (!history.length) {
+              uploadHistory.innerHTML =
+                '<p class="pm-muted">No upload history yet.</p>';
+              return;
+            }
+
+            history.forEach(entry => {
+              const div = document.createElement("div");
+              div.style.borderBottom = "1px solid rgba(255,255,255,0.08)";
+              div.style.marginBottom = "12px";
+              div.style.paddingBottom = "12px";
+              div.style.display = "flex";
+              div.style.alignItems = "center";
+              div.style.gap = "12px";
+              div.style.justifyContent = "space-between";
+
+              const contentDiv = document.createElement("div");
+              const typeLabel = clientTypeLabel(entry.clientType);
+              contentDiv.innerHTML = `
+                <strong>${entry.name}</strong><br/>
+                <small>Client type: ${typeLabel}</small><br/>
+                <small>1BR: ${entry.num1Bedroom} • 2BR: ${
+                entry.num2Bedroom
+              }</small><br/>
+                <small>Terms: ${entry.paymentTerms}</small><br/>
+                <small>Uploaded at ${entry.time}</small>
+                <ul style="margin: 6px 0 0 18px; padding-left: 0; list-style: disc; font-size:12px;">
+                  ${entry.files.map(f => `<li>${f}</li>`).join("")}
+                </ul>
+                <p style="margin-top:6px; font-weight:600; color:#a5d6a7; font-size:12px;">
+                  The client is ready for account creation.
+                </p>
+              `;
+
+              const { svg, progressCircle, progressText } = createProgressCircle();
+              setCircleProgress(progressCircle, progressText, 100);
+
+              div.appendChild(contentDiv);
+              div.appendChild(svg);
+              uploadHistory.appendChild(div);
+            });
+          };
+
+          loadHistory();
+
+          form.addEventListener("submit", async e => {
+            e.preventDefault();
+
+            const name = nameInput.value.trim();
+            const clientType = clientTypeSelect.value;
+            const paymentTerms = paymentTermsSelect.value;
+            const num1Bedroom = Number(num1BedroomInput.value);
+            const num2Bedroom = Number(num2BedroomInput.value);
+
+            if (!clientType) {
+              alert("Please select a client type.");
+              return;
+            }
+
+            if (num1Bedroom < 0 || num2Bedroom < 0) {
+              alert("Bedroom unit counts cannot be negative.");
+              return;
+            }
+
+            if (!paymentTerms) {
+              alert("Please select payment terms.");
+              return;
+            }
+
+            statusDiv.textContent = "Uploading files to Cloudinary...";
+
+            let totalSize = 0;
+            const files = fileInputs.map(f => f.files[0]);
+            for (let i = 0; i < files.length; i++) {
+              if (!files[i]) {
+                alert(`Missing file #${i + 1}`);
+                return;
+              }
+              totalSize += files[i].size;
+            }
+
+            let uploadedSize = 0;
+            const uploadedUrls = [];
+            const uploadedFileNames = [];
+
+            const tempDiv = document.createElement("div");
+            tempDiv.style.display = "flex";
+            tempDiv.style.justifyContent = "space-between";
+            tempDiv.style.alignItems = "center";
+            tempDiv.style.borderBottom = "1px solid rgba(255,255,255,0.08)";
+            tempDiv.style.paddingBottom = "12px";
+            tempDiv.style.marginBottom = "12px";
+
+            const tempContentDiv = document.createElement("div");
+            tempContentDiv.innerHTML = `<strong>${name}</strong><br/><small>Uploading...</small>`;
+            const { svg, progressCircle, progressText } = createProgressCircle();
+
+            tempDiv.appendChild(tempContentDiv);
+            tempDiv.appendChild(svg);
+            uploadHistory.prepend(tempDiv);
+
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("upload_preset", "upload_preset");
+
+              try {
+                await new Promise((resolve, reject) => {
+                  const xhr = new XMLHttpRequest();
+                  xhr.open(
+                    "POST",
+                    "https://api.cloudinary.com/v1_1/dfklsyjch/upload"
+                  );
+
+                  xhr.upload.onprogress = event => {
+                    if (event.lengthComputable) {
+                      const percent =
+                        ((uploadedSize + event.loaded) / totalSize) * 100;
+                      setCircleProgress(progressCircle, progressText, percent);
+                    }
+                  };
+
+                  xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                      const data = JSON.parse(xhr.responseText);
+                      uploadedUrls.push(data.secure_url);
+                      uploadedFileNames.push(file.name);
+                      uploadedSize += file.size;
+                      resolve();
+                    } else {
+                      reject(new Error("Upload failed"));
+                    }
+                  };
+
+                  xhr.onerror = () => reject(new Error("Upload failed"));
+                  xhr.send(formData);
+                });
+              } catch (err) {
+                console.error(err);
+                statusDiv.textContent = "Upload failed.";
+                return;
+              }
+            }
+
+            statusDiv.textContent = "Sending email...";
+
+            const downloadUrls = uploadedUrls.map(url =>
+              url.replace("/upload/", "/upload/fl_attachment/")
+            );
+
+            const typeLabel = clientTypeLabel(clientType);
+
+            const templateParams = {
+              name,
+              clientType: typeLabel,
+              paymentTerms,
+              num1Bedroom,
+              num2Bedroom,
+              time: new Date().toLocaleString(),
+              message: `
+                <p><strong>Client type:</strong> ${typeLabel}</p>
+                <p><strong>1BR units:</strong> ${num1Bedroom}</p>
+                <p><strong>2BR units:</strong> ${num2Bedroom}</p>
+                <p><strong>Payment terms:</strong> ${paymentTerms}</p>
+                <p><strong>Files:</strong></p>
+                ${downloadUrls
+                  .map(
+                    (u, i) =>
+                      `<a href="${u}" target="_blank" rel="noopener noreferrer">${uploadedFileNames[i]}</a>`
+                  )
+                  .join("<br>")}
+              `
+            };
+
+            try {
+              await emailjs.send(
+                "service_u1n5d9t",
+                "template_qu1s2lh",
+                templateParams
+              );
+
+              statusDiv.textContent = "Email sent and history updated.";
+              uploadHistory.removeChild(tempDiv);
+
+              const history = JSON.parse(
+                localStorage.getItem("uploadHistory") || "[]"
+              );
+              history.unshift({
+                name,
+                clientType,
+                paymentTerms,
+                num1Bedroom,
+                num2Bedroom,
+                time: new Date().toLocaleString(),
+                files: uploadedFileNames
+              });
+              if (history.length > 20) history.pop();
+              localStorage.setItem("uploadHistory", JSON.stringify(history));
+              loadHistory();
+
+              form.reset();
+              syncRequirementBlocks();
+            } catch (err) {
+              console.error(err);
+              statusDiv.textContent = "Email sending failed.";
+            }
+          });
+          break;
 
         /* ================= DEFAULT ================= */
         default:
@@ -1133,13 +1629,12 @@ case "inbox":
     };
 
     // ================= AUTHENTICATION CHECK =================
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, user => {
       if (!user) {
         alert("You're not signed in. Redirecting to login...");
         window.location.href = "index.html";
         return;
       }
-      // Show welcome message
       const greeting = document.getElementById("Greeting");
       const nameToShow = user.displayName || user.email;
       if (greeting) greeting.textContent = `Welcome Back!, ${nameToShow}`;
@@ -1149,30 +1644,31 @@ case "inbox":
     window.addEventListener("load", () => {
       loadContent(null, "dashboard");
 
-      // highlight sidebar tab
-      document.querySelectorAll(".sidebar nav ul li a").forEach(link =>
-        link.classList.remove("active")
-      );
-      document.querySelector(".sidebar nav ul li a[href='#']").classList.add("active");
+      document
+        .querySelectorAll(".sidebar nav ul li a")
+        .forEach(link => link.classList.remove("active"));
+      const firstLink = document.querySelector(".sidebar nav ul li a[href='#']");
+      if (firstLink) firstLink.classList.add("active");
     });
 
-    // ================= SHOW REPLY FORM =================
+    // Legacy reply helpers (if still used anywhere else)
     window.showReplyForm = function (email, id) {
-      document.getElementById(`reply-${id}`).style.display = "block";
+      const el = document.getElementById(`reply-${id}`);
+      if (el) el.style.display = "block";
     };
 
-    // ================= SEND REPLY =================
     window.sendReply = async function (toEmail, id, toName) {
-      const replyText = document.getElementById(`replyText-${id}`).value.trim();
+      const replyEl = document.getElementById(`replyText-${id}`);
+      if (!replyEl) return;
+      const replyText = replyEl.value.trim();
       if (!replyText) {
         alert("Please type a reply message.");
         return;
       }
 
-      // Prepare data for backend with correct keys
       const payload = {
-        to: toEmail,                  // was toEmail
-        from: "your-email@gmail.com", // was fromEmail; replace with your actual sender email
+        to: toEmail,
+        from: "your-email@gmail.com",
         subject: `Reply from Project Manager to ${toName}`,
         message: replyText
       };
@@ -1202,19 +1698,16 @@ case "inbox":
           timestamp: new Date()
         });
 
-        document.getElementById(`reply-${id}`).style.display = "none";
-        document.getElementById(`replyText-${id}`).value = "";
+        const container = document.getElementById(`reply-${id}`);
+        if (container) container.style.display = "none";
+        replyEl.value = "";
 
         loadContent(null, "inbox");
-
       } catch (error) {
         console.error("Error sending reply:", error);
         alert("Failed to send reply: " + error.message);
       }
     };
-
-
   </script>
 </body>
 </html>
-
