@@ -7,1528 +7,2048 @@
   <link rel="stylesheet" href="Admin_Dashboard.css" />
 </head>
 <body>
-
-  <!-- SIDEBAR -->
+  <!-- ======================== SIDEBAR ======================== -->
   <div class="sidebar">
     <div class="logo">
-      <img src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+      <img
+        src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp"
+        alt="Solano Logo"
+      />
     </div>
     <nav>
       <ul>
-        <li><a href="#" onclick="loadContent('dashboard')">Dashboard</a></li>
+        <li><a href="#" onclick="loadContent('dashboard')" class="active">Dashboard</a></li>
         <li><a href="#" onclick="loadContent('Payment Received')">Payment Received</a></li>
         <li><a href="#" onclick="loadContent('Maintenance Requests')">Maintenance Requests</a></li>
-        <li><a href="#" onclick="loadContent('Unit Owner Account Creation')">Unit Owner Account Creation</a></li>
+        <li>
+          <a href="#" onclick="loadContent('Unit Owner Account Creation')"
+            >Unit Owner Account Creation</a
+          >
+        </li>
         <li><a href="#" onclick="loadContent('Feedback Received')">Feedback Received</a></li>
         <li><a href="LogIn.html">Logout</a></li>
       </ul>
     </nav>
   </div>
 
-  <!-- MAIN CONTENT -->
+  <!-- ======================== MAIN CONTENT ======================== -->
   <main class="main-content">
     <div id="mainContent">
-      <h1>Welcome, <span id="admin-name">[Admin Name]</span></h1>
-      <p>Select a menu option from the left to get started.</p>
+      <div class="admin-header">
+        <h1>Admin Dashboard</h1>
+        <p>Loading overview…</p>
+      </div>
     </div>
   </main>
 
-  <!-- Firebase SDKs -->
+  <!-- ======================== FIREBASE & CHART.JS ======================== -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <script>
+    // ======================== FIREBASE INIT ========================
     const firebaseConfig = {
       apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
       authDomain: "solanodb-a4f65.firebaseapp.com",
       projectId: "solanodb-a4f65",
       storageBucket: "solanodb-a4f65.appspot.com",
       messagingSenderId: "98081894649",
-      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228",
     };
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById('admin-name').textContent = user.email;
-        console.log("Admin already logged in:", user.email);
-      } else {
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
         window.location.href = "Login.html";
+      } else {
+        console.log("Admin logged in:", user.email);
       }
     });
 
+    // Global drill-down state from KPI cards
+    window.adminDashboardDrilldown = null;
+
+    function formatCurrency(amount) {
+      const num = Number(amount) || 0;
+      return (
+        "₱" +
+        num.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      );
+    }
+
+    // ======================== ROUTER ========================
     function loadContent(section) {
-      const area = document.getElementById('mainContent');
-      document.querySelectorAll('.sidebar nav ul li a').forEach(link => link.classList.remove('active'));
+      const area = document.getElementById("mainContent");
+
+      // sidebar active state
+      document
+        .querySelectorAll(".sidebar nav ul li a")
+        .forEach((link) => link.classList.remove("active"));
       try {
-        if (event && event.target) event.target.classList.add('active');
-      } catch(e) {}
+        if (event && event.target) {
+          event.target.classList.add("active");
+        }
+      } catch (e) {
+        /* programmatic navigation */
+      }
 
       switch (section) {
         case "dashboard":
-        area.innerHTML = `
-          <h1 id="Greeting1">Dashboard</h1>
-          <div class="dashboard-container">
-            <div class="welcome-slider">
-              <div class="slide fade"><img src="1Entertainment room.jpg" alt="Welcome Slide 1" /></div>
-              <div class="slide fade"><img src="1Fitness Gym.jpg" alt="Welcome Slide 2" /></div>
-              <div class="slide fade"><img src="1Roof Garden.jpg" alt="Welcome Slide 3" /></div>
-              <button class="prev" id="sliderPrev">&#10094;</button>
-              <button class="next" id="sliderNext">&#10095;</button>
+          area.innerHTML = `
+            <div class="admin-header">
+              <h1>Admin Dashboard</h1>
+              <p>High-level overview for Solano Hills management.</p>
             </div>
-            <div class="right-side">
-              <div class="calendar-card">
-                <h3>📅 Calendar</h3>
-                <div id="calendar"></div>
+
+            <div class="kpi-row">
+              <div class="stat-card clickable" id="card-maintenance">
+                <div class="stat-label">Maintenance Requests</div>
+                <div class="stat-main" id="stat-maint-total">--</div>
+                <div class="stat-sub" id="stat-maint-pending">Loading…</div>
+                <div class="stat-sub" id="stat-maint-recent"></div>
+              </div>
+
+              <div class="stat-card clickable" id="card-payments">
+                <div class="stat-label">Payments (This Month)</div>
+                <div class="stat-main" id="stat-payments-amount">--</div>
+                <div class="stat-sub" id="stat-payments-count">Loading…</div>
+              </div>
+
+              <div class="stat-card clickable" id="card-feedback">
+                <div class="stat-label">Feedback</div>
+                <div class="stat-main" id="stat-feedback-total">--</div>
+                <div class="stat-sub" id="stat-feedback-recent">Loading…</div>
               </div>
             </div>
-          </div>
-        `;
 
-        // Slider logic
-        (function () {
-          let slideIndexLocal = 1;
-          const slides = () => document.querySelectorAll(".welcome-slider .slide");
+            <div class="dashboard-grid">
+              <div class="dashboard-main-col">
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">Payments (Last 6 Months)</div>
+                    <div class="chart-subtitle">Total collected per month</div>
+                  </div>
+                  <div class="chart-wrapper">
+                    <canvas id="paymentsChart"></canvas>
+                  </div>
+                </div>
 
-          function showSlidesLocal(n) {
-            const nodeList = slides();
-            if (!nodeList || nodeList.length === 0) return;
-            if (n > nodeList.length) slideIndexLocal = 1;
-            if (n < 1) slideIndexLocal = nodeList.length;
-            nodeList.forEach(s => (s.style.display = "none"));
-            nodeList[slideIndexLocal - 1].style.display = "block";
-          }
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">Feedback Rating Mix</div>
+                    <div class="chart-subtitle">Distribution of 1–5 star feedback</div>
+                  </div>
+                  <div class="chart-wrapper">
+                    <canvas id="feedbackChart"></canvas>
+                  </div>
+                </div>
+              </div>
 
-          showSlidesLocal(slideIndexLocal);
+              <div class="dashboard-side-col">
+                <div class="chart-card small">
+                  <div class="chart-header">
+                    <div class="chart-title">Maintenance Status</div>
+                    <div class="chart-subtitle">Open vs completed</div>
+                  </div>
+                  <div class="chart-wrapper">
+                    <canvas id="maintenanceChart"></canvas>
+                  </div>
+                </div>
 
-          document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
-          document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
+                <div class="calendar-card">
+                  <h3><span>📅</span> Calendar</h3>
+                  <div id="adminCalendar"></div>
+                </div>
 
-          const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
-          const sliderEl = document.querySelector(".welcome-slider");
-          if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
-        })();
-
-        // Calendar logic
-        (function () {
-          function generateCalendar() {
-            const calendar = document.getElementById("calendar");
-            if (!calendar) return;
-
-            const today = new Date();
-            const monthName = today.toLocaleString("default", { month: "long" });
-            const year = today.getFullYear();
-            const firstDay = new Date(year, today.getMonth(), 1);
-            const lastDay = new Date(year, today.getMonth() + 1, 0);
-            const startDay = firstDay.getDay();
-
-            let html = "<table class='cal-table'>";
-            html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
-            html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
-
-            for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
-
-            for (let day = 1; day <= lastDay.getDate(); day++) {
-              const isToday = day === today.getDate();
-              html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
-              if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
-            }
-            html += "</tr></table>";
-            calendar.innerHTML = html;
-          }
-          generateCalendar();
-        })();
-        break;
-
-     case 'Payment Received':
-  area.innerHTML = `
-    <h1>Payments Received</h1>
-    <p>Real-time list of Unit Owner PayPal payments.</p>
-
-    <div class="payment-controls" style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <div>
-        <input type="text" id="paymentSearch" placeholder="Search by unit owner email..." 
-          style="padding:8px;width:260px;border:1px solid #ccc;border-radius:6px;">
-      </div>
-      
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
-        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="date-desc">Date (Newest First)</option>
-          <option value="date-asc">Date (Oldest First)</option>
-          <option value="amount-desc">Amount (High to Low)</option>
-          <option value="amount-asc">Amount (Low to High)</option>
-          <option value="email-asc">Email (A to Z)</option>
-          <option value="email-desc">Email (Z to A)</option>
-        </select>
-      </div>
-      
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Filter by:</label>
-        <select id="filterBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="all">All Payments</option>
-          <option value="last7">Last 7 Days</option>
-          <option value="last30">Last 30 Days</option>
-          <option value="thisMonth">This Month</option>
-          <option value="lastMonth">Last Month</option>
-        </select>
-      </div>
-      
-      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
-        Reset Filters
-      </button>
-    </div>
-
-    <div id="stats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
-      <span style="font-weight:bold;">Showing:</span> 
-      <span id="paymentCount">0</span> payments | 
-      <span style="font-weight:bold;">Total:</span> ₱<span id="totalAmount">0.00</span>
-    </div>
-
-    <div id="paypalSection">
-      <h2>💳 PayPal Payments</h2>
-      <div id="paypalList">Loading PayPal payments...</div>
-    </div>
-  `;
-
-  const paypalList = document.getElementById("paypalList");
-  const searchInput = document.getElementById("paymentSearch");
-  const sortBy = document.getElementById("sortBy");
-  const filterBy = document.getElementById("filterBy");
-  const resetFilters = document.getElementById("resetFilters");
-  const paymentCount = document.getElementById("paymentCount");
-  const totalAmount = document.getElementById("totalAmount");
-  const statsDiv = document.getElementById("stats");
-
-  // Store all payments for sorting/filtering
-  let allPayments = [];
-  let filteredPayments = [];
-
-  function formatDate(date) {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  function applyFiltersAndSort() {
-    const searchValue = searchInput.value.toLowerCase();
-    const filterValue = filterBy.value;
-    const sortValue = sortBy.value;
-    
-    // Start with all PayPal payments
-    filteredPayments = allPayments.filter(payment => 
-      payment.method === "PayPal"
-    );
-    
-    // Apply search filter
-    if (searchValue) {
-      filteredPayments = filteredPayments.filter(payment => 
-        payment.tenantEmail.toLowerCase().includes(searchValue) ||
-        (payment.payerEmail && payment.payerEmail.toLowerCase().includes(searchValue))
-      );
-    }
-    
-    // Apply date filter
-    const now = new Date();
-    if (filterValue === "last7") {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredPayments = filteredPayments.filter(payment => 
-        payment.timestamp.toDate() >= sevenDaysAgo
-      );
-    } else if (filterValue === "last30") {
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filteredPayments = filteredPayments.filter(payment => 
-        payment.timestamp.toDate() >= thirtyDaysAgo
-      );
-    } else if (filterValue === "thisMonth") {
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      filteredPayments = filteredPayments.filter(payment => 
-        payment.timestamp.toDate() >= firstDayOfMonth
-      );
-    } else if (filterValue === "lastMonth") {
-      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-      filteredPayments = filteredPayments.filter(payment => {
-        const paymentDate = payment.timestamp.toDate();
-        return paymentDate >= firstDayOfLastMonth && paymentDate <= lastDayOfLastMonth;
-      });
-    }
-    
-    // Apply sorting
-    filteredPayments.sort((a, b) => {
-      switch(sortValue) {
-        case 'date-desc':
-          return b.timestamp.toDate() - a.timestamp.toDate();
-        case 'date-asc':
-          return a.timestamp.toDate() - b.timestamp.toDate();
-        case 'amount-desc':
-          return (b.amount || 0) - (a.amount || 0);
-        case 'amount-asc':
-          return (a.amount || 0) - (b.amount || 0);
-        case 'email-asc':
-          return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
-        case 'email-desc':
-          return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
-        default:
-          return 0;
-      }
-    });
-    
-    renderPayments();
-  }
-
-  function renderPayments() {
-    paypalList.innerHTML = "";
-    
-    if (filteredPayments.length === 0) {
-      paypalList.innerHTML = "<p>No PayPal payments found matching your criteria.</p>";
-      statsDiv.style.display = 'none';
-      return;
-    }
-    
-    let paypalHTML = "";
-    let total = 0;
-    
-    filteredPayments.forEach(payment => {
-      const tenantEmail = payment.tenantEmail || "Unknown";
-      const amount = payment.amount ? `₱${Number(payment.amount).toLocaleString()}` : "₱0.00";
-      const date = payment.timestamp?.toDate ? formatDate(payment.timestamp.toDate()) : "Unknown date";
-      const method = payment.method || "Unknown";
-      const transactionId = payment.transactionId || "N/A";
-      const payerEmail = payment.payerEmail || "Unknown";
-      const status = payment.status || "Completed";
-      
-      total += Number(payment.amount) || 0;
-      
-      const card = `
-        <div style="border:1px solid #ccc;border-radius:10px;padding:14px;margin-bottom:12px;">
-          <p><strong>Unit Owner Email:</strong> ${tenantEmail}</p>
-          <p><strong>Payer Email:</strong> ${payerEmail}</p>
-          <p><strong>Amount:</strong> ${amount}</p>
-          <p><strong>Method:</strong> ${method}</p>
-          <p><strong>Status:</strong> ${status}</p>
-          <p><strong>Transaction ID:</strong> ${transactionId}</p>
-          <p><strong>Date:</strong> ${date}</p>
-        </div>
-      `;
-      
-      paypalHTML += card;
-    });
-    
-    paypalList.innerHTML = paypalHTML;
-    
-    // Update stats
-    paymentCount.textContent = filteredPayments.length;
-    totalAmount.textContent = total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    statsDiv.style.display = 'block';
-  }
-
-  // Load all payments initially
-  db.collection("payments")
-    .orderBy("timestamp", "desc")
-    .onSnapshot((snapshot) => {
-      allPayments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      applyFiltersAndSort();
-    });
-
-  // Event listeners for filters
-  searchInput.addEventListener("input", applyFiltersAndSort);
-  sortBy.addEventListener("change", applyFiltersAndSort);
-  filterBy.addEventListener("change", applyFiltersAndSort);
-  resetFilters.addEventListener("click", () => {
-    searchInput.value = "";
-    sortBy.value = "date-desc";
-    filterBy.value = "all";
-    applyFiltersAndSort();
-  });
-  break;
-
-  case 'Maintenance Requests':
-  area.innerHTML = `
-    <h1>Maintenance Requests</h1>
-    <p>Maintenance requests submitted by Unit Owners.</p>
-    
-    <div class="maintenance-controls" style="margin-bottom:20px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Filter by Status:</label>
-        <select id="statusFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="all">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="Complete">Complete</option>
-        </select>
-      </div>
-      
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Filter by Personnel:</label>
-        <select id="personnelFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="all">All Personnel</option>
-          <option value="John Doe">John Doe</option>
-          <option value="Jane Smith">Jane Smith</option>
-          <option value="Mike Johnson">Mike Johnson</option>
-          <option value="unassigned">Unassigned</option>
-        </select>
-      </div>
-      
-      <div>
-        <input type="text" id="maintenanceSearch" placeholder="Search by unit, email, or issue..." 
-          style="padding:8px;width:280px;border:1px solid #ccc;border-radius:6px;">
-      </div>
-      
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
-        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="date-desc">Date (Newest First)</option>
-          <option value="date-asc">Date (Oldest First)</option>
-          <option value="unit-asc">Unit Number (A-Z)</option>
-          <option value="unit-desc">Unit Number (Z-A)</option>
-          <option value="email-asc">Email (A-Z)</option>
-          <option value="email-desc">Email (Z-A)</option>
-        </select>
-      </div>
-      
-      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
-        Reset Filters
-      </button>
-    </div>
-    
-    <div id="maintenanceStats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
-      <span style="font-weight:bold;">Showing:</span> 
-      <span id="requestCount">0</span> requests | 
-      <span id="pendingCount">0</span> pending | 
-      <span id="completeCount">0</span> complete
-    </div>
-    
-    <div id="maintenanceList" style="margin-top:20px;">
-      <p>Loading maintenance requests...</p>
-    </div>`;
-
-  // Store all requests for filtering
-  let allRequests = [];
-  let filteredRequests = [];
-  
-  // Keep track of assigned personnel
-  let assignedPersonnel = new Set();
-
-  setTimeout(() => {
-    const statusFilter = document.getElementById('statusFilter');
-    const personnelFilter = document.getElementById('personnelFilter');
-    const maintenanceSearch = document.getElementById('maintenanceSearch');
-    const sortBy = document.getElementById('sortBy');
-    const resetFilters = document.getElementById('resetFilters');
-    const maintenanceStats = document.getElementById('maintenanceStats');
-    const requestCount = document.getElementById('requestCount');
-    const pendingCount = document.getElementById('pendingCount');
-    const completeCount = document.getElementById('completeCount');
-
-    function formatDateTimeAMPM(date) {
-      if (!date) return "N/A";
-      let d = date.toDate ? date.toDate() : date;
-      let hours = d.getHours();
-      const minutes = d.getMinutes().toString().padStart(2, "0");
-      const ampm = hours >= 12 ? "PM" : "AM";
-      hours = hours % 12 || 12;
-      const month = (d.getMonth() + 1).toString().padStart(2, "0");
-      const day = d.getDate().toString().padStart(2, "0");
-      const year = d.getFullYear();
-      return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-    }
-
-    function applyFiltersAndSort() {
-      const statusValue = statusFilter.value;
-      const personnelValue = personnelFilter.value;
-      const searchValue = maintenanceSearch.value.toLowerCase();
-      const sortValue = sortBy.value;
-      
-      // Start with all requests
-      filteredRequests = [...allRequests];
-      
-      // Apply status filter
-      if (statusValue !== 'all') {
-        filteredRequests = filteredRequests.filter(request => 
-          request.status === statusValue
-        );
-      }
-      
-      // Apply personnel filter
-      if (personnelValue !== 'all') {
-        if (personnelValue === 'unassigned') {
-          filteredRequests = filteredRequests.filter(request => 
-            !request.maintenanceName || request.maintenanceName.trim() === ''
-          );
-        } else {
-          filteredRequests = filteredRequests.filter(request => 
-            request.maintenanceName === personnelValue
-          );
-        }
-      }
-      
-      // Apply search filter
-      if (searchValue) {
-        filteredRequests = filteredRequests.filter(request => {
-          const emailMatch = request.tenantEmail && request.tenantEmail.toLowerCase().includes(searchValue);
-          const unitMatch = request.unitNumber && request.unitNumber.toLowerCase().includes(searchValue);
-          const problemMatch = request.problem && request.problem.toLowerCase().includes(searchValue);
-          const commentMatch = request.comment && request.comment.toLowerCase().includes(searchValue);
-          return emailMatch || unitMatch || problemMatch || commentMatch;
-        });
-      }
-      
-      // Apply sorting
-      filteredRequests.sort((a, b) => {
-        switch(sortValue) {
-          case 'date-desc':
-            return (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0);
-          case 'date-asc':
-            return (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0);
-          case 'unit-asc':
-            return (a.unitNumber || '').localeCompare(b.unitNumber || '');
-          case 'unit-desc':
-            return (b.unitNumber || '').localeCompare(a.unitNumber || '');
-          case 'email-asc':
-            return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
-          case 'email-desc':
-            return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
-          case 'status':
-            // Pending first, then Complete
-            if (a.status === 'Pending' && b.status === 'Complete') return -1;
-            if (a.status === 'Complete' && b.status === 'Pending') return 1;
-            return 0;
-          default:
-            return 0;
-        }
-      });
-      
-      renderMaintenanceRequests();
-    }
-
-    function renderMaintenanceRequests() {
-      const maintenanceList = document.getElementById('maintenanceList');
-      
-      if (filteredRequests.length === 0) {
-        maintenanceList.innerHTML = '<p>No maintenance requests found matching your criteria.</p>';
-        maintenanceStats.style.display = 'none';
-        return;
-      }
-      
-      maintenanceList.innerHTML = '';
-      assignedPersonnel.clear();
-      
-      // Collect assigned personnel for pending requests
-      filteredRequests.forEach(request => {
-        if (request.status !== "Complete" && request.maintenanceName) {
-          assignedPersonnel.add(request.maintenanceName);
-        }
-      });
-      
-      let pending = 0;
-      let complete = 0;
-      
-      filteredRequests.forEach(request => {
-        const data = request;
-        const id = request.id;
-        
-        if (data.status === 'Pending') pending++;
-        if (data.status === 'Complete') complete++;
-        
-        // Card container
-        const card = document.createElement("div");
-        card.className = "maintenance-card";
-        card.style.border = "1px solid #ccc";
-        card.style.padding = "15px";
-        card.style.marginBottom = "15px";
-        card.style.borderRadius = "8px";
-        card.style.backgroundColor = data.status === 'Complete' ? '#0000' : '#0000';
-        
-        // Status dropdown
-        const statusSelect = document.createElement("select");
-        ["Pending", "Complete"].forEach(option => {
-          const opt = document.createElement("option");
-          opt.value = option;
-          opt.textContent = option;
-          if (data.status === option) opt.selected = true;
-          statusSelect.appendChild(opt);
-        });
-        statusSelect.style.marginRight = "10px";
-        
-        // Personnel assignment dropdown
-        const personnelSelect = document.createElement("select");
-        const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
-        personnelNames.forEach(name => {
-          const option = document.createElement("option");
-          option.value = name;
-          option.textContent = name;
-          
-          // Disable if assigned to another Pending request
-          if (assignedPersonnel.has(name) && data.maintenanceName !== name) {
-            option.disabled = true;
-            option.textContent += " (Assigned)";
-          }
-          
-          // Preselect if this request has the personnel
-          if (data.maintenanceName === name) option.selected = true;
-          
-          personnelSelect.appendChild(option);
-        });
-        personnelSelect.style.marginRight = "10px";
-        
-        // Update button
-        const updateBtn = document.createElement("button");
-        updateBtn.textContent = "Update";
-        updateBtn.style.background = "#8d6c39";
-        updateBtn.style.color = "white";
-        updateBtn.style.border = "none";
-        updateBtn.style.borderRadius = "6px";
-        updateBtn.style.padding = "6px 12px";
-        updateBtn.style.cursor = "pointer";
-        updateBtn.style.marginRight = "10px";
-        
-        if (data.status === "Complete") {
-          statusSelect.disabled = true;
-          personnelSelect.disabled = true;
-          updateBtn.disabled = true;
-          statusSelect.style.backgroundColor = "#e0e0e0";
-          personnelSelect.style.backgroundColor = "#e0e0e0";
-          updateBtn.style.backgroundColor = "#aaa";
-          updateBtn.style.cursor = "not-allowed";
-        }
-        
-        // Update event
-        updateBtn.addEventListener("click", async () => {
-          try {
-            await db.collection("maintenanceRequests").doc(id).update({
-              status: statusSelect.value,
-              maintenanceName: personnelSelect.value.trim(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            showPopup("Request updated successfully!");
-            
-            // Refresh the filtered list
-            applyFiltersAndSort();
-          } catch (error) {
-            showPopup("Error updating request: " + error.message);
-          }
-        });
-        
-        // Respond button
-        const respondBtn = document.createElement("button");
-        respondBtn.textContent = "Respond";
-        respondBtn.style.background = "#4a90e2";
-        respondBtn.style.color = "white";
-        respondBtn.style.border = "none";
-        respondBtn.style.borderRadius = "6px";
-        respondBtn.style.padding = "6px 12px";
-        respondBtn.style.cursor = "pointer";
-        
-        const responseContainer = document.createElement("div");
-        responseContainer.style.marginTop = "10px";
-        responseContainer.style.display = "none";
-        
-        const responseTextarea = document.createElement("textarea");
-        responseTextarea.placeholder = "Enter your response message here...";
-        responseTextarea.style.width = "100%";
-        responseTextarea.style.height = "60px";
-        responseTextarea.style.marginBottom = "8px";
-        responseTextarea.style.resize = "vertical";
-        responseTextarea.style.padding = "8px";
-        responseTextarea.style.fontSize = "14px";
-        responseTextarea.style.borderRadius = "4px";
-        responseTextarea.style.border = "1px solid #ccc";
-        
-        const sendResponseBtn = document.createElement("button");
-        sendResponseBtn.textContent = "Send Response";
-        sendResponseBtn.style.background = "#4a90e2";
-        sendResponseBtn.style.color = "white";
-        sendResponseBtn.style.border = "none";
-        sendResponseBtn.style.borderRadius = "6px";
-        sendResponseBtn.style.padding = "6px 12px";
-        sendResponseBtn.style.cursor = "pointer";
-        sendResponseBtn.style.marginRight = "10px";
-        
-        responseContainer.appendChild(responseTextarea);
-        responseContainer.appendChild(sendResponseBtn);
-        
-        respondBtn.addEventListener("click", () => {
-          responseContainer.style.display =
-            responseContainer.style.display === "none" ? "block" : "none";
-          if(responseContainer.style.display === "block") responseTextarea.focus();
-        });
-        
-        sendResponseBtn.addEventListener("click", async () => {
-          const responseMessage = responseTextarea.value.trim();
-          if (!responseMessage) {
-            showPopup("Response message cannot be empty.");
-            return;
-          }
-          try {
-            const requestDocRef = db.collection("maintenanceRequests").doc(id);
-            await requestDocRef.collection("responses").add({
-              adminEmail: auth.currentUser.email,
-              message: responseMessage,
-              timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            await requestDocRef.update({
-              responseTime: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            showPopup("Response sent successfully!");
-            responseTextarea.value = "";
-            responseContainer.style.display = "none";
-          } catch (error) {
-            showPopup("Failed to send response: " + error.message);
-          }
-        });
-        
-        // Delete button
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
-        deleteBtn.className = "btn btn-danger";
-        deleteBtn.style.marginLeft = "8px";
-        deleteBtn.style.cursor = "pointer";
-        
-        deleteBtn.addEventListener("click", () => {
-          showPopup(`
-            <strong>Are you sure?</strong><br>
-            This maintenance request will be permanently deleted.<br><br>
-            <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-              Delete
-            </button>
-            <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-              Cancel
-            </button>
-          `);
-          
-          setTimeout(() => {
-            const confirmBtn = document.getElementById("confirmDeleteBtn");
-            if (!confirmBtn) return;
-            
-            confirmBtn.addEventListener("click", async () => {
-              try {
-                await db.collection("maintenanceRequests").doc(id).delete();
-                closePopup();
-                showPopup("Maintenance request deleted.");
-                // Refresh the filtered list
-                applyFiltersAndSort();
-              } catch (error) {
-                closePopup();
-                showPopup("Failed to delete: " + error.message);
-              }
-            });
-          }, 50);
-        });
-        
-        // Image slider HTML
-        let imagesHTML = "";
-        if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0) {
-          imagesHTML = `
-            <div style="margin-top:-45px;">
-              <strong>Attachments:</strong><br/>
-              <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                ${
-                  data.imageUrls.length > 1
-                    ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
-                        background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                      <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
-                        background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
-                    : ''
-                }
+                <div class="recent-card">
+                  <h3>Recent Payments</h3>
+                  <p class="recent-sub">Last 5 payments recorded in the system.</p>
+                  <div id="recentPaymentsList"></div>
+                </div>
               </div>
             </div>
           `;
-        }
-        
-        card.innerHTML = `
-          <h3 style="margin-bottom:8px;">${data.problem || 'Unknown Issue'}</h3>
-          <div style="display:flex; gap:20px; align-items:flex-start;">
-            <div style="flex:1; min-width: 0;">
-              <p><strong>Unit Owner:</strong> ${data.tenantEmail || 'Unknown Unit Owner'}</p>
-              <p><strong>Unit Number:</strong> ${data.unitNumber || 'N/A'}</p>
-              <p><strong>Details:</strong> ${data.comment || 'No additional details.'}</p>
-              <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
-              <p><strong>Status:</strong> ${data.status || 'Pending'}</p>
-              <p><strong>Maintenance Personnel:</strong> ${data.maintenanceName || 'Not assigned'}</p>
-              <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+          initAdminDashboard();
+          break;
+
+        case "Payment Received":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>Payments Received</h2>
+              <p>Real-time list of unit owner PayPal payments.</p>
             </div>
-            <div style="min-width:220px; display:flex; flex-direction:column;">
-              ${imagesHTML}
+
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="paymentSearch">Search</label>
+                <input
+                  type="text"
+                  id="paymentSearch"
+                  placeholder="Search by unit owner or payer email…"
+                />
+              </div>
+
+              <div class="filter-group">
+                <label for="sortBy">Sort by</label>
+                <select id="sortBy">
+                  <option value="date-desc">Date (Newest First)</option>
+                  <option value="date-asc">Date (Oldest First)</option>
+                  <option value="amount-desc">Amount (High to Low)</option>
+                  <option value="amount-asc">Amount (Low to High)</option>
+                  <option value="email-asc">Email (A to Z)</option>
+                  <option value="email-desc">Email (Z to A)</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="filterBy">Quick range</label>
+                <select id="filterBy">
+                  <option value="all">All Payments</option>
+                  <option value="last7">Last 7 Days</option>
+                  <option value="last30">Last 30 Days</option>
+                  <option value="thisMonth">This Month</option>
+                  <option value="lastMonth">Last Month</option>
+                  <option value="thisYear">This Year</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="dateFrom">Date from</label>
+                <input type="date" id="dateFrom" />
+              </div>
+
+              <div class="filter-group">
+                <label for="dateTo">Date to</label>
+                <input type="date" id="dateTo" />
+              </div>
+
+              <button id="resetFilters" class="btn-secondary">Reset Filters</button>
             </div>
-          </div>
-        `;
-        
-        // Append controls
-        card.appendChild(statusSelect);
-        card.appendChild(personnelSelect);
-        card.appendChild(updateBtn);
-        card.appendChild(respondBtn);
-        card.appendChild(deleteBtn);
-        card.appendChild(responseContainer);
-        
-        // --- Response history ---
-        const responsesContainer = document.createElement("div");
-        responsesContainer.style.marginTop = "10px";
-        responsesContainer.style.borderTop = "1px dashed #ccc";
-        responsesContainer.style.paddingTop = "8px";
-        responsesContainer.innerHTML = "<strong>Response History:</strong><p>Loading...</p>";
-        card.appendChild(responsesContainer);
-        
-        db.collection("maintenanceRequests")
-          .doc(id)
-          .collection("responses")
-          .orderBy("timestamp", "asc")
-          .onSnapshot(snapshotResp => {
-            responsesContainer.innerHTML = "<strong>Response History:</strong>";
-            if (snapshotResp.empty) {
-              responsesContainer.innerHTML += "<p>No responses yet.</p>";
-            } else {
-              snapshotResp.forEach(r => {
-                const rData = r.data();
-                const rEl = document.createElement("div");
-                rEl.style.borderBottom = "1px solid #eee";
-                rEl.style.padding = "4px 0";
-                rEl.innerHTML = `
-                  <strong>${rData.adminEmail || "Admin"}:</strong> ${rData.message || ""}
-                  <br><small style="color:#ffff;">${formatDateTimeAMPM(rData.timestamp)}</small>
-                `;
-                responsesContainer.appendChild(rEl);
-              });
-            }
-          });
-        
-        maintenanceList.appendChild(card);
-        
-        // slider
-        if (data.imageUrls && data.imageUrls.length > 1) {
-          let currentIndex = 0;
-          const imgEl = card.querySelector(`#img-${id}`);
-          const prevBtn = card.querySelector('.prev-btn');
-          const nextBtn = card.querySelector('.next-btn');
-          
-          prevBtn.addEventListener('click', () => {
-            currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
-            imgEl.src = data.imageUrls[currentIndex];
-          });
-          
-          nextBtn.addEventListener('click', () => {
-            currentIndex = (currentIndex + 1) % data.imageUrls.length;
-            imgEl.src = data.imageUrls[currentIndex];
-          });
-        }
-      });
-      
-      // Update stats
-      requestCount.textContent = filteredRequests.length;
-      pendingCount.textContent = pending;
-      completeCount.textContent = complete;
-      maintenanceStats.style.display = 'block';
-    }
 
-    // Load all maintenance requests
-    db.collection("maintenanceRequests")
-      .orderBy("timestamp", "desc")
-      .onSnapshot(snapshot => {
-        if (snapshot.empty) {
-          allRequests = [];
-          filteredRequests = [];
-          applyFiltersAndSort();
-          return;
-        }
-        
-        allRequests = snapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }));
-        
-        applyFiltersAndSort();
-      }, error => {
-        const maintenanceList = document.getElementById('maintenanceList');
-        maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-      });
-    
-    // Event listeners for filters
-    statusFilter.addEventListener('change', applyFiltersAndSort);
-    personnelFilter.addEventListener('change', applyFiltersAndSort);
-    maintenanceSearch.addEventListener('input', applyFiltersAndSort);
-    sortBy.addEventListener('change', applyFiltersAndSort);
-    resetFilters.addEventListener('click', () => {
-      statusFilter.value = 'all';
-      personnelFilter.value = 'all';
-      maintenanceSearch.value = '';
-      sortBy.value = 'date-desc';
-      applyFiltersAndSort();
-    });
-    
-  }, 100);
-  break;
+            <div id="stats" class="stats-strip">
+              <span id="paymentCount">0</span> payments |
+              <span>Total:</span> ₱<span id="totalAmount">0.00</span>
+            </div>
 
+            <div id="paypalSection" class="list-card">
+              <h3 style="margin:0 0 10px;font-size:15px;">PayPal Payments</h3>
+              <div id="paypalList">
+                <p>Loading PayPal payments...</p>
+              </div>
+            </div>
+          `;
+          initPaymentReceived();
+          break;
 
-  // <============== ACCOUNT CREATION ===============>
-   case 'Unit Owner Account Creation':
-  area.innerHTML = `
-    <h1>Create New Unit Owner Account</h1>
+        case "Maintenance Requests":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>Maintenance Requests</h2>
+              <p>Maintenance requests submitted by unit owners.</p>
+            </div>
 
-    <form id="createTenantForm">
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="statusFilter">Filter by Status</label>
+                <select id="statusFilter">
+                  <option value="all">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Complete">Complete</option>
+                </select>
+              </div>
 
-      <input type="email" id="tenantEmail" placeholder="Unit Owner Solano Email" required 
-        style="padding:10px;margin-bottom:10px;width:100%;" />
+              <div class="filter-group">
+                <label for="personnelFilter">Filter by Personnel</label>
+                <select id="personnelFilter">
+                  <option value="all">All Personnel</option>
+                  <option value="John Doe">John Doe</option>
+                  <option value="Jane Smith">Jane Smith</option>
+                  <option value="Mike Johnson">Mike Johnson</option>
+                  <option value="unassigned">Unassigned</option>
+                </select>
+              </div>
 
-      <div style="display:flex; gap:10px; margin-bottom:10px;">
-        <input type="text" id="tenantPassword" placeholder="Temporary Password" required readonly
-          style="padding:10px;width:100%; background:#f5f5f5;" />
-        <button type="button" id="generatePasswordBtn" style="
-          padding:10px 15px; background:#4CAF50; color:white; border:none; border-radius:6px; white-space:nowrap;">
-          Generate Password
-        </button>
-      </div>
+              <div class="filter-group">
+                <label for="maintenanceSearch">Search</label>
+                <input
+                  type="text"
+                  id="maintenanceSearch"
+                  placeholder="Search by unit, email, or issue…"
+                />
+              </div>
 
-      <div id="unitContainer">
-        <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
-          <select class="unitType" required style="padding:10px; flex:1;">
-            <option value="">-- Select Type --</option>
-            <option value="1B">1B (1 Bedroom)</option>
-            <option value="2B">2B (2 Bedroom)</option>
-          </select>
-          <select class="unitNumber" required style="padding:10px; flex:1;">
-            <option value="">-- Select Unit Number --</option>
-          </select>
-          <button type="button" class="removeUnitBtn" style="
-            padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
-            X
-          </button>
-        </div>
-      </div>
+              <div class="filter-group">
+                <label for="sortBy">Sort by</label>
+                <select id="sortBy">
+                  <option value="date-desc">Date (Newest First)</option>
+                  <option value="date-asc">Date (Oldest First)</option>
+                  <option value="unit-asc">Unit Number (A–Z)</option>
+                  <option value="unit-desc">Unit Number (Z–A)</option>
+                  <option value="email-asc">Email (A–Z)</option>
+                  <option value="email-desc">Email (Z–A)</option>
+                </select>
+              </div>
 
-      <button type="button" id="addUnitBtn" style="
-        padding:10px 20px; background:#6b8e23; color:white; border:none; border-radius:6px; margin-bottom:15px;">
-        + Add Another Unit
-      </button>
+              <button id="resetFilters" class="btn-secondary">Reset Filters</button>
+            </div>
 
-      <button type="submit" style="padding:10px 20px;background:#8d6c39;color:white;border:none;border-radius:6px;">
-        Create Unit Owner
-      </button>
+            <div id="maintenanceStats" class="stats-strip">
+              <span id="requestCount">0</span> requests |
+              <span id="pendingCount">0</span> pending |
+              <span id="completeCount">0</span> complete
+            </div>
 
-    </form>
-  `;
+            <div id="maintenanceList" class="list-card">
+              <p>Loading maintenance requests...</p>
+            </div>
+          `;
+          initMaintenanceRequests();
+          break;
 
-  const adminEmail = "adminaccount@solano.com";
-  const adminPassword = "123456";
+        case "Unit Owner Account Creation":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>Create New Unit Owner Account</h2>
+              <p>Create Solano accounts for unit owners and assign units.</p>
+            </div>
 
-  setTimeout(async () => {
-    // Password generation function
-    function generatePassword() {
-      const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-      const numbers = '0123456789';
-      
-      // Ensure we have at least one uppercase, one lowercase, and one number
-      let password = '';
-      password += uppercase[Math.floor(Math.random() * uppercase.length)];
-      password += lowercase[Math.floor(Math.random() * lowercase.length)];
-      password += numbers[Math.floor(Math.random() * numbers.length)];
-      
-      // Add remaining characters (total 8)
-      const allChars = uppercase + lowercase + numbers;
-      for (let i = 3; i < 8; i++) {
-        password += allChars[Math.floor(Math.random() * allChars.length)];
+            <div class="list-card">
+              <form id="createTenantForm">
+                <div class="filter-group" style="margin-bottom:10px;">
+                  <label for="tenantEmail">Unit Owner Solano Email</label>
+                  <input type="email" id="tenantEmail" required />
+                </div>
+
+                <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                  <div class="filter-group" style="flex:1; min-width:220px;">
+                    <label for="tenantPassword">Temporary Password</label>
+                    <input
+                      type="text"
+                      id="tenantPassword"
+                      required
+                      readonly
+                      style="background:#222;border-color:rgba(255,255,255,0.18);"
+                    />
+                  </div>
+                  <button type="button" id="generatePasswordBtn" class="btn-primary">
+                    Generate Password
+                  </button>
+                </div>
+
+                <div id="unitContainer" style="margin-bottom:10px;">
+                  <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                    <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                      <option value="">-- Select Type --</option>
+                      <option value="1B">1B (1 Bedroom)</option>
+                      <option value="2B">2B (2 Bedroom)</option>
+                    </select>
+                    <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                      <option value="">-- Select Unit Number --</option>
+                    </select>
+                    <button type="button" class="removeUnitBtn" class="btn-danger"
+                      style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
+                      X
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" id="addUnitBtn" class="btn-secondary" style="margin-bottom:16px;">
+                  + Add Another Unit
+                </button>
+
+                <div>
+                  <button type="submit" class="btn-primary">
+                    Create Unit Owner
+                  </button>
+                </div>
+              </form>
+            </div>
+          `;
+          initUnitOwnerCreation();
+          break;
+
+        case "Feedback Received":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>Feedback from Unit Owners</h2>
+              <p>View ratings and qualitative feedback submitted through the tenant portal.</p>
+            </div>
+
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="ratingFilter">Filter by Rating</label>
+                <select id="ratingFilter">
+                  <option value="all">All Ratings</option>
+                  <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                  <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                  <option value="3">⭐⭐⭐ (3 Stars)</option>
+                  <option value="2">⭐⭐ (2 Stars)</option>
+                  <option value="1">⭐ (1 Star)</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="feedbackSearch">Search</label>
+                <input
+                  type="text"
+                  id="feedbackSearch"
+                  placeholder="Search by email or comments…"
+                />
+              </div>
+
+              <div class="filter-group">
+                <label for="sortBy">Sort by</label>
+                <select id="sortBy">
+                  <option value="date-desc">Date (Newest First)</option>
+                  <option value="date-asc">Date (Oldest First)</option>
+                  <option value="rating-desc">Rating (High to Low)</option>
+                  <option value="rating-asc">Rating (Low to High)</option>
+                  <option value="email-asc">Email (A to Z)</option>
+                  <option value="email-desc">Email (Z to A)</option>
+                </select>
+              </div>
+
+              <button id="resetFilters" class="btn-secondary">Reset Filters</button>
+              <button id="refreshFeedbackBtn" class="btn-primary">Refresh</button>
+            </div>
+
+            <div id="feedbackStats" class="stats-strip">
+              <span id="feedbackCount">0</span> feedback entries |
+              <span>Average Rating:</span> <span id="averageRating">0.0</span>
+            </div>
+
+            <div id="feedback-list" class="list-card">
+              <p>Loading feedback...</p>
+            </div>
+          `;
+          initFeedbackReceived();
+          break;
+
+        default:
+          area.innerHTML =
+            "<h1>Welcome</h1><p>Select a menu option from the sidebar.</p>";
       }
-      
-      // Shuffle the password to randomize character positions
-      return password.split('').sort(() => Math.random() - 0.5).join('');
     }
 
-    // Fetch all occupied units from the database
-    async function getOccupiedUnits() {
+    // ======================== DASHBOARD LOGIC ========================
+    async function initAdminDashboard() {
+      const maintTotalEl = document.getElementById("stat-maint-total");
+      const maintPendingEl = document.getElementById("stat-maint-pending");
+      const maintRecentEl = document.getElementById("stat-maint-recent");
+      const payAmountEl = document.getElementById("stat-payments-amount");
+      const payCountEl = document.getElementById("stat-payments-count");
+      const fbTotalEl = document.getElementById("stat-feedback-total");
+      const fbRecentEl = document.getElementById("stat-feedback-recent");
+      const recentListEl = document.getElementById("recentPaymentsList");
+
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thisMonth = now.getMonth();
+      const thisYear = now.getFullYear();
+
+      // ----- Maintenance stats -----
+      let totalRequests = 0;
+      let pendingCount = 0;
+      let recentMaint = 0;
+      const statusCounts = { pending: 0, complete: 0, other: 0 };
+
       try {
-        const usersSnapshot = await db.collection("users")
-          .where("role", "==", "tenant")
+        const maintSnap = await db
+          .collection("maintenanceRequests")
+          .orderBy("timestamp", "desc")
           .get();
-        
-        const occupiedUnits = [];
-        usersSnapshot.forEach(doc => {
-          const userData = doc.data();
-          if (userData.unitNumbers && Array.isArray(userData.unitNumbers)) {
-            occupiedUnits.push(...userData.unitNumbers);
+
+        totalRequests = maintSnap.size;
+
+        maintSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const status = data.status || "Pending";
+
+          if (status === "Pending") {
+            pendingCount++;
+            statusCounts.pending++;
+          } else if (status === "Complete") {
+            statusCounts.complete++;
+          } else {
+            statusCounts.other++;
+          }
+
+          const ts = data.timestamp?.toDate
+            ? data.timestamp.toDate()
+            : null;
+          if (ts && ts >= sevenDaysAgo) {
+            recentMaint++;
           }
         });
-        
-        console.log("Occupied units:", occupiedUnits);
-        return occupiedUnits;
-      } catch (error) {
-        console.error("Error fetching occupied units:", error);
-        return [];
+      } catch (err) {
+        console.error("Error loading maintenance stats:", err);
       }
-    }
 
-    // Get occupied units on load
-    let occupiedUnits = await getOccupiedUnits();
+      if (maintTotalEl) maintTotalEl.textContent = totalRequests;
+      if (maintPendingEl)
+        maintPendingEl.textContent = `${pendingCount} pending`;
+      if (maintRecentEl)
+        maintRecentEl.textContent = `${recentMaint} in last 7 days`;
 
-    // Setup password field and generate button
-    const passwordInput = document.getElementById('tenantPassword');
-    const generateBtn = document.getElementById('generatePasswordBtn');
-
-    // Generate password on button click
-    generateBtn.addEventListener('click', () => {
-      const newPassword = generatePassword();
-      passwordInput.value = newPassword;
-      passwordInput.style.background = '#e8f5e8';
-      passwordInput.style.border = '1px solid #4CAF50';
-      
-      // Reset background after 3 seconds
-      setTimeout(() => {
-        passwordInput.style.background = '#f5f5f5';
-        passwordInput.style.border = '1px solid #ccc';
-      }, 3000);
-    });
-
-    // Function to populate unit numbers with occupied unit filtering
-    function populateUnitNumbers(typeSelect, numberSelect, occupiedUnitsList) {
-      numberSelect.innerHTML = `<option value="">-- Select Unit Number --</option>`;
-      if (!typeSelect.value) return;
-      
-      let start = typeSelect.value === '1B' ? 1 : 50;
-      let end = typeSelect.value === '1B' ? 49 : 100;
-      
-      // Get current value before clearing to restore if still available
-      const currentValue = numberSelect.value;
-      let currentValueStillAvailable = false;
-      
-      for (let i = start; i <= end; i++) {
-        const num = i.toString().padStart(3, '0');
-        const unitValue = `${typeSelect.value}-${num}`;
-        
-        // Check if unit is occupied
-        if (occupiedUnitsList.includes(unitValue)) {
-          continue; // Skip occupied units
-        }
-        
-        const option = document.createElement('option');
-        option.value = unitValue;
-        option.textContent = `${num}`;
-        numberSelect.appendChild(option);
-        
-        // Check if current value is still available
-        if (currentValue === unitValue) {
-          currentValueStillAvailable = true;
-        }
+      // ----- Payments stats -----
+      const monthLabels = [];
+      const monthlyTotals = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(thisYear, thisMonth - i, 1);
+        const label = d.toLocaleString("default", { month: "short" });
+        monthLabels.push(label);
+        monthlyTotals[label] = 0;
       }
-      
-      // Restore previous selection if still available
-      if (currentValueStillAvailable) {
-        numberSelect.value = currentValue;
-      }
-    }
 
-    // Form submission
-    const form = document.getElementById('createTenantForm');
-    form.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      
-      const email = document.getElementById('tenantEmail').value;
-      const password = passwordInput.value;
-      const unitNumbers = Array.from(document.querySelectorAll('.unitNumber'))
-        .map(i => i.value)
-        .filter(v => v !== "");
-
-      // Validate that all selected units are not occupied
-      const occupiedSet = new Set(occupiedUnits);
-      const occupiedSelections = unitNumbers.filter(unit => occupiedSet.has(unit));
-      
-      if (occupiedSelections.length > 0) {
-        showPopup(`Error: The following units are already occupied: ${occupiedSelections.join(', ')}. Please select different units.`);
-        return;
-      }
+      let totalThisMonth = 0;
+      let countThisMonth = 0;
+      const recentPayments = [];
 
       try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
+        const paySnap = await db
+          .collection("payments")
+          .orderBy("timestamp", "desc")
+          .get();
 
-        await db.collection("users").doc(user.uid).set({
-          email,
-          role: "tenant",
-          unitNumbers,
-          mustChangePassword: true,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        paySnap.forEach((docSnap, index) => {
+          const data = docSnap.data();
+          const ts = data.timestamp?.toDate
+            ? data.timestamp.toDate()
+            : null;
+          if (!ts) return;
+
+          const amount = Number(data.amount) || 0;
+          const status = data.status || "Paid";
+          const isPaid =
+            status === "Paid" ||
+            status === "Approved" ||
+            status === "Completed";
+
+          if (
+            isPaid &&
+            ts.getFullYear() === thisYear &&
+            ts.getMonth() === thisMonth
+          ) {
+            totalThisMonth += amount;
+            countThisMonth++;
+          }
+
+          const monthsDiff =
+            (thisYear - ts.getFullYear()) * 12 +
+            (thisMonth - ts.getMonth());
+          if (monthsDiff >= 0 && monthsDiff <= 5) {
+            const label = ts.toLocaleString("default", { month: "short" });
+            if (monthlyTotals[label] != null) {
+              monthlyTotals[label] += amount;
+            }
+          }
+
+          if (index < 5) {
+            recentPayments.push({ ...data, timestamp: ts });
+          }
+        });
+      } catch (err) {
+        console.error("Error loading payment stats:", err);
+      }
+
+      if (payAmountEl) payAmountEl.textContent = formatCurrency(totalThisMonth);
+      if (payCountEl) {
+        payCountEl.textContent =
+          countThisMonth === 1
+            ? "1 payment this month"
+            : `${countThisMonth} payments this month`;
+      }
+
+      if (recentListEl) {
+        if (!recentPayments.length) {
+          recentListEl.innerHTML =
+            '<p class="muted">No payments recorded yet.</p>';
+        } else {
+          recentListEl.innerHTML = "";
+          recentPayments.forEach((p) => {
+            const row = document.createElement("div");
+            row.className = "recent-payment-row";
+            const tenantEmail = p.tenantEmail || "Unknown";
+            const method = p.method || "Unknown";
+            const amount = formatCurrency(p.amount);
+            const dateStr = p.timestamp
+              ? p.timestamp.toLocaleString()
+              : "";
+
+            row.innerHTML = `
+              <div class="recent-main">
+                <div class="recent-email">${tenantEmail}</div>
+                <div class="recent-method">${method}</div>
+              </div>
+              <div class="recent-meta">
+                <div class="recent-amount">${amount}</div>
+                <div class="recent-date">${dateStr}</div>
+              </div>
+            `;
+            recentListEl.appendChild(row);
+          });
+        }
+      }
+
+      // ----- Feedback stats -----
+      let totalFeedback = 0;
+      let feedbackLast7 = 0;
+      const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+      try {
+        const fbSnap = await db
+          .collection("feedback")
+          .orderBy("timestamp", "desc")
+          .get();
+
+        totalFeedback = fbSnap.size;
+
+        fbSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const rating = Number(data.rating) || 0;
+          if (rating >= 1 && rating <= 5) {
+            ratingCounts[rating] += 1;
+          }
+          const ts = data.timestamp?.toDate
+            ? data.timestamp.toDate()
+            : null;
+          if (ts && ts >= sevenDaysAgo) {
+            feedbackLast7++;
+          }
+        });
+      } catch (err) {
+        console.error("Error loading feedback stats:", err);
+      }
+
+      if (fbTotalEl) fbTotalEl.textContent = totalFeedback;
+      if (fbRecentEl)
+        fbRecentEl.textContent = `${feedbackLast7} in last 7 days`;
+
+      // ----- Charts -----
+      const payCanvas = document.getElementById("paymentsChart");
+      if (payCanvas) {
+        const payCtx = payCanvas.getContext("2d");
+        const payGradient = payCtx.createLinearGradient(0, 0, 0, 220);
+        payGradient.addColorStop(0, "rgba(255, 213, 122, 1)");
+        payGradient.addColorStop(1, "rgba(192, 147, 60, 1)");
+
+        new Chart(payCtx, {
+          type: "bar",
+          data: {
+            labels: monthLabels,
+            datasets: [
+              {
+                label: "Total Paid (₱)",
+                data: monthLabels.map((m) => monthlyTotals[m]),
+                backgroundColor: payGradient,
+                borderRadius: 4,
+                maxBarThickness: 32,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.4,
+            animation: {
+              duration: 900,
+              easing: "easeOutCubic",
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) =>
+                    "₱" +
+                    (ctx.parsed.y || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }),
+                },
+              },
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "#cccccc" },
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: "rgba(255,255,255,0.06)" },
+                ticks: {
+                  color: "#cccccc",
+                  callback: (value) => "₱" + value,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      const maintCanvas = document.getElementById("maintenanceChart");
+      if (maintCanvas) {
+        const maintCtx = maintCanvas.getContext("2d");
+        new Chart(maintCtx, {
+          type: "doughnut",
+          data: {
+            labels: ["Pending", "Complete", "Other"],
+            datasets: [
+              {
+                data: [
+                  statusCounts.pending,
+                  statusCounts.complete,
+                  statusCounts.other,
+                ],
+                backgroundColor: ["#ffb347", "#66bb6a", "#90a4ae"],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: "60%",
+            animation: {
+              animateRotate: true,
+              animateScale: true,
+              duration: 1100,
+              easing: "easeOutExpo",
+            },
+            plugins: {
+              legend: {
+                position: "bottom",
+                labels: { color: "#f3efe9" },
+              },
+            },
+          },
+        });
+      }
+
+      const fbCanvas = document.getElementById("feedbackChart");
+      if (fbCanvas) {
+        const fbCtx = fbCanvas.getContext("2d");
+        new Chart(fbCtx, {
+          type: "doughnut",
+          data: {
+            labels: ["5★", "4★", "3★", "2★", "1★"],
+            datasets: [
+              {
+                data: [
+                  ratingCounts[5],
+                  ratingCounts[4],
+                  ratingCounts[3],
+                  ratingCounts[2],
+                  ratingCounts[1],
+                ],
+                backgroundColor: [
+                  "#66bb6a",
+                  "#9ccc65",
+                  "#ffeb3b",
+                  "#ffb74d",
+                  "#ef5350",
+                ],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: "55%",
+            animation: {
+              animateRotate: true,
+              animateScale: true,
+              duration: 1100,
+              easing: "easeOutExpo",
+            },
+            plugins: {
+              legend: {
+                position: "bottom",
+                labels: { color: "#f3efe9" },
+              },
+            },
+          },
+        });
+      }
+
+      renderAdminCalendar();
+
+      // KPI drilldown
+      const maintCard = document.getElementById("card-maintenance");
+      const payCard = document.getElementById("card-payments");
+      const fbCard = document.getElementById("card-feedback");
+
+      if (maintCard) {
+        maintCard.addEventListener("click", () => {
+          window.adminDashboardDrilldown = { maintenanceStatus: "Pending" };
+          loadContent("Maintenance Requests");
+        });
+      }
+      if (payCard) {
+        payCard.addEventListener("click", () => {
+          window.adminDashboardDrilldown = { paymentsFilter: "thisMonth" };
+          loadContent("Payment Received");
+        });
+      }
+      if (fbCard) {
+        fbCard.addEventListener("click", () => {
+          window.adminDashboardDrilldown = { feedbackTab: true };
+          loadContent("Feedback Received");
+        });
+      }
+    }
+
+    function renderAdminCalendar() {
+      const calendarEl = document.getElementById("adminCalendar");
+      if (!calendarEl) return;
+
+      const today = new Date();
+      const monthName = today.toLocaleString("default", { month: "long" });
+      const year = today.getFullYear();
+      const firstDay = new Date(year, today.getMonth(), 1);
+      const lastDay = new Date(year, today.getMonth() + 1, 0);
+      const startDay = firstDay.getDay();
+
+      let html = "<table class='cal-table'>";
+      html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+      html +=
+        "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+      for (let i = 0; i < startDay; i++) {
+        html += "<td class='cal-empty'></td>";
+      }
+
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const isToday = day === today.getDate();
+        html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+        if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) {
+          html += "</tr><tr>";
+        }
+      }
+
+      html += "</tr></table>";
+      calendarEl.innerHTML = html;
+    }
+
+    // ======================== PAYMENTS RECEIVED LOGIC ========================
+    function initPaymentReceived() {
+      const paypalList = document.getElementById("paypalList");
+      const searchInput = document.getElementById("paymentSearch");
+      const sortBy = document.getElementById("sortBy");
+      const filterBy = document.getElementById("filterBy");
+      const dateFrom = document.getElementById("dateFrom");
+      const dateTo = document.getElementById("dateTo");
+      const resetFilters = document.getElementById("resetFilters");
+      const paymentCount = document.getElementById("paymentCount");
+      const totalAmount = document.getElementById("totalAmount");
+      const statsDiv = document.getElementById("stats");
+
+      let allPayments = [];
+      let filteredPayments = [];
+
+      const drill = window.adminDashboardDrilldown || {};
+      if (drill.paymentsFilter) {
+        filterBy.value = drill.paymentsFilter;
+      }
+      window.adminDashboardDrilldown = null;
+
+      function applyFiltersAndSort() {
+        const searchValue = searchInput.value.toLowerCase();
+        const filterValue = filterBy.value;
+        const sortValue = sortBy.value;
+        const startVal = dateFrom.value;
+        const endVal = dateTo.value;
+
+        filteredPayments = allPayments.filter(
+          (p) => p.method === "PayPal"
+        );
+
+        if (searchValue) {
+          filteredPayments = filteredPayments.filter((p) => {
+            const tEmail = (p.tenantEmail || "").toLowerCase();
+            const pEmail = (p.payerEmail || "").toLowerCase();
+            return (
+              tEmail.includes(searchValue) || pEmail.includes(searchValue)
+            );
+          });
+        }
+
+        const now = new Date();
+        let startDate = null;
+        let endDate = null;
+
+        if (startVal) startDate = new Date(startVal + "T00:00:00");
+        if (endVal) endDate = new Date(endVal + "T23:59:59.999");
+
+        if (startDate || endDate) {
+          filteredPayments = filteredPayments.filter((p) => {
+            const ts = p.timestamp?.toDate ? p.timestamp.toDate() : null;
+            if (!ts) return false;
+            if (startDate && ts < startDate) return false;
+            if (endDate && ts > endDate) return false;
+            return true;
+          });
+        } else if (filterValue !== "all") {
+          filteredPayments = filteredPayments.filter((p) => {
+            const ts = p.timestamp?.toDate ? p.timestamp.toDate() : null;
+            if (!ts) return false;
+            const diffMs = now - ts;
+            const diffDays = diffMs / (1000 * 60 * 60 * 24);
+            switch (filterValue) {
+              case "last7":
+                return diffDays <= 7;
+              case "last30":
+                return diffDays <= 30;
+              case "thisMonth":
+                return (
+                  ts.getFullYear() === now.getFullYear() &&
+                  ts.getMonth() === now.getMonth()
+                );
+              case "lastMonth": {
+                const lastMonthDate = new Date(
+                  now.getFullYear(),
+                  now.getMonth() - 1,
+                  1
+                );
+                const start = lastMonthDate;
+                const end = new Date(
+                  now.getFullYear(),
+                  now.getMonth(),
+                  0,
+                  23,
+                  59,
+                  59,
+                  999
+                );
+                return ts >= start && ts <= end;
+              }
+              case "thisYear":
+                return ts.getFullYear() === now.getFullYear();
+              default:
+                return true;
+            }
+          });
+        }
+
+        filteredPayments.sort((a, b) => {
+          const aDate = a.timestamp?.toDate
+            ? a.timestamp.toDate()
+            : null;
+          const bDate = b.timestamp?.toDate
+            ? b.timestamp.toDate()
+            : null;
+
+          switch (sortValue) {
+            case "date-asc":
+              return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+            case "date-desc":
+              return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+            case "amount-asc":
+              return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+            case "amount-desc":
+              return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+            case "email-asc":
+              return (a.tenantEmail || "").localeCompare(
+                b.tenantEmail || ""
+              );
+            case "email-desc":
+              return (b.tenantEmail || "").localeCompare(
+                a.tenantEmail || ""
+              );
+            default:
+              return 0;
+          }
         });
 
-        // Add newly created units to occupied units list
-        occupiedUnits.push(...unitNumbers);
-        
-        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-        showPopup("Unit Owner created successfully! Temporary password: " + password);
-        form.reset();
-        passwordInput.value = '';
-        passwordInput.style.background = '#f5f5f5';
-        passwordInput.style.border = '1px solid #ccc';
+        renderPayments();
+      }
 
-        // Reset first row
-        const unitContainer = document.getElementById('unitContainer');
-        unitContainer.innerHTML = `
-          <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
-            <select class="unitType" required style="padding:10px; flex:1;">
+      function renderPayments() {
+        paypalList.innerHTML = "";
+
+        if (!filteredPayments.length) {
+          paypalList.innerHTML =
+            "<p>No PayPal payments found matching your criteria.</p>";
+          statsDiv.style.display = "none";
+          return;
+        }
+
+        let total = 0;
+
+        filteredPayments.forEach((p) => {
+          const row = document.createElement("div");
+          row.className = "payment-row";
+
+          const ts = p.timestamp?.toDate ? p.timestamp.toDate() : null;
+          const dateStr = ts ? ts.toLocaleString() : "Unknown date";
+          const status = p.status || "Completed";
+          const amountNum = Number(p.amount) || 0;
+
+          let statusClass = "badge-muted";
+          if (
+            status === "Paid" ||
+            status === "Approved" ||
+            status === "Completed"
+          ) {
+            statusClass = "badge-success";
+            total += amountNum;
+          } else if (status === "Pending Verification") {
+            statusClass = "badge-warning";
+          } else if (status === "Rejected") {
+            statusClass = "badge-danger";
+          }
+
+          row.innerHTML = `
+            <div class="payment-main">
+              <div class="payment-email">${p.tenantEmail || "Unknown unit owner"}</div>
+              <div class="payment-sub">${p.payerEmail || ""}</div>
+            </div>
+            <div class="payment-meta">
+              <div class="payment-amount">${formatCurrency(p.amount)}</div>
+              <div class="payment-meta-row">
+                <span class="badge ${statusClass}">${status}</span>
+                <span class="payment-method">${p.method || ""}</span>
+                <span class="payment-date">${dateStr}</span>
+              </div>
+            </div>
+          `;
+          paypalList.appendChild(row);
+        });
+
+        paymentCount.textContent = filteredPayments.length;
+        totalAmount.textContent = total.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        statsDiv.style.display = "block";
+      }
+
+      db.collection("payments")
+        .orderBy("timestamp", "desc")
+        .onSnapshot(
+          (snapshot) => {
+            allPayments = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+            applyFiltersAndSort();
+          },
+          (error) => {
+            paypalList.innerHTML = `<p style="color:red;">Error loading payments: ${error.message}</p>`;
+            statsDiv.style.display = "none";
+          }
+        );
+
+      searchInput.addEventListener("input", applyFiltersAndSort);
+      sortBy.addEventListener("change", applyFiltersAndSort);
+      filterBy.addEventListener("change", applyFiltersAndSort);
+      dateFrom.addEventListener("change", applyFiltersAndSort);
+      dateTo.addEventListener("change", applyFiltersAndSort);
+
+      resetFilters.addEventListener("click", () => {
+        searchInput.value = "";
+        sortBy.value = "date-desc";
+        filterBy.value = "all";
+        dateFrom.value = "";
+        dateTo.value = "";
+        applyFiltersAndSort();
+      });
+    }
+
+    // ======================== MAINTENANCE REQUESTS LOGIC ========================
+    function initMaintenanceRequests() {
+      const maintenanceList = document.getElementById("maintenanceList");
+      const statusFilter = document.getElementById("statusFilter");
+      const personnelFilter = document.getElementById("personnelFilter");
+      const maintenanceSearch = document.getElementById("maintenanceSearch");
+      const sortBy = document.getElementById("sortBy");
+      const resetFilters = document.getElementById("resetFilters");
+      const maintenanceStats = document.getElementById("maintenanceStats");
+      const requestCount = document.getElementById("requestCount");
+      const pendingCountEl = document.getElementById("pendingCount");
+      const completeCountEl = document.getElementById("completeCount");
+
+      let allRequests = [];
+      let filteredRequests = [];
+      let assignedPersonnel = new Set();
+
+      const drill = window.adminDashboardDrilldown || {};
+      if (drill.maintenanceStatus) {
+        statusFilter.value = drill.maintenanceStatus;
+      }
+      window.adminDashboardDrilldown = null;
+
+      function formatDateTimeAMPM(date) {
+        if (!date) return "N/A";
+        const d = date.toDate ? date.toDate() : date;
+        let hours = d.getHours();
+        const minutes = d.getMinutes().toString().padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        const month = (d.getMonth() + 1).toString().padStart(2, "0");
+        const day = d.getDate().toString().padStart(2, "0");
+        const year = d.getFullYear();
+        return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+      }
+
+      function applyFiltersAndSort() {
+        const statusValue = statusFilter.value;
+        const personnelValue = personnelFilter.value;
+        const searchValue = maintenanceSearch.value.toLowerCase();
+        const sortValue = sortBy.value;
+
+        filteredRequests = [...allRequests];
+
+        if (statusValue !== "all") {
+          filteredRequests = filteredRequests.filter(
+            (r) => r.status === statusValue
+          );
+        }
+
+        if (personnelValue !== "all") {
+          if (personnelValue === "unassigned") {
+            filteredRequests = filteredRequests.filter(
+              (r) => !r.maintenanceName || !r.maintenanceName.trim()
+            );
+          } else {
+            filteredRequests = filteredRequests.filter(
+              (r) => r.maintenanceName === personnelValue
+            );
+          }
+        }
+
+        if (searchValue) {
+          filteredRequests = filteredRequests.filter((r) => {
+            const emailMatch =
+              r.tenantEmail &&
+              r.tenantEmail.toLowerCase().includes(searchValue);
+            const unitMatch =
+              r.unitNumber &&
+              r.unitNumber.toLowerCase().includes(searchValue);
+            const problemMatch =
+              r.problem &&
+              r.problem.toLowerCase().includes(searchValue);
+            const commentMatch =
+              r.comment &&
+              r.comment.toLowerCase().includes(searchValue);
+            return emailMatch || unitMatch || problemMatch || commentMatch;
+          });
+        }
+
+        filteredRequests.sort((a, b) => {
+          const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+          const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+          switch (sortValue) {
+            case "date-desc":
+              return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+            case "date-asc":
+              return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+            case "unit-asc":
+              return (a.unitNumber || "").localeCompare(
+                b.unitNumber || ""
+              );
+            case "unit-desc":
+              return (b.unitNumber || "").localeCompare(
+                a.unitNumber || ""
+              );
+            case "email-asc":
+              return (a.tenantEmail || "").localeCompare(
+                b.tenantEmail || ""
+              );
+            case "email-desc":
+              return (b.tenantEmail || "").localeCompare(
+                a.tenantEmail || ""
+              );
+            default:
+              return 0;
+          }
+        });
+
+        renderMaintenanceRequests();
+      }
+
+      function renderMaintenanceRequests() {
+        if (!filteredRequests.length) {
+          maintenanceList.innerHTML =
+            "<p>No maintenance requests found matching your criteria.</p>";
+          maintenanceStats.style.display = "none";
+          return;
+        }
+
+        maintenanceList.innerHTML = "";
+        assignedPersonnel.clear();
+
+        let pending = 0;
+        let complete = 0;
+
+        filteredRequests.forEach((request) => {
+          const data = request;
+          const id = data.id;
+
+          if (data.status === "Pending") pending++;
+          if (data.status === "Complete") complete++;
+
+          const card = document.createElement("div");
+          card.className = "maintenance-card";
+
+          const attachmentsHTML =
+            data.imageUrls &&
+            Array.isArray(data.imageUrls) &&
+            data.imageUrls.length > 0
+              ? `
+              <div style="margin-top:6px;">
+                <strong>Attachments:</strong><br/>
+                <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                  <img src="${
+                    data.imageUrls[0]
+                  }" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                  ${
+                    data.imageUrls.length > 1
+                      ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
+                          background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                        <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
+                          background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
+                      : ""
+                  }
+                </div>
+              </div>`
+              : "";
+
+          card.innerHTML = `
+            <h3>${data.problem || "Unknown Issue"}</h3>
+            <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+              <div style="flex:1; min-width:220px;">
+                <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
+                <p><strong>Details:</strong> ${
+                  data.comment || "No additional details."
+                }</p>
+                <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(
+                  data.preferredVisitTime
+                )}</p>
+                <p><strong>Status:</strong> ${data.status || "Pending"}</p>
+                <p><strong>Maintenance Personnel:</strong> ${
+                  data.maintenanceName || "Not assigned"
+                }</p>
+                <p><strong>Submitted:</strong> ${formatDateTimeAMPM(
+                  data.timestamp
+                )}</p>
+              </div>
+              <div style="min-width:220px;">
+                ${attachmentsHTML}
+              </div>
+            </div>
+          `;
+
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "maintenance-card-actions";
+
+          const statusSelect = document.createElement("select");
+          ["Pending", "Complete"].forEach((option) => {
+            const opt = document.createElement("option");
+            opt.value = option;
+            opt.textContent = option;
+            if (data.status === option) opt.selected = true;
+            statusSelect.appendChild(opt);
+          });
+
+          const personnelSelect = document.createElement("select");
+          const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
+          personnelNames.forEach((name) => {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            if (
+              assignedPersonnel.has(name) &&
+              data.maintenanceName !== name &&
+              data.status !== "Complete"
+            ) {
+              opt.disabled = true;
+              opt.textContent += " (Assigned)";
+            }
+            if (data.maintenanceName === name) opt.selected = true;
+            personnelSelect.appendChild(opt);
+          });
+
+          if (
+            data.status !== "Complete" &&
+            data.maintenanceName &&
+            !assignedPersonnel.has(data.maintenanceName)
+          ) {
+            assignedPersonnel.add(data.maintenanceName);
+          }
+
+          const updateBtn = document.createElement("button");
+          updateBtn.textContent = "Update";
+          updateBtn.className = "btn-primary";
+
+          if (data.status === "Complete") {
+            statusSelect.disabled = true;
+            personnelSelect.disabled = true;
+            updateBtn.disabled = true;
+            updateBtn.style.backgroundColor = "#777";
+            updateBtn.style.cursor = "not-allowed";
+          }
+
+          updateBtn.addEventListener("click", async () => {
+            try {
+              await db.collection("maintenanceRequests").doc(id).update({
+                status: statusSelect.value,
+                maintenanceName: personnelSelect.value.trim(),
+                updatedAt:
+                  firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              showPopup("Request updated successfully!");
+            } catch (error) {
+              showPopup("Error updating request: " + error.message);
+            }
+          });
+
+          const respondBtn = document.createElement("button");
+          respondBtn.textContent = "Respond";
+          respondBtn.className = "btn-primary";
+          respondBtn.style.background = "#4a90e2";
+
+          const responseContainer = document.createElement("div");
+          responseContainer.style.marginTop = "8px";
+          responseContainer.style.display = "none";
+
+          const responseTextarea = document.createElement("textarea");
+          responseTextarea.placeholder =
+            "Enter your response message here...";
+          responseTextarea.style.width = "100%";
+          responseTextarea.style.height = "60px";
+          responseTextarea.style.marginBottom = "8px";
+          responseTextarea.style.resize = "vertical";
+
+          const sendResponseBtn = document.createElement("button");
+          sendResponseBtn.textContent = "Send Response";
+          sendResponseBtn.className = "btn-primary";
+          sendResponseBtn.style.background = "#4a90e2";
+
+          responseContainer.appendChild(responseTextarea);
+          responseContainer.appendChild(sendResponseBtn);
+
+          respondBtn.addEventListener("click", () => {
+            responseContainer.style.display =
+              responseContainer.style.display === "none"
+                ? "block"
+                : "none";
+            if (responseContainer.style.display === "block") {
+              responseTextarea.focus();
+            }
+          });
+
+          sendResponseBtn.addEventListener("click", async () => {
+            const msg = responseTextarea.value.trim();
+            if (!msg) {
+              showPopup("Response message cannot be empty.");
+              return;
+            }
+            try {
+              const requestDocRef = db
+                .collection("maintenanceRequests")
+                .doc(id);
+              await requestDocRef.collection("responses").add({
+                adminEmail: auth.currentUser.email,
+                message: msg,
+                timestamp:
+                  firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              await requestDocRef.update({
+                responseTime:
+                  firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              showPopup("Response sent successfully!");
+              responseTextarea.value = "";
+              responseContainer.style.display = "none";
+            } catch (error) {
+              showPopup("Failed to send response: " + error.message);
+            }
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.className = "btn-danger";
+
+          deleteBtn.addEventListener("click", () => {
+            showPopup(`
+              <strong>Are you sure?</strong><br>
+              This maintenance request will be permanently deleted.<br><br>
+              <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+                Delete
+              </button>
+              <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+                Cancel
+              </button>
+            `);
+
+            setTimeout(() => {
+              const confirmBtn =
+                document.getElementById("confirmDeleteBtn");
+              if (!confirmBtn) return;
+              confirmBtn.addEventListener("click", async () => {
+                try {
+                  await db.collection("maintenanceRequests")
+                    .doc(id)
+                    .delete();
+                  closePopup();
+                  showPopup("Maintenance request deleted.");
+                } catch (error) {
+                  closePopup();
+                  showPopup("Failed to delete: " + error.message);
+                }
+              });
+            }, 50);
+          });
+
+          actionsDiv.appendChild(statusSelect);
+          actionsDiv.appendChild(personnelSelect);
+          actionsDiv.appendChild(updateBtn);
+          actionsDiv.appendChild(respondBtn);
+          actionsDiv.appendChild(deleteBtn);
+
+          card.appendChild(actionsDiv);
+          card.appendChild(responseContainer);
+
+          const responsesContainer = document.createElement("div");
+          responsesContainer.style.marginTop = "10px";
+          responsesContainer.style.borderTop = "1px dashed #555";
+          responsesContainer.style.paddingTop = "6px";
+          responsesContainer.innerHTML =
+            "<strong>Response History:</strong><p>Loading...</p>";
+
+          card.appendChild(responsesContainer);
+
+          db.collection("maintenanceRequests")
+            .doc(id)
+            .collection("responses")
+            .orderBy("timestamp", "asc")
+            .onSnapshot((snapshotResp) => {
+              responsesContainer.innerHTML =
+                "<strong>Response History:</strong>";
+              if (snapshotResp.empty) {
+                responsesContainer.innerHTML +=
+                  "<p>No responses yet.</p>";
+              } else {
+                snapshotResp.forEach((r) => {
+                  const rData = r.data();
+                  const rEl = document.createElement("div");
+                  rEl.style.borderBottom = "1px solid #444";
+                  rEl.style.padding = "4px 0";
+                  rEl.innerHTML = `
+                    <strong>${rData.adminEmail || "Admin"}:</strong> ${
+                    rData.message || ""
+                  }<br>
+                    <small style="color:#bdbdbd;">${formatDateTimeAMPM(
+                      rData.timestamp
+                    )}</small>
+                  `;
+                  responsesContainer.appendChild(rEl);
+                });
+              }
+            });
+
+          maintenanceList.appendChild(card);
+
+          // image slider
+          if (
+            data.imageUrls &&
+            Array.isArray(data.imageUrls) &&
+            data.imageUrls.length > 1
+          ) {
+            let currentIndex = 0;
+            const imgEl = card.querySelector(`#img-${id}`);
+            const prevBtn = card.querySelector(".prev-btn");
+            const nextBtn = card.querySelector(".next-btn");
+
+            prevBtn.addEventListener("click", () => {
+              currentIndex =
+                (currentIndex - 1 + data.imageUrls.length) %
+                data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+
+            nextBtn.addEventListener("click", () => {
+              currentIndex =
+                (currentIndex + 1) % data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+          }
+        });
+
+        requestCount.textContent = filteredRequests.length;
+        pendingCountEl.textContent = pending;
+        completeCountEl.textContent = complete;
+        maintenanceStats.style.display = "block";
+      }
+
+      db.collection("maintenanceRequests")
+        .orderBy("timestamp", "desc")
+        .onSnapshot(
+          (snapshot) => {
+            if (snapshot.empty) {
+              allRequests = [];
+              filteredRequests = [];
+              maintenanceList.innerHTML =
+                "<p>No maintenance requests found.</p>";
+              maintenanceStats.style.display = "none";
+              return;
+            }
+            allRequests = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            }));
+            applyFiltersAndSort();
+          },
+          (error) => {
+            maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+          }
+        );
+
+      statusFilter.addEventListener("change", applyFiltersAndSort);
+      personnelFilter.addEventListener("change", applyFiltersAndSort);
+      maintenanceSearch.addEventListener("input", applyFiltersAndSort);
+      sortBy.addEventListener("change", applyFiltersAndSort);
+      resetFilters.addEventListener("click", () => {
+        statusFilter.value = "all";
+        personnelFilter.value = "all";
+        maintenanceSearch.value = "";
+        sortBy.value = "date-desc";
+        applyFiltersAndSort();
+      });
+    }
+
+    // ======================== UNIT OWNER CREATION LOGIC ========================
+    function initUnitOwnerCreation() {
+      const adminEmail = "adminaccount@solano.com";
+      const adminPassword = "123456";
+
+      function generatePassword() {
+        const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const lowercase = "abcdefghijklmnopqrstuvwxyz";
+        const numbers = "0123456789";
+
+        let password = "";
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+
+        const allChars = uppercase + lowercase + numbers;
+        for (let i = 3; i < 8; i++) {
+          password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+
+        return password
+          .split("")
+          .sort(() => Math.random() - 0.5)
+          .join("");
+      }
+
+      async function getOccupiedUnits() {
+        try {
+          const usersSnapshot = await db
+            .collection("users")
+            .where("role", "==", "tenant")
+            .get();
+
+          const occupiedUnits = [];
+          usersSnapshot.forEach((docSnap) => {
+            const userData = docSnap.data();
+            if (
+              userData.unitNumbers &&
+              Array.isArray(userData.unitNumbers)
+            ) {
+              occupiedUnits.push(...userData.unitNumbers);
+            }
+          });
+          return occupiedUnits;
+        } catch (error) {
+          console.error("Error fetching occupied units:", error);
+          return [];
+        }
+      }
+
+      function populateUnitNumbers(typeSelect, numberSelect, occupied) {
+        numberSelect.innerHTML =
+          '<option value="">-- Select Unit Number --</option>';
+        if (!typeSelect.value) return;
+
+        const type = typeSelect.value;
+        let start = type === "1B" ? 1 : 50;
+        let end = type === "1B" ? 49 : 100;
+
+        const currentValue = numberSelect.value;
+        let currentStillAvailable = false;
+
+        for (let i = start; i <= end; i++) {
+          const num = i.toString().padStart(3, "0");
+          const unitValue = `${type}-${num}`;
+          if (occupied.includes(unitValue)) continue;
+
+          const opt = document.createElement("option");
+          opt.value = unitValue;
+          opt.textContent = num;
+          numberSelect.appendChild(opt);
+
+          if (currentValue === unitValue) {
+            currentStillAvailable = true;
+          }
+        }
+
+        if (currentStillAvailable) {
+          numberSelect.value = currentValue;
+        }
+      }
+
+      (async () => {
+        let occupiedUnits = await getOccupiedUnits();
+
+        const passwordInput = document.getElementById("tenantPassword");
+        const generateBtn = document.getElementById("generatePasswordBtn");
+        const form = document.getElementById("createTenantForm");
+        const unitContainer = document.getElementById("unitContainer");
+        const addUnitBtn = document.getElementById("addUnitBtn");
+
+        generateBtn.addEventListener("click", () => {
+          const newPassword = generatePassword();
+          passwordInput.value = newPassword;
+          passwordInput.style.background = "#e8f5e8";
+          passwordInput.style.border = "1px solid #4CAF50";
+          setTimeout(() => {
+            passwordInput.style.background = "#222";
+            passwordInput.style.border =
+              "1px solid rgba(255,255,255,0.18)";
+          }, 3000);
+        });
+
+        const firstType = document.querySelector(".unitType");
+        const firstNumber = document.querySelector(".unitNumber");
+        firstType.addEventListener("change", () =>
+          populateUnitNumbers(firstType, firstNumber, occupiedUnits)
+        );
+
+        addUnitBtn.addEventListener("click", () => {
+          const row = document.createElement("div");
+          row.classList.add("unit-row");
+          row.style =
+            "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
+          row.innerHTML = `
+            <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
               <option value="">-- Select Type --</option>
               <option value="1B">1B (1 Bedroom)</option>
               <option value="2B">2B (2 Bedroom)</option>
             </select>
-            <select class="unitNumber" required style="padding:10px; flex:1;">
+            <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
               <option value="">-- Select Unit Number --</option>
             </select>
-            <button type="button" class="removeUnitBtn" style="padding:10px;background:#b33a3a;color:white;border:none;border-radius:6px;">X</button>
-          </div>
-        `;
-        
-        // Re-setup the first row with current occupied units
-        const firstType = document.querySelector('.unitType');
-        const firstNumber = document.querySelector('.unitNumber');
-        firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber, occupiedUnits));
+            <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+          `;
+          unitContainer.appendChild(row);
 
-      } catch (error) {
-        showPopup("Error: " + error.message);
-      }
-    });
+          const tSelect = row.querySelector(".unitType");
+          const nSelect = row.querySelector(".unitNumber");
+          tSelect.addEventListener("change", () =>
+            populateUnitNumbers(tSelect, nSelect, occupiedUnits)
+          );
 
-    // Unit management functions
-    const unitContainer = document.getElementById('unitContainer');
-    const addUnitBtn = document.getElementById('addUnitBtn');
-
-    // Populate the first row
-    const firstType = document.querySelector('.unitType');
-    const firstNumber = document.querySelector('.unitNumber');
-    firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber, occupiedUnits));
-
-    // Add another unit row
-    addUnitBtn.addEventListener('click', () => {
-      const row = document.createElement('div');
-      row.classList.add('unit-row');
-      row.style = "display:flex; gap:10px; margin-bottom:10px;";
-      row.innerHTML = `
-        <select class="unitType" required style="padding:10px; flex:1;">
-          <option value="">-- Select Type --</option>
-          <option value="1B">1B (1 Bedroom)</option>
-          <option value="2B">2B (2 Bedroom)</option>
-        </select>
-        <select class="unitNumber" required style="padding:10px; flex:1;">
-          <option value="">-- Select Unit Number --</option>
-        </select>
-        <button type="button" class="removeUnitBtn" style="
-          padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
-          X
-        </button>
-      `;
-      unitContainer.appendChild(row);
-
-      const typeSelect = row.querySelector('.unitType');
-      const numberSelect = row.querySelector('.unitNumber');
-      typeSelect.addEventListener('change', () => populateUnitNumbers(typeSelect, numberSelect, occupiedUnits));
-
-      row.querySelector('.removeUnitBtn').addEventListener('click', () => {
-        if (document.querySelectorAll('.unit-row').length > 1) row.remove();
-      });
-    });
-
-    // Remove button for first row
-    document.querySelector('.removeUnitBtn').addEventListener('click', function () {
-      if (document.querySelectorAll('.unit-row').length > 1) this.parentElement.remove();
-    });
-
-  }, 100);
-  break;
-
-
-        //<==============feedback atb===========>
- case 'Feedback Received':
-  area.innerHTML = `
-    <h1>Feedback from Unit Owners</h1>
-    
-    <div class="feedback-controls" style="margin-bottom:20px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Filter by Rating:</label>
-        <select id="ratingFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="all">All Ratings</option>
-          <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
-          <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
-          <option value="3">⭐⭐⭐ (3 Stars)</option>
-          <option value="2">⭐⭐ (2 Stars)</option>
-          <option value="1">⭐ (1 Star)</option>
-        </select>
-      </div>
-      
-      <div>
-        <input type="text" id="feedbackSearch" placeholder="Search in feedback..." 
-          style="padding:8px;width:300px;border:1px solid #ccc;border-radius:6px;">
-      </div>
-      
-      <div>
-        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
-        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
-          <option value="date-desc">Date (Newest First)</option>
-          <option value="date-asc">Date (Oldest First)</option>
-          <option value="rating-desc">Rating (High to Low)</option>
-          <option value="rating-asc">Rating (Low to High)</option>
-          <option value="email-asc">Email (A to Z)</option>
-          <option value="email-desc">Email (Z to A)</option>
-        </select>
-      </div>
-      
-      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
-        Reset Filters
-      </button>
-      
-      <button id="refreshFeedbackBtn" style="padding:8px 12px; background:#8d6c39; color:white; border:none; border-radius:6px; cursor:pointer;">
-        Refresh
-      </button>
-    </div>
-    
-    <div id="feedbackStats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
-      <span style="font-weight:bold;">Showing:</span> 
-      <span id="feedbackCount">0</span> feedback entries | 
-      <span style="font-weight:bold;">Average Rating:</span> 
-      <span id="averageRating">0.0</span>
-    </div>
-    
-    <div id="feedback-list">Loading feedback...</div>`;
-
-  // Wait for DOM to render before getting elements
-  setTimeout(() => {
-    // Store all feedback for filtering
-    let allFeedback = [];
-    let filteredFeedback = [];
-
-    const ratingFilter = document.getElementById('ratingFilter');
-    const feedbackSearch = document.getElementById('feedbackSearch');
-    const sortBy = document.getElementById('sortBy');
-    const resetFilters = document.getElementById('resetFilters');
-    const refreshFeedbackBtn = document.getElementById('refreshFeedbackBtn');
-    const feedbackStats = document.getElementById('feedbackStats');
-    const feedbackCount = document.getElementById('feedbackCount');
-    const averageRating = document.getElementById('averageRating');
-
-    async function loadFeedbacks() {
-      const feedbackList = document.getElementById('feedback-list');
-      feedbackList.innerHTML = '<p>Loading feedback...</p>';
-
-      try {
-        const snapshot = await db.collection("feedback").orderBy("timestamp", "desc").get();
-
-        if (snapshot.empty) {
-          feedbackList.innerHTML = '<p>No feedback found.</p>';
-          allFeedback = [];
-          filteredFeedback = [];
-          feedbackStats.style.display = 'none';
-          return;
-        }
-
-        allFeedback = snapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }));
-
-        applyFiltersAndSort();
-        
-      } catch (error) {
-        feedbackList.innerHTML = `<p style="color:red;">Error loading feedback: ${error.message}</p>`;
-        console.error('Error loading feedback:', error);
-      }
-    }
-
-    function applyFiltersAndSort() {
-      const ratingValue = ratingFilter.value;
-      const searchValue = feedbackSearch.value.toLowerCase();
-      const sortValue = sortBy.value;
-      
-      // Start with all feedback
-      filteredFeedback = [...allFeedback];
-      
-      // Apply rating filter
-      if (ratingValue !== 'all') {
-        filteredFeedback = filteredFeedback.filter(feedback => 
-          feedback.rating == ratingValue
-        );
-      }
-      
-      // Apply search filter
-      if (searchValue) {
-        filteredFeedback = filteredFeedback.filter(feedback => {
-          const emailMatch = feedback.tenantEmail && feedback.tenantEmail.toLowerCase().includes(searchValue);
-          const q2Match = feedback.question2 && feedback.question2.toLowerCase().includes(searchValue);
-          const q3Match = feedback.question3 && feedback.question3.toLowerCase().includes(searchValue);
-          return emailMatch || q2Match || q3Match;
-        });
-      }
-      
-      // Apply sorting
-      filteredFeedback.sort((a, b) => {
-        switch(sortValue) {
-          case 'date-desc':
-            return (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0);
-          case 'date-asc':
-            return (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0);
-          case 'rating-desc':
-            return (b.rating || 0) - (a.rating || 0);
-          case 'rating-asc':
-            return (a.rating || 0) - (b.rating || 0);
-          case 'email-asc':
-            return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
-          case 'email-desc':
-            return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
-          default:
-            return 0;
-        }
-      });
-      
-      renderFeedbacks();
-    }
-
-    function renderFeedbacks() {
-      const feedbackList = document.getElementById('feedback-list');
-      
-      if (filteredFeedback.length === 0) {
-        feedbackList.innerHTML = '<p>No feedback found matching your criteria.</p>';
-        feedbackStats.style.display = 'none';
-        return;
-      }
-      
-      feedbackList.innerHTML = '';
-      
-      let totalRating = 0;
-      
-      filteredFeedback.forEach(feedback => {
-        const timeText = feedback.timestamp?.toDate
-          ? feedback.timestamp.toDate().toLocaleString()
-          : (feedback.timestamp?.seconds ? new Date(feedback.timestamp.seconds * 1000).toLocaleString() : 'Unknown time');
-        
-        const stars = "⭐".repeat(feedback.rating || 0);
-        const emptyStars = "☆".repeat(5 - (feedback.rating || 0));
-        
-        totalRating += feedback.rating || 0;
-        
-        const wrapper = document.createElement('div');
-        wrapper.className = 'feedback-item';
-        wrapper.style.border = '1px solid #e0e0e0';
-        wrapper.style.padding = '15px';
-        wrapper.style.marginBottom = '12px';
-        wrapper.style.borderRadius = '8px';
-        // wrapper.style.backgroundColor = '#fff';
-        wrapper.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-        
-        wrapper.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-            <div>
-              <strong style="font-size: 16px;">${feedback.tenantEmail || "Unknown User"}</strong>
-              <div style="margin-top: 5px; color: #ffa500; font-size: 18px;">
-                <div strong style="color: #fff;">How satisfied are you with our services?</strong></div>
-                ${stars}${emptyStars}
-                <span style="color: #666; font-size: 14px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
-              </div>
-            </div>
-            <div style="color: #666; font-size: 13px;">
-              ${timeText}
-            </div>
-          </div>
-          
-          <div style="margin-top: 15px;">
-            <div style="margin-bottom: 10px;">
-              <strong style="color: #fff;">What do you like about our services, unit, and facilities?</strong>
-              <div style="margin-top: 5px; padding: 10px; border-radius: 6px; border-left: 3px solid #8d6c39;">
-                ${escapeHtml(feedback.question2 || "No answer provided")}
-              </div>
-            </div>
-            
-            <div>
-              <strong style="color: #fff;">What can we improve in our unit, services, or facilities?</strong>
-              <div style="margin-top: 5px; padding: 10px; border-radius: 6px; border-left: 3px solid #6b8e23;">
-                ${escapeHtml(feedback.question3 || "No answer provided")}
-              </div>
-            </div>
-          </div>
-        `;
-        
-        feedbackList.appendChild(wrapper);
-      });
-      
-      // Update stats
-      const average = filteredFeedback.length > 0 ? (totalRating / filteredFeedback.length).toFixed(1) : '0.0';
-      feedbackCount.textContent = filteredFeedback.length;
-      averageRating.textContent = average;
-      feedbackStats.style.display = 'block';
-    }
-
-    // Event listeners
-    ratingFilter.addEventListener('change', applyFiltersAndSort);
-    feedbackSearch.addEventListener('input', applyFiltersAndSort);
-    sortBy.addEventListener('change', applyFiltersAndSort);
-    resetFilters.addEventListener('click', () => {
-      ratingFilter.value = 'all';
-      feedbackSearch.value = '';
-      sortBy.value = 'date-desc';
-      applyFiltersAndSort();
-    });
-    refreshFeedbackBtn.addEventListener('click', loadFeedbacks);
-
-    // Initial load
-    loadFeedbacks();
-  }, 100); // Small delay to ensure DOM is rendered
-  break;
-
-    default:
-      area.innerHTML = '<h1>Welcome</h1><p>Select a menu option from the sidebar.</p>';
-  }
-}
-
-  async function loadFeedbacks() {
-    const feedbackList = document.getElementById('feedback-list');
-    const statusSpan = document.getElementById('feedbackStatus');
-    const deleteBtn = document.getElementById('deleteSelectedBtn');
-    const selectAll = document.getElementById('selectAllCheckbox');
-
-    feedbackList.innerHTML = '<p>Loading feedback...</p>';
-    statusSpan.textContent = '';
-
-    try {
-      const snapshot = await db.collection("feedback").orderBy("timestamp", "desc").get();
-
-      if (snapshot.empty) {
-        feedbackList.innerHTML = '<p>No feedback found.</p>';
-        deleteBtn.disabled = true;
-        selectAll.checked = false;
-        return;
-      }
-
-      feedbackList.innerHTML = '';
-
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const id = docSnap.id;
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'feedback-item';
-        wrapper.style.border = '1px solid #ccc';
-        wrapper.style.padding = '10px';
-        wrapper.style.marginBottom = '10px';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'feedback-checkbox';
-        checkbox.dataset.id = id;
-        checkbox.id = `chk-${id}`;
-        checkbox.classList.add('feedback-item-checkbox');
-
-        checkbox.addEventListener('change', () => {
-          const anyChecked = !!document.querySelector('.feedback-checkbox:checked');
-          deleteBtn.disabled = !anyChecked;
-
-          const total = document.querySelectorAll('.feedback-checkbox').length;
-          const checked = document.querySelectorAll('.feedback-checkbox:checked').length;
-          selectAll.checked = (total === checked && total > 0);
-          selectAll.indeterminate = (checked > 0 && checked < total);
+          row
+            .querySelector(".removeUnitBtn")
+            .addEventListener("click", function () {
+              if (
+                document.querySelectorAll(".unit-row").length > 1
+              ) {
+                row.remove();
+              }
+            });
         });
 
-        const content = document.createElement('div');
-        content.className = 'feedback-item-content';
+        document
+          .querySelector(".removeUnitBtn")
+          .addEventListener("click", function () {
+            if (document.querySelectorAll(".unit-row").length > 1) {
+              this.parentElement.remove();
+            }
+          });
 
-        const timeText = data.timestamp?.toDate
-          ? data.timestamp.toDate().toLocaleString()
-          : (data.timestamp && data.timestamp.seconds ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown time');
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const email = document.getElementById("tenantEmail").value;
+          const password = passwordInput.value;
+          const unitNumbers = Array.from(
+            document.querySelectorAll(".unitNumber")
+          )
+            .map((i) => i.value)
+            .filter((v) => v !== "");
 
-        const stars = "⭐".repeat(data.rating || 0);
+          const occupiedSet = new Set(occupiedUnits);
+          const occupiedSelections = unitNumbers.filter((u) =>
+            occupiedSet.has(u)
+          );
+          if (occupiedSelections.length > 0) {
+            showPopup(
+              `Error: The following units are already occupied: ${occupiedSelections.join(
+                ", "
+              )}. Please select different units.`
+            );
+            return;
+          }
 
-        content.innerHTML = `
-          <strong>From:</strong> ${data.tenantEmail || "Unknown"}<br/>
-          <strong>Rating:</strong> ${stars}<br/>
-          <strong>Question 2:</strong> ${escapeHtml(data.question2 || "No answer")}<br/>
-          <strong>Question 3:</strong> ${escapeHtml(data.question3 || "No answer")}<br/>
-          <small style="color:#666">${timeText}</small>`;
-
-        const perDeleteBtn = document.createElement('button');
-        perDeleteBtn.textContent = 'Delete';
-        perDeleteBtn.className = 'btn btn-danger';
-        perDeleteBtn.style.marginLeft = '8px';
-        perDeleteBtn.addEventListener('click', async () => {
-          if (!confirm('Delete this feedback? This action cannot be undone.')) return;
           try {
-            await db.collection('feedback').doc(id).delete();
-            statusSpan.textContent = 'Feedback deleted.';
-            loadFeedbacks();
+            const userCredential =
+              await auth.createUserWithEmailAndPassword(
+                email,
+                password
+              );
+            const user = userCredential.user;
+
+            await db.collection("users").doc(user.uid).set({
+              email,
+              role: "tenant",
+              unitNumbers,
+              mustChangePassword: true,
+              createdAt:
+                firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            occupiedUnits.push(...unitNumbers);
+
+            await auth.signInWithEmailAndPassword(
+              adminEmail,
+              adminPassword
+            );
+
+            showPopup(
+              "Unit Owner created successfully! Temporary password: " +
+                password
+            );
+
+            form.reset();
+            passwordInput.value = "";
+            passwordInput.style.background = "#222";
+            passwordInput.style.border =
+              "1px solid rgba(255,255,255,0.18)";
+
+            unitContainer.innerHTML = `
+              <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                  <option value="">-- Select Type --</option>
+                  <option value="1B">1B (1 Bedroom)</option>
+                  <option value="2B">2B (2 Bedroom)</option>
+                </select>
+                <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                  <option value="">-- Select Unit Number --</option>
+                </select>
+                <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+              </div>
+            `;
+
+            const newFirstType = document.querySelector(".unitType");
+            const newFirstNumber = document.querySelector(".unitNumber");
+            newFirstType.addEventListener("change", () =>
+              populateUnitNumbers(
+                newFirstType,
+                newFirstNumber,
+                occupiedUnits
+              )
+            );
+
+            document
+              .querySelector(".removeUnitBtn")
+              .addEventListener("click", function () {
+                if (
+                  document.querySelectorAll(".unit-row").length > 1
+                ) {
+                  this.parentElement.remove();
+                }
+              });
           } catch (error) {
-            alert('Delete failed: ' + error.message);
+            showPopup("Error: " + error.message);
+          }
+        });
+      })();
+    }
+
+    // ======================== FEEDBACK RECEIVED LOGIC ========================
+    function initFeedbackReceived() {
+      let allFeedback = [];
+      let filteredFeedback = [];
+
+      const ratingFilter = document.getElementById("ratingFilter");
+      const feedbackSearch = document.getElementById("feedbackSearch");
+      const sortBy = document.getElementById("sortBy");
+      const resetFilters = document.getElementById("resetFilters");
+      const refreshBtn = document.getElementById("refreshFeedbackBtn");
+      const feedbackStats = document.getElementById("feedbackStats");
+      const feedbackCount = document.getElementById("feedbackCount");
+      const averageRating = document.getElementById("averageRating");
+      const feedbackList = document.getElementById("feedback-list");
+
+      async function loadFeedbacks() {
+        feedbackList.innerHTML = "<p>Loading feedback...</p>";
+        try {
+          const snapshot = await db
+            .collection("feedback")
+            .orderBy("timestamp", "desc")
+            .get();
+
+          if (snapshot.empty) {
+            allFeedback = [];
+            filteredFeedback = [];
+            feedbackList.innerHTML = "<p>No feedback found.</p>";
+            feedbackStats.style.display = "none";
+            return;
+          }
+
+          allFeedback = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }));
+
+          applyFiltersAndSort();
+        } catch (error) {
+          feedbackList.innerHTML = `<p style="color:red;">Error loading feedback: ${error.message}</p>`;
+        }
+      }
+
+      function applyFiltersAndSort() {
+        const ratingValue = ratingFilter.value;
+        const searchValue = feedbackSearch.value.toLowerCase();
+        const sortValue = sortBy.value;
+
+        filteredFeedback = [...allFeedback];
+
+        if (ratingValue !== "all") {
+          filteredFeedback = filteredFeedback.filter(
+            (f) => String(f.rating) === ratingValue
+          );
+        }
+
+        if (searchValue) {
+          filteredFeedback = filteredFeedback.filter((f) => {
+            const emailMatch =
+              f.tenantEmail &&
+              f.tenantEmail.toLowerCase().includes(searchValue);
+
+            const textFields = [
+              f.q1,
+              f.q2,
+              f.q3,
+              f.q4,
+              f.q5,
+              f.q6,
+              f.question2,
+              f.question3,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+
+            return (
+              emailMatch || textFields.includes(searchValue)
+            );
+          });
+        }
+
+        filteredFeedback.sort((a, b) => {
+          const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+          const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+
+          switch (sortValue) {
+            case "date-desc":
+              return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+            case "date-asc":
+              return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+            case "rating-desc":
+              return (b.rating || 0) - (a.rating || 0);
+            case "rating-asc":
+              return (a.rating || 0) - (b.rating || 0);
+            case "email-asc":
+              return (a.tenantEmail || "").localeCompare(
+                b.tenantEmail || ""
+              );
+            case "email-desc":
+              return (b.tenantEmail || "").localeCompare(
+                a.tenantEmail || ""
+              );
+            default:
+              return 0;
           }
         });
 
-        wrapper.appendChild(checkbox);
-        wrapper.appendChild(content);
-        wrapper.appendChild(perDeleteBtn);
-        feedbackList.appendChild(wrapper);
+        renderFeedbacks();
+      }
+
+      function renderFeedbacks() {
+        if (!filteredFeedback.length) {
+          feedbackList.innerHTML =
+            "<p>No feedback found matching your criteria.</p>";
+          feedbackStats.style.display = "none";
+          return;
+        }
+
+        feedbackList.innerHTML = "";
+        let totalRating = 0;
+
+        filteredFeedback.forEach((f) => {
+          const ts = f.timestamp?.toDate
+            ? f.timestamp.toDate()
+            : f.timestamp?.seconds
+            ? new Date(f.timestamp.seconds * 1000)
+            : null;
+          const timeText = ts ? ts.toLocaleString() : "Unknown time";
+
+          const rating = Number(f.rating) || 0;
+          totalRating += rating;
+          const stars = "⭐".repeat(rating);
+          const empty = "☆".repeat(5 - rating);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "feedback-item";
+
+          // handle new schema q1–q6 or old question2/3
+          const hasNewSchema =
+            f.q1 || f.q2 || f.q3 || f.q4 || f.q5 || f.q6;
+
+          let questionsHtml = "";
+
+          if (hasNewSchema) {
+            questionsHtml += `
+              <div class="feedback-question">
+                <strong>Overall condition and appearance of the property</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q1 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>Maintenance services (unit, hallway, garden)</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q2 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>Professionalism of property management staff</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q3 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>Ease of paying monthly dues / rent</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q4 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>Amenities (gym, pool, clubhouse)</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q5 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>Additional suggestions</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.q6 || "No suggestions provided"
+                )}</div>
+              </div>
+            `;
+          } else {
+            questionsHtml += `
+              <div class="feedback-question">
+                <strong>What do you like about our services, unit, and facilities?</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.question2 || "No answer provided"
+                )}</div>
+              </div>
+              <div class="feedback-question">
+                <strong>What can we improve in our unit, services, or facilities?</strong>
+                <div class="feedback-answer">${escapeHtml(
+                  f.question3 || "No answer provided"
+                )}</div>
+              </div>
+            `;
+          }
+
+          wrapper.innerHTML = `
+            <div class="feedback-item-header">
+              <div>
+                <div class="feedback-email">${
+                  f.tenantEmail || "Unknown User"
+                }</div>
+                <div class="feedback-rating">
+                  ${stars}${empty}
+                  <span class="meta">(${rating}/5)</span>
+                </div>
+              </div>
+              <div class="feedback-time">${timeText}</div>
+            </div>
+            ${questionsHtml}
+          `;
+
+          feedbackList.appendChild(wrapper);
+        });
+
+        const avg =
+          filteredFeedback.length > 0
+            ? (totalRating / filteredFeedback.length).toFixed(1)
+            : "0.0";
+        feedbackCount.textContent = filteredFeedback.length;
+        averageRating.textContent = avg;
+        feedbackStats.style.display = "block";
+      }
+
+      ratingFilter.addEventListener("change", applyFiltersAndSort);
+      feedbackSearch.addEventListener("input", applyFiltersAndSort);
+      sortBy.addEventListener("change", applyFiltersAndSort);
+      resetFilters.addEventListener("click", () => {
+        ratingFilter.value = "all";
+        feedbackSearch.value = "";
+        sortBy.value = "date-desc";
+        applyFiltersAndSort();
       });
+      refreshBtn.addEventListener("click", loadFeedbacks);
 
-      deleteBtn.disabled = true;
-      selectAll.checked = false;
-      selectAll.indeterminate = false;
-
-    } catch (error) {
-      feedbackList.innerHTML = `<p style="color:red;">Error loading feedback: ${error.message}</p>`;
-    }
-  }
-
-  function toggleSelectAll(e) {
-    const checked = e.target.checked;
-    document.querySelectorAll('.feedback-checkbox').forEach(cb => cb.checked = checked);
-    document.getElementById('deleteSelectedBtn').disabled = !checked;
-  }
-
-  async function deleteSelectedFeedbacks() {
-    const selected = [...document.querySelectorAll('.feedback-checkbox:checked')].map(cb => cb.dataset.id);
-    if (selected.length === 0) return alert("No feedback selected.");
-
-    if (!confirm(`Delete ${selected.length} selected feedback(s)? This action cannot be undone.`)) return;
-
-    try {
-      const batch = db.batch();
-      selected.forEach(id => {
-        const ref = db.collection('feedback').doc(id);
-        batch.delete(ref);
-      });
-      await batch.commit();
-      document.getElementById('feedbackStatus').textContent = `Deleted ${selected.length} feedback(s).`;
       loadFeedbacks();
-    } catch (error) {
-      alert("Delete failed: " + error.message);
     }
-  }
 
-  function escapeHtml(text) {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-  window.showPopup = function(message) {
-    document.getElementById("popupMessage").innerHTML = message;
-    document.getElementById("customPopup").classList.remove("hidden");
-  };
+    // ======================== HELPERS ========================
+    function escapeHtml(text) {
+      if (!text) return "";
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-  window.closePopup = function() {
-    document.getElementById("customPopup").classList.add("hidden");
-  };
+    window.showPopup = function (message) {
+      document.getElementById("popupMessage").innerHTML = message;
+      document.getElementById("customPopup").classList.remove("hidden");
+    };
 
-  window.onload = function () {
-    loadContent('dashboard');
-  };
-</script>
-<div id="customPopup" class="popup hidden">
-  <div class="popup-content">
-    <p id="popupMessage">Your message goes here</p>
-    <button onclick="closePopup()">Close</button>
+    window.closePopup = function () {
+      document.getElementById("customPopup").classList.add("hidden");
+    };
+
+    window.onload = function () {
+      loadContent("dashboard");
+    };
+  </script>
+
+  <!-- ======================== POPUP ======================== -->
+  <div id="customPopup" class="popup hidden">
+    <div class="popup-content">
+      <p id="popupMessage">Your message goes here</p>
+      <button onclick="closePopup()">Close</button>
+    </div>
   </div>
-</div>
 </body>
 </html>
