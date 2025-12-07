@@ -144,556 +144,935 @@
         })();
         break;
 
-      case 'Payment Received':
-      area.innerHTML = `
-        <h1>Payments Received</h1>
-        <p>Real-time list of Unit Owner payments (PayPal & Cash-on-Hand).</p>
+     case 'Payment Received':
+  area.innerHTML = `
+    <h1>Payments Received</h1>
+    <p>Real-time list of Unit Owner PayPal payments.</p>
 
-        <div class="payment-controls" style="margin-bottom:15px;">
-          <input type="text" id="paymentSearch" placeholder="Search by unit owner email..." 
-            style="padding:8px;width:260px;border:1px solid #ccc;border-radius:6px;">
-        </div>
+    <div class="payment-controls" style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <div>
+        <input type="text" id="paymentSearch" placeholder="Search by unit owner email..." 
+          style="padding:8px;width:260px;border:1px solid #ccc;border-radius:6px;">
+      </div>
+      
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
+        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="date-desc">Date (Newest First)</option>
+          <option value="date-asc">Date (Oldest First)</option>
+          <option value="amount-desc">Amount (High to Low)</option>
+          <option value="amount-asc">Amount (Low to High)</option>
+          <option value="email-asc">Email (A to Z)</option>
+          <option value="email-desc">Email (Z to A)</option>
+        </select>
+      </div>
+      
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Filter by:</label>
+        <select id="filterBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="all">All Payments</option>
+          <option value="last7">Last 7 Days</option>
+          <option value="last30">Last 30 Days</option>
+          <option value="thisMonth">This Month</option>
+          <option value="lastMonth">Last Month</option>
+        </select>
+      </div>
+      
+      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
+        Reset Filters
+      </button>
+    </div>
 
-        <div id="paypalSection">
-          <h2>💳 PayPal Payments</h2>
-          <div id="paypalList">Loading PayPal payments...</div>
-        </div>
+    <div id="stats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
+      <span style="font-weight:bold;">Showing:</span> 
+      <span id="paymentCount">0</span> payments | 
+      <span style="font-weight:bold;">Total:</span> ₱<span id="totalAmount">0.00</span>
+    </div>
 
-        <hr style="margin:25px 0;">
+    <div id="paypalSection">
+      <h2>💳 PayPal Payments</h2>
+      <div id="paypalList">Loading PayPal payments...</div>
+    </div>
+  `;
 
-        <div id="cashSection">
-          <h2>💵 Cash-on-Hand Payments</h2>
-          <div id="cashList">Loading cash payments...</div>
+  const paypalList = document.getElementById("paypalList");
+  const searchInput = document.getElementById("paymentSearch");
+  const sortBy = document.getElementById("sortBy");
+  const filterBy = document.getElementById("filterBy");
+  const resetFilters = document.getElementById("resetFilters");
+  const paymentCount = document.getElementById("paymentCount");
+  const totalAmount = document.getElementById("totalAmount");
+  const statsDiv = document.getElementById("stats");
+
+  // Store all payments for sorting/filtering
+  let allPayments = [];
+  let filteredPayments = [];
+
+  function formatDate(date) {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function applyFiltersAndSort() {
+    const searchValue = searchInput.value.toLowerCase();
+    const filterValue = filterBy.value;
+    const sortValue = sortBy.value;
+    
+    // Start with all PayPal payments
+    filteredPayments = allPayments.filter(payment => 
+      payment.method === "PayPal"
+    );
+    
+    // Apply search filter
+    if (searchValue) {
+      filteredPayments = filteredPayments.filter(payment => 
+        payment.tenantEmail.toLowerCase().includes(searchValue) ||
+        (payment.payerEmail && payment.payerEmail.toLowerCase().includes(searchValue))
+      );
+    }
+    
+    // Apply date filter
+    const now = new Date();
+    if (filterValue === "last7") {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      filteredPayments = filteredPayments.filter(payment => 
+        payment.timestamp.toDate() >= sevenDaysAgo
+      );
+    } else if (filterValue === "last30") {
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      filteredPayments = filteredPayments.filter(payment => 
+        payment.timestamp.toDate() >= thirtyDaysAgo
+      );
+    } else if (filterValue === "thisMonth") {
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      filteredPayments = filteredPayments.filter(payment => 
+        payment.timestamp.toDate() >= firstDayOfMonth
+      );
+    } else if (filterValue === "lastMonth") {
+      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      filteredPayments = filteredPayments.filter(payment => {
+        const paymentDate = payment.timestamp.toDate();
+        return paymentDate >= firstDayOfLastMonth && paymentDate <= lastDayOfLastMonth;
+      });
+    }
+    
+    // Apply sorting
+    filteredPayments.sort((a, b) => {
+      switch(sortValue) {
+        case 'date-desc':
+          return b.timestamp.toDate() - a.timestamp.toDate();
+        case 'date-asc':
+          return a.timestamp.toDate() - b.timestamp.toDate();
+        case 'amount-desc':
+          return (b.amount || 0) - (a.amount || 0);
+        case 'amount-asc':
+          return (a.amount || 0) - (b.amount || 0);
+        case 'email-asc':
+          return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
+        case 'email-desc':
+          return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
+        default:
+          return 0;
+      }
+    });
+    
+    renderPayments();
+  }
+
+  function renderPayments() {
+    paypalList.innerHTML = "";
+    
+    if (filteredPayments.length === 0) {
+      paypalList.innerHTML = "<p>No PayPal payments found matching your criteria.</p>";
+      statsDiv.style.display = 'none';
+      return;
+    }
+    
+    let paypalHTML = "";
+    let total = 0;
+    
+    filteredPayments.forEach(payment => {
+      const tenantEmail = payment.tenantEmail || "Unknown";
+      const amount = payment.amount ? `₱${Number(payment.amount).toLocaleString()}` : "₱0.00";
+      const date = payment.timestamp?.toDate ? formatDate(payment.timestamp.toDate()) : "Unknown date";
+      const method = payment.method || "Unknown";
+      const transactionId = payment.transactionId || "N/A";
+      const payerEmail = payment.payerEmail || "Unknown";
+      const status = payment.status || "Completed";
+      
+      total += Number(payment.amount) || 0;
+      
+      const card = `
+        <div style="border:1px solid #ccc;border-radius:10px;padding:14px;margin-bottom:12px;">
+          <p><strong>Unit Owner Email:</strong> ${tenantEmail}</p>
+          <p><strong>Payer Email:</strong> ${payerEmail}</p>
+          <p><strong>Amount:</strong> ${amount}</p>
+          <p><strong>Method:</strong> ${method}</p>
+          <p><strong>Status:</strong> ${status}</p>
+          <p><strong>Transaction ID:</strong> ${transactionId}</p>
+          <p><strong>Date:</strong> ${date}</p>
         </div>
       `;
+      
+      paypalHTML += card;
+    });
+    
+    paypalList.innerHTML = paypalHTML;
+    
+    // Update stats
+    paymentCount.textContent = filteredPayments.length;
+    totalAmount.textContent = total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    statsDiv.style.display = 'block';
+  }
 
-      const paypalList = document.getElementById("paypalList");
-      const cashList = document.getElementById("cashList");
-      const searchInput = document.getElementById("paymentSearch");
+  // Load all payments initially
+  db.collection("payments")
+    .orderBy("timestamp", "desc")
+    .onSnapshot((snapshot) => {
+      allPayments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      applyFiltersAndSort();
+    });
 
-      function renderPayments(snapshot) {
-        paypalList.innerHTML = "";
-        cashList.innerHTML = "";
+  // Event listeners for filters
+  searchInput.addEventListener("input", applyFiltersAndSort);
+  sortBy.addEventListener("change", applyFiltersAndSort);
+  filterBy.addEventListener("change", applyFiltersAndSort);
+  resetFilters.addEventListener("click", () => {
+    searchInput.value = "";
+    sortBy.value = "date-desc";
+    filterBy.value = "all";
+    applyFiltersAndSort();
+  });
+  break;
 
-        const searchValue = searchInput.value.toLowerCase();
+  case 'Maintenance Requests':
+  area.innerHTML = `
+    <h1>Maintenance Requests</h1>
+    <p>Maintenance requests submitted by Unit Owners.</p>
+    
+    <div class="maintenance-controls" style="margin-bottom:20px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Filter by Status:</label>
+        <select id="statusFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="all">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Complete">Complete</option>
+        </select>
+      </div>
+      
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Filter by Personnel:</label>
+        <select id="personnelFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="all">All Personnel</option>
+          <option value="John Doe">John Doe</option>
+          <option value="Jane Smith">Jane Smith</option>
+          <option value="Mike Johnson">Mike Johnson</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
+      </div>
+      
+      <div>
+        <input type="text" id="maintenanceSearch" placeholder="Search by unit, email, or issue..." 
+          style="padding:8px;width:280px;border:1px solid #ccc;border-radius:6px;">
+      </div>
+      
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
+        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="date-desc">Date (Newest First)</option>
+          <option value="date-asc">Date (Oldest First)</option>
+          <option value="unit-asc">Unit Number (A-Z)</option>
+          <option value="unit-desc">Unit Number (Z-A)</option>
+          <option value="email-asc">Email (A-Z)</option>
+          <option value="email-desc">Email (Z-A)</option>
+        </select>
+      </div>
+      
+      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
+        Reset Filters
+      </button>
+    </div>
+    
+    <div id="maintenanceStats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
+      <span style="font-weight:bold;">Showing:</span> 
+      <span id="requestCount">0</span> requests | 
+      <span id="pendingCount">0</span> pending | 
+      <span id="completeCount">0</span> complete
+    </div>
+    
+    <div id="maintenanceList" style="margin-top:20px;">
+      <p>Loading maintenance requests...</p>
+    </div>`;
 
-        let paypalHTML = "";
-        let cashHTML = "";
+  // Store all requests for filtering
+  let allRequests = [];
+  let filteredRequests = [];
+  
+  // Keep track of assigned personnel
+  let assignedPersonnel = new Set();
 
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          if (!data) return;
+  setTimeout(() => {
+    const statusFilter = document.getElementById('statusFilter');
+    const personnelFilter = document.getElementById('personnelFilter');
+    const maintenanceSearch = document.getElementById('maintenanceSearch');
+    const sortBy = document.getElementById('sortBy');
+    const resetFilters = document.getElementById('resetFilters');
+    const maintenanceStats = document.getElementById('maintenanceStats');
+    const requestCount = document.getElementById('requestCount');
+    const pendingCount = document.getElementById('pendingCount');
+    const completeCount = document.getElementById('completeCount');
 
-          const tenantEmail = data.tenantEmail || "Unknown";
+    function formatDateTimeAMPM(date) {
+      if (!date) return "N/A";
+      let d = date.toDate ? date.toDate() : date;
+      let hours = d.getHours();
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12 || 12;
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
+      const year = d.getFullYear();
+      return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+    }
 
-          // Search only by email
-          if (searchValue && !tenantEmail.toLowerCase().includes(searchValue)) return;
+    function applyFiltersAndSort() {
+      const statusValue = statusFilter.value;
+      const personnelValue = personnelFilter.value;
+      const searchValue = maintenanceSearch.value.toLowerCase();
+      const sortValue = sortBy.value;
+      
+      // Start with all requests
+      filteredRequests = [...allRequests];
+      
+      // Apply status filter
+      if (statusValue !== 'all') {
+        filteredRequests = filteredRequests.filter(request => 
+          request.status === statusValue
+        );
+      }
+      
+      // Apply personnel filter
+      if (personnelValue !== 'all') {
+        if (personnelValue === 'unassigned') {
+          filteredRequests = filteredRequests.filter(request => 
+            !request.maintenanceName || request.maintenanceName.trim() === ''
+          );
+        } else {
+          filteredRequests = filteredRequests.filter(request => 
+            request.maintenanceName === personnelValue
+          );
+        }
+      }
+      
+      // Apply search filter
+      if (searchValue) {
+        filteredRequests = filteredRequests.filter(request => {
+          const emailMatch = request.tenantEmail && request.tenantEmail.toLowerCase().includes(searchValue);
+          const unitMatch = request.unitNumber && request.unitNumber.toLowerCase().includes(searchValue);
+          const problemMatch = request.problem && request.problem.toLowerCase().includes(searchValue);
+          const commentMatch = request.comment && request.comment.toLowerCase().includes(searchValue);
+          return emailMatch || unitMatch || problemMatch || commentMatch;
+        });
+      }
+      
+      // Apply sorting
+      filteredRequests.sort((a, b) => {
+        switch(sortValue) {
+          case 'date-desc':
+            return (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0);
+          case 'date-asc':
+            return (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0);
+          case 'unit-asc':
+            return (a.unitNumber || '').localeCompare(b.unitNumber || '');
+          case 'unit-desc':
+            return (b.unitNumber || '').localeCompare(a.unitNumber || '');
+          case 'email-asc':
+            return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
+          case 'email-desc':
+            return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
+          case 'status':
+            // Pending first, then Complete
+            if (a.status === 'Pending' && b.status === 'Complete') return -1;
+            if (a.status === 'Complete' && b.status === 'Pending') return 1;
+            return 0;
+          default:
+            return 0;
+        }
+      });
+      
+      renderMaintenanceRequests();
+    }
 
-          const amount = data.amount ? `₱${Number(data.amount).toLocaleString()}` : "₱0.00";
-          const date = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "Unknown date";
-          const method = data.method || "Unknown";
-          const transactionId = data.transactionId || "N/A";
-
-          let extraDetails = "";
-
-          // PayPal details
-          if (method === "PayPal") {
-            extraDetails += `
-              <p><strong>Payer Email:</strong> ${data.payerEmail || "Unknown"}</p>
-            `;
+    function renderMaintenanceRequests() {
+      const maintenanceList = document.getElementById('maintenanceList');
+      
+      if (filteredRequests.length === 0) {
+        maintenanceList.innerHTML = '<p>No maintenance requests found matching your criteria.</p>';
+        maintenanceStats.style.display = 'none';
+        return;
+      }
+      
+      maintenanceList.innerHTML = '';
+      assignedPersonnel.clear();
+      
+      // Collect assigned personnel for pending requests
+      filteredRequests.forEach(request => {
+        if (request.status !== "Complete" && request.maintenanceName) {
+          assignedPersonnel.add(request.maintenanceName);
+        }
+      });
+      
+      let pending = 0;
+      let complete = 0;
+      
+      filteredRequests.forEach(request => {
+        const data = request;
+        const id = request.id;
+        
+        if (data.status === 'Pending') pending++;
+        if (data.status === 'Complete') complete++;
+        
+        // Card container
+        const card = document.createElement("div");
+        card.className = "maintenance-card";
+        card.style.border = "1px solid #ccc";
+        card.style.padding = "15px";
+        card.style.marginBottom = "15px";
+        card.style.borderRadius = "8px";
+        card.style.backgroundColor = data.status === 'Complete' ? '#0000' : '#0000';
+        
+        // Status dropdown
+        const statusSelect = document.createElement("select");
+        ["Pending", "Complete"].forEach(option => {
+          const opt = document.createElement("option");
+          opt.value = option;
+          opt.textContent = option;
+          if (data.status === option) opt.selected = true;
+          statusSelect.appendChild(opt);
+        });
+        statusSelect.style.marginRight = "10px";
+        
+        // Personnel assignment dropdown
+        const personnelSelect = document.createElement("select");
+        const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
+        personnelNames.forEach(name => {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          
+          // Disable if assigned to another Pending request
+          if (assignedPersonnel.has(name) && data.maintenanceName !== name) {
+            option.disabled = true;
+            option.textContent += " (Assigned)";
           }
-
-          // Cash-on-hand details + buttons
-          if (method === "Cash on Hand") {
-            extraDetails += `
-              <p><strong>Status:</strong> ${data.status || "Pending Verification"}</p>
-              ${
-                data.receiptUrl
-                  ? `<p><strong>Receipt:</strong><br>
-                    <img src="${data.receiptUrl}" style="max-width:180px;border-radius:8px;margin-top:6px;">
-                    </p>`
-                  : "<p>No receipt uploaded.</p>"
+          
+          // Preselect if this request has the personnel
+          if (data.maintenanceName === name) option.selected = true;
+          
+          personnelSelect.appendChild(option);
+        });
+        personnelSelect.style.marginRight = "10px";
+        
+        // Update button
+        const updateBtn = document.createElement("button");
+        updateBtn.textContent = "Update";
+        updateBtn.style.background = "#8d6c39";
+        updateBtn.style.color = "white";
+        updateBtn.style.border = "none";
+        updateBtn.style.borderRadius = "6px";
+        updateBtn.style.padding = "6px 12px";
+        updateBtn.style.cursor = "pointer";
+        updateBtn.style.marginRight = "10px";
+        
+        if (data.status === "Complete") {
+          statusSelect.disabled = true;
+          personnelSelect.disabled = true;
+          updateBtn.disabled = true;
+          statusSelect.style.backgroundColor = "#e0e0e0";
+          personnelSelect.style.backgroundColor = "#e0e0e0";
+          updateBtn.style.backgroundColor = "#aaa";
+          updateBtn.style.cursor = "not-allowed";
+        }
+        
+        // Update event
+        updateBtn.addEventListener("click", async () => {
+          try {
+            await db.collection("maintenanceRequests").doc(id).update({
+              status: statusSelect.value,
+              maintenanceName: personnelSelect.value.trim(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showPopup("Request updated successfully!");
+            
+            // Refresh the filtered list
+            applyFiltersAndSort();
+          } catch (error) {
+            showPopup("Error updating request: " + error.message);
+          }
+        });
+        
+        // Respond button
+        const respondBtn = document.createElement("button");
+        respondBtn.textContent = "Respond";
+        respondBtn.style.background = "#4a90e2";
+        respondBtn.style.color = "white";
+        respondBtn.style.border = "none";
+        respondBtn.style.borderRadius = "6px";
+        respondBtn.style.padding = "6px 12px";
+        respondBtn.style.cursor = "pointer";
+        
+        const responseContainer = document.createElement("div");
+        responseContainer.style.marginTop = "10px";
+        responseContainer.style.display = "none";
+        
+        const responseTextarea = document.createElement("textarea");
+        responseTextarea.placeholder = "Enter your response message here...";
+        responseTextarea.style.width = "100%";
+        responseTextarea.style.height = "60px";
+        responseTextarea.style.marginBottom = "8px";
+        responseTextarea.style.resize = "vertical";
+        responseTextarea.style.padding = "8px";
+        responseTextarea.style.fontSize = "14px";
+        responseTextarea.style.borderRadius = "4px";
+        responseTextarea.style.border = "1px solid #ccc";
+        
+        const sendResponseBtn = document.createElement("button");
+        sendResponseBtn.textContent = "Send Response";
+        sendResponseBtn.style.background = "#4a90e2";
+        sendResponseBtn.style.color = "white";
+        sendResponseBtn.style.border = "none";
+        sendResponseBtn.style.borderRadius = "6px";
+        sendResponseBtn.style.padding = "6px 12px";
+        sendResponseBtn.style.cursor = "pointer";
+        sendResponseBtn.style.marginRight = "10px";
+        
+        responseContainer.appendChild(responseTextarea);
+        responseContainer.appendChild(sendResponseBtn);
+        
+        respondBtn.addEventListener("click", () => {
+          responseContainer.style.display =
+            responseContainer.style.display === "none" ? "block" : "none";
+          if(responseContainer.style.display === "block") responseTextarea.focus();
+        });
+        
+        sendResponseBtn.addEventListener("click", async () => {
+          const responseMessage = responseTextarea.value.trim();
+          if (!responseMessage) {
+            showPopup("Response message cannot be empty.");
+            return;
+          }
+          try {
+            const requestDocRef = db.collection("maintenanceRequests").doc(id);
+            await requestDocRef.collection("responses").add({
+              adminEmail: auth.currentUser.email,
+              message: responseMessage,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await requestDocRef.update({
+              responseTime: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showPopup("Response sent successfully!");
+            responseTextarea.value = "";
+            responseContainer.style.display = "none";
+          } catch (error) {
+            showPopup("Failed to send response: " + error.message);
+          }
+        });
+        
+        // Delete button
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.className = "btn btn-danger";
+        deleteBtn.style.marginLeft = "8px";
+        deleteBtn.style.cursor = "pointer";
+        
+        deleteBtn.addEventListener("click", () => {
+          showPopup(`
+            <strong>Are you sure?</strong><br>
+            This maintenance request will be permanently deleted.<br><br>
+            <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+              Delete
+            </button>
+            <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+              Cancel
+            </button>
+          `);
+          
+          setTimeout(() => {
+            const confirmBtn = document.getElementById("confirmDeleteBtn");
+            if (!confirmBtn) return;
+            
+            confirmBtn.addEventListener("click", async () => {
+              try {
+                await db.collection("maintenanceRequests").doc(id).delete();
+                closePopup();
+                showPopup("Maintenance request deleted.");
+                // Refresh the filtered list
+                applyFiltersAndSort();
+              } catch (error) {
+                closePopup();
+                showPopup("Failed to delete: " + error.message);
               }
-
-              <button class="approveBtn" data-id="${docSnap.id}"
-                style="padding:6px 12px;margin-top:6px;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">
-                ✓ Approve
-              </button>
-
-              <button class="rejectBtn" data-id="${docSnap.id}"
-                style="padding:6px 12px;margin-top:6px;background:#d9534f;color:white;border:none;border-radius:6px;cursor:pointer;margin-left:6px;">
-                ✗ Reject
-              </button>
-            `;
-          }
-
-          const card = `
-            <div style="border:1px solid #ccc;border-radius:10px;padding:14px;margin-bottom:12px;">
-              <p><strong>Unit Owner Email:</strong> ${tenantEmail}</p>
-              <p><strong>Amount:</strong> ${amount}</p>
-              <p><strong>Method:</strong> ${method}</p>
-              <p><strong>Transaction ID:</strong> ${transactionId}</p>
-              <p><strong>Date:</strong> ${date}</p>
-              ${extraDetails}
+            });
+          }, 50);
+        });
+        
+        // Image slider HTML
+        let imagesHTML = "";
+        if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0) {
+          imagesHTML = `
+            <div style="margin-top:-45px;">
+              <strong>Attachments:</strong><br/>
+              <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                ${
+                  data.imageUrls.length > 1
+                    ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
+                        background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                      <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
+                        background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
+                    : ''
+                }
+              </div>
             </div>
           `;
-
-          if (method === "PayPal") paypalHTML += card;
-          if (method === "Cash on Hand") cashHTML += card;
-        });
-
-        paypalList.innerHTML = paypalHTML || "<p>No PayPal payments found.</p>";
-        cashList.innerHTML = cashHTML || "<p>No Cash-on-Hand payments found.</p>";
-
-        attachCashButtons();
-      }
-
-      function attachCashButtons() {
-        document.querySelectorAll(".approveBtn").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            const id = btn.getAttribute("data-id");
-            await db.collection("payments").doc(id).update({ status: "Approved" });
-
-            // 🔔 Custom Popup instead of alert
-            showPopup("Receipt Approved Successfully!");
-          });
-        });
-
-        document.querySelectorAll(".rejectBtn").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            const id = btn.getAttribute("data-id");
-            await db.collection("payments").doc(id).update({ status: "Rejected" });
-
-            // 🔔 Custom Popup instead of alert
-            showPopup("Receipt Rejected.");
-          });
-        });
-      }
-
-      db.collection("payments")
-        .orderBy("timestamp", "desc")
-        .onSnapshot(renderPayments);
-
-      searchInput.addEventListener("input", async () => {
-        const snapshot = await db.collection("payments").orderBy("timestamp", "desc").get();
-        renderPayments(snapshot);
-      })
-      break;
-
-    case 'Maintenance Requests':
-      area.innerHTML = `
-        <h1>Maintenance Requests</h1>
-        <p>Maintenance requests submitted by Unit Owners will appear here.</p>
-        <div id="maintenanceList" style="margin-top:20px;">
-          <p>Loading maintenance requests...</p>
-        </div>`;
-
-      // Keep track of assigned personnel
-      let assignedPersonnel = new Set();
-
-      async function loadMaintenanceRequests() {
-        const maintenanceList = document.getElementById('maintenanceList');
-
+        }
+        
+        card.innerHTML = `
+          <h3 style="margin-bottom:8px;">${data.problem || 'Unknown Issue'}</h3>
+          <div style="display:flex; gap:20px; align-items:flex-start;">
+            <div style="flex:1; min-width: 0;">
+              <p><strong>Unit Owner:</strong> ${data.tenantEmail || 'Unknown Unit Owner'}</p>
+              <p><strong>Unit Number:</strong> ${data.unitNumber || 'N/A'}</p>
+              <p><strong>Details:</strong> ${data.comment || 'No additional details.'}</p>
+              <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
+              <p><strong>Status:</strong> ${data.status || 'Pending'}</p>
+              <p><strong>Maintenance Personnel:</strong> ${data.maintenanceName || 'Not assigned'}</p>
+              <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+            </div>
+            <div style="min-width:220px; display:flex; flex-direction:column;">
+              ${imagesHTML}
+            </div>
+          </div>
+        `;
+        
+        // Append controls
+        card.appendChild(statusSelect);
+        card.appendChild(personnelSelect);
+        card.appendChild(updateBtn);
+        card.appendChild(respondBtn);
+        card.appendChild(deleteBtn);
+        card.appendChild(responseContainer);
+        
+        // --- Response history ---
+        const responsesContainer = document.createElement("div");
+        responsesContainer.style.marginTop = "10px";
+        responsesContainer.style.borderTop = "1px dashed #ccc";
+        responsesContainer.style.paddingTop = "8px";
+        responsesContainer.innerHTML = "<strong>Response History:</strong><p>Loading...</p>";
+        card.appendChild(responsesContainer);
+        
         db.collection("maintenanceRequests")
-          .orderBy("timestamp", "desc")
-          .onSnapshot(snapshot => {
-            if (snapshot.empty) {
-              maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
-              return;
-            }
-
-            maintenanceList.innerHTML = "";
-            assignedPersonnel.clear();
-
-            // First pass: collect personnel assigned to Pending requests
-            snapshot.forEach(docSnap => {
-              const data = docSnap.data();
-              if (data.status !== "Complete" && data.maintenanceName) {
-                assignedPersonnel.add(data.maintenanceName);
-              }
-            });
-
-            snapshot.forEach(docSnap => {
-              const data = docSnap.data();
-              const id = docSnap.id;
-
-              function formatDateTimeAMPM(date) {
-                if (!date) return "N/A";
-                let d = date.toDate ? date.toDate() : date;
-                let hours = d.getHours();
-                const minutes = d.getMinutes().toString().padStart(2, "0");
-                const ampm = hours >= 12 ? "PM" : "AM";
-                hours = hours % 12 || 12;
-                const month = (d.getMonth() + 1).toString().padStart(2, "0");
-                const day = d.getDate().toString().padStart(2, "0");
-                const year = d.getFullYear();
-                return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-              }
-
-              // Card container
-              const card = document.createElement("div");
-              card.className = "maintenance-card";
-              card.style.border = "1px solid #ccc";
-              card.style.padding = "15px";
-              card.style.marginBottom = "15px";
-              card.style.borderRadius = "8px";
-
-              // Status dropdown
-              const statusSelect = document.createElement("select");
-              ["Pending", "Complete"].forEach(option => {
-                const opt = document.createElement("option");
-                opt.value = option;
-                opt.textContent = option;
-                if (data.status === option) opt.selected = true;
-                statusSelect.appendChild(opt);
-              });
-              statusSelect.style.marginRight = "10px";
-
-              // Personnel assignment dropdown
-              const personnelSelect = document.createElement("select");
-              const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"]; // predefined personnel
-              personnelNames.forEach(name => {
-                const option = document.createElement("option");
-                option.value = name;
-                option.textContent = name;
-
-                // Disable if assigned to another Pending request
-                if (assignedPersonnel.has(name) && data.maintenanceName !== name) {
-                  option.disabled = true;
-                  option.textContent += " (Assigned)";
-                }
-
-                // Preselect if this request has the personnel
-                if (data.maintenanceName === name) option.selected = true;
-
-                personnelSelect.appendChild(option);
-              });
-              personnelSelect.style.marginRight = "10px";
-
-              // Update button
-              const updateBtn = document.createElement("button");
-              updateBtn.textContent = "Update";
-              updateBtn.style.background = "#8d6c39";
-              updateBtn.style.color = "white";
-              updateBtn.style.border = "none";
-              updateBtn.style.borderRadius = "6px";
-              updateBtn.style.padding = "6px 12px";
-              updateBtn.style.cursor = "pointer";
-              updateBtn.style.marginRight = "10px";
-
-              if (data.status === "Complete") {
-                statusSelect.disabled = true;
-                personnelSelect.disabled = true;
-                updateBtn.disabled = true;
-                statusSelect.style.backgroundColor = "#e0e0e0";
-                personnelSelect.style.backgroundColor = "#e0e0e0";
-                updateBtn.style.backgroundColor = "#aaa";
-                updateBtn.style.cursor = "not-allowed";
-              }
-
-              // Update event
-              updateBtn.addEventListener("click", async () => {
-                try {
-                  await db.collection("maintenanceRequests").doc(id).update({
-                    status: statusSelect.value,
-                    maintenanceName: personnelSelect.value.trim(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                  });
-                  showPopup("Request updated successfully!");
-
-                  // Refresh list to dynamically update assigned personnel
-                  loadMaintenanceRequests();
-                } catch (error) {
-                  showPopup("Error updating request: " + error.message);
-                }
-              });
-
-              // Respond button
-              const respondBtn = document.createElement("button");
-              respondBtn.textContent = "Respond";
-              respondBtn.style.background = "#4a90e2";
-              respondBtn.style.color = "white";
-              respondBtn.style.border = "none";
-              respondBtn.style.borderRadius = "6px";
-              respondBtn.style.padding = "6px 12px";
-              respondBtn.style.cursor = "pointer";
-
-              const responseContainer = document.createElement("div");
-              responseContainer.style.marginTop = "10px";
-              responseContainer.style.display = "none";
-
-              const responseTextarea = document.createElement("textarea");
-              responseTextarea.placeholder = "Enter your response message here...";
-              responseTextarea.style.width = "100%";
-              responseTextarea.style.height = "60px";
-              responseTextarea.style.marginBottom = "8px";
-              responseTextarea.style.resize = "vertical";
-              responseTextarea.style.padding = "8px";
-              responseTextarea.style.fontSize = "14px";
-              responseTextarea.style.borderRadius = "4px";
-              responseTextarea.style.border = "1px solid #ccc";
-
-              const sendResponseBtn = document.createElement("button");
-              sendResponseBtn.textContent = "Send Response";
-              sendResponseBtn.style.background = "#4a90e2";
-              sendResponseBtn.style.color = "white";
-              sendResponseBtn.style.border = "none";
-              sendResponseBtn.style.borderRadius = "6px";
-              sendResponseBtn.style.padding = "6px 12px";
-              sendResponseBtn.style.cursor = "pointer";
-              sendResponseBtn.style.marginRight = "10px";
-
-              responseContainer.appendChild(responseTextarea);
-              responseContainer.appendChild(sendResponseBtn);
-
-              respondBtn.addEventListener("click", () => {
-                responseContainer.style.display =
-                  responseContainer.style.display === "none" ? "block" : "none";
-                if(responseContainer.style.display === "block") responseTextarea.focus();
-              });
-
-              sendResponseBtn.addEventListener("click", async () => {
-                const responseMessage = responseTextarea.value.trim();
-                if (!responseMessage) {
-                  showPopup("Response message cannot be empty.");
-                  return;
-                }
-                try {
-                  const requestDocRef = db.collection("maintenanceRequests").doc(id);
-                  await requestDocRef.collection("responses").add({
-                    adminEmail: auth.currentUser.email,
-                    message: responseMessage,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                  });
-                  await requestDocRef.update({
-                    responseTime: firebase.firestore.FieldValue.serverTimestamp()
-                  });
-                  showPopup("Response sent successfully!");
-                  responseTextarea.value = "";
-                  responseContainer.style.display = "none";
-                } catch (error) {
-                  showPopup("Failed to send response: " + error.message);
-                }
-              });
-
-              // Delete button
-              const deleteBtn = document.createElement("button");
-              deleteBtn.textContent = "Delete";
-              deleteBtn.className = "btn btn-danger";
-              deleteBtn.style.marginLeft = "8px";
-              deleteBtn.style.cursor = "pointer";
-
-              deleteBtn.addEventListener("click", () => {
-                showPopup(`
-                  <strong>Are you sure?</strong><br>
-                  This maintenance request will be permanently deleted.<br><br>
-                  <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-                    Delete
-                  </button>
-                  <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-                    Cancel
-                  </button>
-                `);
-
-                setTimeout(() => {
-                  const confirmBtn = document.getElementById("confirmDeleteBtn");
-                  if (!confirmBtn) return;
-
-                  confirmBtn.addEventListener("click", async () => {
-                    try {
-                      await db.collection("maintenanceRequests").doc(id).delete();
-                      closePopup();
-                      showPopup("Maintenance request deleted.");
-                    } catch (error) {
-                      closePopup();
-                      showPopup("Failed to delete: " + error.message);
-                    }
-                  });
-                }, 50);
-              });
-
-              // Image slider HTML
-              let imagesHTML = "";
-              if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0) {
-                imagesHTML = `
-                  <div style="margin-top:-45px;">
-                    <strong>Attachments:</strong><br/>
-                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                      <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                      ${
-                        data.imageUrls.length > 1
-                          ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
-                              background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                            <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
-                              background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
-                          : ''
-                      }
-                    </div>
-                  </div>
+          .doc(id)
+          .collection("responses")
+          .orderBy("timestamp", "asc")
+          .onSnapshot(snapshotResp => {
+            responsesContainer.innerHTML = "<strong>Response History:</strong>";
+            if (snapshotResp.empty) {
+              responsesContainer.innerHTML += "<p>No responses yet.</p>";
+            } else {
+              snapshotResp.forEach(r => {
+                const rData = r.data();
+                const rEl = document.createElement("div");
+                rEl.style.borderBottom = "1px solid #eee";
+                rEl.style.padding = "4px 0";
+                rEl.innerHTML = `
+                  <strong>${rData.adminEmail || "Admin"}:</strong> ${rData.message || ""}
+                  <br><small style="color:#ffff;">${formatDateTimeAMPM(rData.timestamp)}</small>
                 `;
-              }
-
-              card.innerHTML = `
-                <h3 style="margin-bottom:8px;">${data.problem || 'Unknown Issue'}</h3>
-                <div style="display:flex; gap:20px; align-items:flex-start;">
-                  <div style="flex:1; min-width: 0;">
-                    <p><strong>Unit Owner:</strong> ${data.tenantEmail || 'Unknown Unit Owner'}</p>
-                    <p><strong>Unit Number:</strong> ${data.unitNumber || 'N/A'}</p>
-                    <p><strong>Details:</strong> ${data.comment || 'No additional details.'}</p>
-                    <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
-                    <p><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                    <p><strong>Maintenance Personnel:</strong> ${data.maintenanceName || 'Not assigned'}</p>
-                    <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
-                  </div>
-                  <div style="min-width:220px; display:flex; flex-direction:column;">
-                    ${imagesHTML}
-                  </div>
-                </div>
-              `;
-
-              // Append controls
-              card.appendChild(statusSelect);
-              card.appendChild(personnelSelect);
-              card.appendChild(updateBtn);
-              card.appendChild(respondBtn);
-              card.appendChild(deleteBtn);
-              card.appendChild(responseContainer);
-
-              // --- Response history ---
-              const responsesContainer = document.createElement("div");
-              responsesContainer.style.marginTop = "10px";
-              responsesContainer.style.borderTop = "1px dashed #ccc";
-              responsesContainer.style.paddingTop = "8px";
-              responsesContainer.innerHTML = "<strong>Response History:</strong><p>Loading...</p>";
-              card.appendChild(responsesContainer);
-
-              db.collection("maintenanceRequests")
-                .doc(id)
-                .collection("responses")
-                .orderBy("timestamp", "asc")
-                .onSnapshot(snapshotResp => {
-                  responsesContainer.innerHTML = "<strong>Response History:</strong>";
-                  if (snapshotResp.empty) {
-                    responsesContainer.innerHTML += "<p>No responses yet.</p>";
-                  } else {
-                    snapshotResp.forEach(r => {
-                      const rData = r.data();
-                      const rEl = document.createElement("div");
-                      rEl.style.borderBottom = "1px solid #eee";
-                      rEl.style.padding = "4px 0";
-                      rEl.innerHTML = `
-                        <strong>${rData.adminEmail || "Admin"}:</strong> ${rData.message || ""}
-                        <br><small style="color:#ffff;">${formatDateTimeAMPM(rData.timestamp)}</small>
-                      `;
-                      responsesContainer.appendChild(rEl);
-                    });
-                  }
-                });
-
-              maintenanceList.appendChild(card);
-
-              // slider
-              if (data.imageUrls && data.imageUrls.length > 1) {
-                let currentIndex = 0;
-                const imgEl = card.querySelector(`#img-${id}`);
-                const prevBtn = card.querySelector('.prev-btn');
-                const nextBtn = card.querySelector('.next-btn');
-
-                prevBtn.addEventListener('click', () => {
-                  currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
-                  imgEl.src = data.imageUrls[currentIndex];
-                });
-
-                nextBtn.addEventListener('click', () => {
-                  currentIndex = (currentIndex + 1) % data.imageUrls.length;
-                  imgEl.src = data.imageUrls[currentIndex];
-                });
-              }
-            });
-          }, error => {
-            maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+                responsesContainer.appendChild(rEl);
+              });
+            }
           });
-      }
+        
+        maintenanceList.appendChild(card);
+        
+        // slider
+        if (data.imageUrls && data.imageUrls.length > 1) {
+          let currentIndex = 0;
+          const imgEl = card.querySelector(`#img-${id}`);
+          const prevBtn = card.querySelector('.prev-btn');
+          const nextBtn = card.querySelector('.next-btn');
+          
+          prevBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
+            imgEl.src = data.imageUrls[currentIndex];
+          });
+          
+          nextBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % data.imageUrls.length;
+            imgEl.src = data.imageUrls[currentIndex];
+          });
+        }
+      });
+      
+      // Update stats
+      requestCount.textContent = filteredRequests.length;
+      pendingCount.textContent = pending;
+      completeCount.textContent = complete;
+      maintenanceStats.style.display = 'block';
+    }
 
-      loadMaintenanceRequests();
-      break;
-
+    // Load all maintenance requests
+    db.collection("maintenanceRequests")
+      .orderBy("timestamp", "desc")
+      .onSnapshot(snapshot => {
+        if (snapshot.empty) {
+          allRequests = [];
+          filteredRequests = [];
+          applyFiltersAndSort();
+          return;
+        }
+        
+        allRequests = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        
+        applyFiltersAndSort();
+      }, error => {
+        const maintenanceList = document.getElementById('maintenanceList');
+        maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+      });
+    
+    // Event listeners for filters
+    statusFilter.addEventListener('change', applyFiltersAndSort);
+    personnelFilter.addEventListener('change', applyFiltersAndSort);
+    maintenanceSearch.addEventListener('input', applyFiltersAndSort);
+    sortBy.addEventListener('change', applyFiltersAndSort);
+    resetFilters.addEventListener('click', () => {
+      statusFilter.value = 'all';
+      personnelFilter.value = 'all';
+      maintenanceSearch.value = '';
+      sortBy.value = 'date-desc';
+      applyFiltersAndSort();
+    });
+    
+  }, 100);
+  break;
 
 
   // <============== ACCOUNT CREATION ===============>
-    case 'Unit Owner Account Creation':
-      area.innerHTML = `
-        <h1>Create New Unit Owner Account</h1>
+   case 'Unit Owner Account Creation':
+  area.innerHTML = `
+    <h1>Create New Unit Owner Account</h1>
 
-        <form id="createTenantForm">
+    <form id="createTenantForm">
 
-          <input type="email" id="tenantEmail" placeholder="Unit Owner Solano Email" required 
-            style="padding:10px;margin-bottom:10px;width:100%;" />
+      <input type="email" id="tenantEmail" placeholder="Unit Owner Solano Email" required 
+        style="padding:10px;margin-bottom:10px;width:100%;" />
 
-          <input type="password" id="tenantPassword" placeholder="Temporary Password" required 
-            style="padding:10px;margin-bottom:10px;width:100%;" />
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <input type="text" id="tenantPassword" placeholder="Temporary Password" required readonly
+          style="padding:10px;width:100%; background:#f5f5f5;" />
+        <button type="button" id="generatePasswordBtn" style="
+          padding:10px 15px; background:#4CAF50; color:white; border:none; border-radius:6px; white-space:nowrap;">
+          Generate Password
+        </button>
+      </div>
 
-          <div id="unitContainer">
-            <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
-              <select class="unitType" required style="padding:10px; flex:1;">
-                <option value="">-- Select Type --</option>
-                <option value="1B">1B (1 Bedroom)</option>
-                <option value="2B">2B (2 Bedroom)</option>
-              </select>
-              <select class="unitNumber" required style="padding:10px; flex:1;">
-                <option value="">-- Select Unit Number --</option>
-              </select>
-              <button type="button" class="removeUnitBtn" style="
-                padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
-                X
-              </button>
-            </div>
-          </div>
-
-          <button type="button" id="addUnitBtn" style="
-            padding:10px 20px; background:#6b8e23; color:white; border:none; border-radius:6px; margin-bottom:15px;">
-            + Add Another Unit
+      <div id="unitContainer">
+        <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
+          <select class="unitType" required style="padding:10px; flex:1;">
+            <option value="">-- Select Type --</option>
+            <option value="1B">1B (1 Bedroom)</option>
+            <option value="2B">2B (2 Bedroom)</option>
+          </select>
+          <select class="unitNumber" required style="padding:10px; flex:1;">
+            <option value="">-- Select Unit Number --</option>
+          </select>
+          <button type="button" class="removeUnitBtn" style="
+            padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
+            X
           </button>
+        </div>
+      </div>
 
-          <button type="submit" style="padding:10px 20px;background:#8d6c39;color:white;border:none;border-radius:6px;">
-            Create Unit Owner
-          </button>
+      <button type="button" id="addUnitBtn" style="
+        padding:10px 20px; background:#6b8e23; color:white; border:none; border-radius:6px; margin-bottom:15px;">
+        + Add Another Unit
+      </button>
 
-        </form>
-      `;
+      <button type="submit" style="padding:10px 20px;background:#8d6c39;color:white;border:none;border-radius:6px;">
+        Create Unit Owner
+      </button>
 
-      const adminEmail = "adminaccount@solano.com";
-      const adminPassword = "123456";
+    </form>
+  `;
 
-      setTimeout(() => {
-        const unitContainer = document.getElementById('unitContainer');
-        const addUnitBtn = document.getElementById('addUnitBtn');
+  const adminEmail = "adminaccount@solano.com";
+  const adminPassword = "123456";
 
-        function populateUnitNumbers(typeSelect, numberSelect) {
-          numberSelect.innerHTML = `<option value="">-- Select Unit Number --</option>`;
-          if (!typeSelect.value) return;
-          let start = typeSelect.value === '1B' ? 1 : 50;
-          let end = typeSelect.value === '1B' ? 49 : 100;
-          for (let i = start; i <= end; i++) {
-            const num = i.toString().padStart(3, '0');
-            const option = document.createElement('option');
-            option.value = `${typeSelect.value}-${num}`;
-            option.textContent = `${num}`;
-            numberSelect.appendChild(option);
+  setTimeout(async () => {
+    // Password generation function
+    function generatePassword() {
+      const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+      const numbers = '0123456789';
+      
+      // Ensure we have at least one uppercase, one lowercase, and one number
+      let password = '';
+      password += uppercase[Math.floor(Math.random() * uppercase.length)];
+      password += lowercase[Math.floor(Math.random() * lowercase.length)];
+      password += numbers[Math.floor(Math.random() * numbers.length)];
+      
+      // Add remaining characters (total 8)
+      const allChars = uppercase + lowercase + numbers;
+      for (let i = 3; i < 8; i++) {
+        password += allChars[Math.floor(Math.random() * allChars.length)];
+      }
+      
+      // Shuffle the password to randomize character positions
+      return password.split('').sort(() => Math.random() - 0.5).join('');
+    }
+
+    // Fetch all occupied units from the database
+    async function getOccupiedUnits() {
+      try {
+        const usersSnapshot = await db.collection("users")
+          .where("role", "==", "tenant")
+          .get();
+        
+        const occupiedUnits = [];
+        usersSnapshot.forEach(doc => {
+          const userData = doc.data();
+          if (userData.unitNumbers && Array.isArray(userData.unitNumbers)) {
+            occupiedUnits.push(...userData.unitNumbers);
           }
+        });
+        
+        console.log("Occupied units:", occupiedUnits);
+        return occupiedUnits;
+      } catch (error) {
+        console.error("Error fetching occupied units:", error);
+        return [];
+      }
+    }
+
+    // Get occupied units on load
+    let occupiedUnits = await getOccupiedUnits();
+
+    // Setup password field and generate button
+    const passwordInput = document.getElementById('tenantPassword');
+    const generateBtn = document.getElementById('generatePasswordBtn');
+
+    // Generate password on button click
+    generateBtn.addEventListener('click', () => {
+      const newPassword = generatePassword();
+      passwordInput.value = newPassword;
+      passwordInput.style.background = '#e8f5e8';
+      passwordInput.style.border = '1px solid #4CAF50';
+      
+      // Reset background after 3 seconds
+      setTimeout(() => {
+        passwordInput.style.background = '#f5f5f5';
+        passwordInput.style.border = '1px solid #ccc';
+      }, 3000);
+    });
+
+    // Function to populate unit numbers with occupied unit filtering
+    function populateUnitNumbers(typeSelect, numberSelect, occupiedUnitsList) {
+      numberSelect.innerHTML = `<option value="">-- Select Unit Number --</option>`;
+      if (!typeSelect.value) return;
+      
+      let start = typeSelect.value === '1B' ? 1 : 50;
+      let end = typeSelect.value === '1B' ? 49 : 100;
+      
+      // Get current value before clearing to restore if still available
+      const currentValue = numberSelect.value;
+      let currentValueStillAvailable = false;
+      
+      for (let i = start; i <= end; i++) {
+        const num = i.toString().padStart(3, '0');
+        const unitValue = `${typeSelect.value}-${num}`;
+        
+        // Check if unit is occupied
+        if (occupiedUnitsList.includes(unitValue)) {
+          continue; // Skip occupied units
         }
+        
+        const option = document.createElement('option');
+        option.value = unitValue;
+        option.textContent = `${num}`;
+        numberSelect.appendChild(option);
+        
+        // Check if current value is still available
+        if (currentValue === unitValue) {
+          currentValueStillAvailable = true;
+        }
+      }
+      
+      // Restore previous selection if still available
+      if (currentValueStillAvailable) {
+        numberSelect.value = currentValue;
+      }
+    }
 
-        // Populate the first row
-        const firstType = document.querySelector('.unitType');
-        const firstNumber = document.querySelector('.unitNumber');
-        firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber));
+    // Form submission
+    const form = document.getElementById('createTenantForm');
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      
+      const email = document.getElementById('tenantEmail').value;
+      const password = passwordInput.value;
+      const unitNumbers = Array.from(document.querySelectorAll('.unitNumber'))
+        .map(i => i.value)
+        .filter(v => v !== "");
 
-        // Add another unit row
-        addUnitBtn.addEventListener('click', () => {
-          const row = document.createElement('div');
-          row.classList.add('unit-row');
-          row.style = "display:flex; gap:10px; margin-bottom:10px;";
-          row.innerHTML = `
+      // Validate that all selected units are not occupied
+      const occupiedSet = new Set(occupiedUnits);
+      const occupiedSelections = unitNumbers.filter(unit => occupiedSet.has(unit));
+      
+      if (occupiedSelections.length > 0) {
+        showPopup(`Error: The following units are already occupied: ${occupiedSelections.join(', ')}. Please select different units.`);
+        return;
+      }
+
+      try {
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        await db.collection("users").doc(user.uid).set({
+          email,
+          role: "tenant",
+          unitNumbers,
+          mustChangePassword: true,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Add newly created units to occupied units list
+        occupiedUnits.push(...unitNumbers);
+        
+        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+        showPopup("Unit Owner created successfully! Temporary password: " + password);
+        form.reset();
+        passwordInput.value = '';
+        passwordInput.style.background = '#f5f5f5';
+        passwordInput.style.border = '1px solid #ccc';
+
+        // Reset first row
+        const unitContainer = document.getElementById('unitContainer');
+        unitContainer.innerHTML = `
+          <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
             <select class="unitType" required style="padding:10px; flex:1;">
               <option value="">-- Select Type --</option>
               <option value="1B">1B (1 Bedroom)</option>
@@ -702,97 +1081,302 @@
             <select class="unitNumber" required style="padding:10px; flex:1;">
               <option value="">-- Select Unit Number --</option>
             </select>
-            <button type="button" class="removeUnitBtn" style="
-              padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
-              X
-            </button>
-          `;
-          unitContainer.appendChild(row);
+            <button type="button" class="removeUnitBtn" style="padding:10px;background:#b33a3a;color:white;border:none;border-radius:6px;">X</button>
+          </div>
+        `;
+        
+        // Re-setup the first row with current occupied units
+        const firstType = document.querySelector('.unitType');
+        const firstNumber = document.querySelector('.unitNumber');
+        firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber, occupiedUnits));
 
-          const typeSelect = row.querySelector('.unitType');
-          const numberSelect = row.querySelector('.unitNumber');
-          typeSelect.addEventListener('change', () => populateUnitNumbers(typeSelect, numberSelect));
+      } catch (error) {
+        showPopup("Error: " + error.message);
+      }
+    });
 
-          row.querySelector('.removeUnitBtn').addEventListener('click', () => {
-            if (document.querySelectorAll('.unit-row').length > 1) row.remove();
-          });
-        });
+    // Unit management functions
+    const unitContainer = document.getElementById('unitContainer');
+    const addUnitBtn = document.getElementById('addUnitBtn');
 
-        // Remove button for first row
-        document.querySelector('.removeUnitBtn').addEventListener('click', function () {
-          if (document.querySelectorAll('.unit-row').length > 1) this.parentElement.remove();
-        });
+    // Populate the first row
+    const firstType = document.querySelector('.unitType');
+    const firstNumber = document.querySelector('.unitNumber');
+    firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber, occupiedUnits));
 
-        // Submit form
-        const form = document.getElementById('createTenantForm');
-        form.addEventListener('submit', async function (e) {
-          e.preventDefault();
-          const email = document.getElementById('tenantEmail').value;
-          const password = document.getElementById('tenantPassword').value;
-          const unitNumbers = Array.from(document.querySelectorAll('.unitNumber'))
-            .map(i => i.value)
-            .filter(v => v !== "");
+    // Add another unit row
+    addUnitBtn.addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.classList.add('unit-row');
+      row.style = "display:flex; gap:10px; margin-bottom:10px;";
+      row.innerHTML = `
+        <select class="unitType" required style="padding:10px; flex:1;">
+          <option value="">-- Select Type --</option>
+          <option value="1B">1B (1 Bedroom)</option>
+          <option value="2B">2B (2 Bedroom)</option>
+        </select>
+        <select class="unitNumber" required style="padding:10px; flex:1;">
+          <option value="">-- Select Unit Number --</option>
+        </select>
+        <button type="button" class="removeUnitBtn" style="
+          padding:10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
+          X
+        </button>
+      `;
+      unitContainer.appendChild(row);
 
-          try {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
+      const typeSelect = row.querySelector('.unitType');
+      const numberSelect = row.querySelector('.unitNumber');
+      typeSelect.addEventListener('change', () => populateUnitNumbers(typeSelect, numberSelect, occupiedUnits));
 
-            await db.collection("users").doc(user.uid).set({
-              email,
-              role: "tenant",
-              unitNumbers,
-              mustChangePassword: true,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+      row.querySelector('.removeUnitBtn').addEventListener('click', () => {
+        if (document.querySelectorAll('.unit-row').length > 1) row.remove();
+      });
+    });
 
-            await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-            showPopup("Unit Owner created successfully!");
-            form.reset();
+    // Remove button for first row
+    document.querySelector('.removeUnitBtn').addEventListener('click', function () {
+      if (document.querySelectorAll('.unit-row').length > 1) this.parentElement.remove();
+    });
 
-            // Reset first row
-            unitContainer.innerHTML = `
-              <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px;">
-                <select class="unitType" required style="padding:10px; flex:1;">
-                  <option value="">-- Select Type --</option>
-                  <option value="1B">1B (1 Bedroom)</option>
-                  <option value="2B">2B (2 Bedroom)</option>
-                </select>
-                <select class="unitNumber" required style="padding:10px; flex:1;">
-                  <option value="">-- Select Unit Number --</option>
-                </select>
-                <button type="button" class="removeUnitBtn" style="padding:10px;background:#b33a3a;color:white;border:none;border-radius:6px;">X</button>
-              </div>
-            `;
-            const firstType = document.querySelector('.unitType');
-            const firstNumber = document.querySelector('.unitNumber');
-            firstType.addEventListener('change', () => populateUnitNumbers(firstType, firstNumber));
-
-          } catch (error) {
-            showPopup("Error: " + error.message);
-          }
-        });
-
-      }, 100);
-      break;
+  }, 100);
+  break;
 
 
         //<==============feedback atb===========>
-    case 'Feedback Received':
-      area.innerHTML = `
-        <h1>Feedback from Unit Owners</h1>
-        <div class="feedback-controls">
-          <label><input type="checkbox" id="selectAllCheckbox" /> Select All</label>
-          <button id="deleteSelectedBtn" class="btn btn-danger" disabled>Delete Selected</button>
-          <button id="refreshFeedbackBtn" class="btn btn-ghost">Refresh</button>
-          <span id="feedbackStatus" style="margin-left:8px;color:#666;"></span>
-        </div>
-        <div id="feedback-list">Loading...</div>`;
+ case 'Feedback Received':
+  area.innerHTML = `
+    <h1>Feedback from Unit Owners</h1>
+    
+    <div class="feedback-controls" style="margin-bottom:20px; display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Filter by Rating:</label>
+        <select id="ratingFilter" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="all">All Ratings</option>
+          <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+          <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+          <option value="3">⭐⭐⭐ (3 Stars)</option>
+          <option value="2">⭐⭐ (2 Stars)</option>
+          <option value="1">⭐ (1 Star)</option>
+        </select>
+      </div>
+      
+      <div>
+        <input type="text" id="feedbackSearch" placeholder="Search in feedback..." 
+          style="padding:8px;width:300px;border:1px solid #ccc;border-radius:6px;">
+      </div>
+      
+      <div>
+        <label style="font-size:14px; margin-right:5px;">Sort by:</label>
+        <select id="sortBy" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+          <option value="date-desc">Date (Newest First)</option>
+          <option value="date-asc">Date (Oldest First)</option>
+          <option value="rating-desc">Rating (High to Low)</option>
+          <option value="rating-asc">Rating (Low to High)</option>
+          <option value="email-asc">Email (A to Z)</option>
+          <option value="email-desc">Email (Z to A)</option>
+        </select>
+      </div>
+      
+      <button id="resetFilters" style="padding:8px 12px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer;">
+        Reset Filters
+      </button>
+      
+      <button id="refreshFeedbackBtn" style="padding:8px 12px; background:#8d6c39; color:white; border:none; border-radius:6px; cursor:pointer;">
+        Refresh
+      </button>
+    </div>
+    
+    <div id="feedbackStats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
+      <span style="font-weight:bold;">Showing:</span> 
+      <span id="feedbackCount">0</span> feedback entries | 
+      <span style="font-weight:bold;">Average Rating:</span> 
+      <span id="averageRating">0.0</span>
+    </div>
+    
+    <div id="feedback-list">Loading feedback...</div>`;
 
-      document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelectedFeedbacks);
-      document.getElementById('selectAllCheckbox').addEventListener('change', toggleSelectAll);
-      document.getElementById('refreshFeedbackBtn').addEventListener('click', loadFeedbacks);
-      loadFeedbacks();
-      break;
+  // Wait for DOM to render before getting elements
+  setTimeout(() => {
+    // Store all feedback for filtering
+    let allFeedback = [];
+    let filteredFeedback = [];
+
+    const ratingFilter = document.getElementById('ratingFilter');
+    const feedbackSearch = document.getElementById('feedbackSearch');
+    const sortBy = document.getElementById('sortBy');
+    const resetFilters = document.getElementById('resetFilters');
+    const refreshFeedbackBtn = document.getElementById('refreshFeedbackBtn');
+    const feedbackStats = document.getElementById('feedbackStats');
+    const feedbackCount = document.getElementById('feedbackCount');
+    const averageRating = document.getElementById('averageRating');
+
+    async function loadFeedbacks() {
+      const feedbackList = document.getElementById('feedback-list');
+      feedbackList.innerHTML = '<p>Loading feedback...</p>';
+
+      try {
+        const snapshot = await db.collection("feedback").orderBy("timestamp", "desc").get();
+
+        if (snapshot.empty) {
+          feedbackList.innerHTML = '<p>No feedback found.</p>';
+          allFeedback = [];
+          filteredFeedback = [];
+          feedbackStats.style.display = 'none';
+          return;
+        }
+
+        allFeedback = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+
+        applyFiltersAndSort();
+        
+      } catch (error) {
+        feedbackList.innerHTML = `<p style="color:red;">Error loading feedback: ${error.message}</p>`;
+        console.error('Error loading feedback:', error);
+      }
+    }
+
+    function applyFiltersAndSort() {
+      const ratingValue = ratingFilter.value;
+      const searchValue = feedbackSearch.value.toLowerCase();
+      const sortValue = sortBy.value;
+      
+      // Start with all feedback
+      filteredFeedback = [...allFeedback];
+      
+      // Apply rating filter
+      if (ratingValue !== 'all') {
+        filteredFeedback = filteredFeedback.filter(feedback => 
+          feedback.rating == ratingValue
+        );
+      }
+      
+      // Apply search filter
+      if (searchValue) {
+        filteredFeedback = filteredFeedback.filter(feedback => {
+          const emailMatch = feedback.tenantEmail && feedback.tenantEmail.toLowerCase().includes(searchValue);
+          const q2Match = feedback.question2 && feedback.question2.toLowerCase().includes(searchValue);
+          const q3Match = feedback.question3 && feedback.question3.toLowerCase().includes(searchValue);
+          return emailMatch || q2Match || q3Match;
+        });
+      }
+      
+      // Apply sorting
+      filteredFeedback.sort((a, b) => {
+        switch(sortValue) {
+          case 'date-desc':
+            return (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0);
+          case 'date-asc':
+            return (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0);
+          case 'rating-desc':
+            return (b.rating || 0) - (a.rating || 0);
+          case 'rating-asc':
+            return (a.rating || 0) - (b.rating || 0);
+          case 'email-asc':
+            return (a.tenantEmail || '').localeCompare(b.tenantEmail || '');
+          case 'email-desc':
+            return (b.tenantEmail || '').localeCompare(a.tenantEmail || '');
+          default:
+            return 0;
+        }
+      });
+      
+      renderFeedbacks();
+    }
+
+    function renderFeedbacks() {
+      const feedbackList = document.getElementById('feedback-list');
+      
+      if (filteredFeedback.length === 0) {
+        feedbackList.innerHTML = '<p>No feedback found matching your criteria.</p>';
+        feedbackStats.style.display = 'none';
+        return;
+      }
+      
+      feedbackList.innerHTML = '';
+      
+      let totalRating = 0;
+      
+      filteredFeedback.forEach(feedback => {
+        const timeText = feedback.timestamp?.toDate
+          ? feedback.timestamp.toDate().toLocaleString()
+          : (feedback.timestamp?.seconds ? new Date(feedback.timestamp.seconds * 1000).toLocaleString() : 'Unknown time');
+        
+        const stars = "⭐".repeat(feedback.rating || 0);
+        const emptyStars = "☆".repeat(5 - (feedback.rating || 0));
+        
+        totalRating += feedback.rating || 0;
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'feedback-item';
+        wrapper.style.border = '1px solid #e0e0e0';
+        wrapper.style.padding = '15px';
+        wrapper.style.marginBottom = '12px';
+        wrapper.style.borderRadius = '8px';
+        // wrapper.style.backgroundColor = '#fff';
+        wrapper.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+        
+        wrapper.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div>
+              <strong style="font-size: 16px;">${feedback.tenantEmail || "Unknown User"}</strong>
+              <div style="margin-top: 5px; color: #ffa500; font-size: 18px;">
+                <div strong style="color: #fff;">How satisfied are you with our services?</strong></div>
+                ${stars}${emptyStars}
+                <span style="color: #666; font-size: 14px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
+              </div>
+            </div>
+            <div style="color: #666; font-size: 13px;">
+              ${timeText}
+            </div>
+          </div>
+          
+          <div style="margin-top: 15px;">
+            <div style="margin-bottom: 10px;">
+              <strong style="color: #fff;">What do you like about our services, unit, and facilities?</strong>
+              <div style="margin-top: 5px; padding: 10px; border-radius: 6px; border-left: 3px solid #8d6c39;">
+                ${escapeHtml(feedback.question2 || "No answer provided")}
+              </div>
+            </div>
+            
+            <div>
+              <strong style="color: #fff;">What can we improve in our unit, services, or facilities?</strong>
+              <div style="margin-top: 5px; padding: 10px; border-radius: 6px; border-left: 3px solid #6b8e23;">
+                ${escapeHtml(feedback.question3 || "No answer provided")}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        feedbackList.appendChild(wrapper);
+      });
+      
+      // Update stats
+      const average = filteredFeedback.length > 0 ? (totalRating / filteredFeedback.length).toFixed(1) : '0.0';
+      feedbackCount.textContent = filteredFeedback.length;
+      averageRating.textContent = average;
+      feedbackStats.style.display = 'block';
+    }
+
+    // Event listeners
+    ratingFilter.addEventListener('change', applyFiltersAndSort);
+    feedbackSearch.addEventListener('input', applyFiltersAndSort);
+    sortBy.addEventListener('change', applyFiltersAndSort);
+    resetFilters.addEventListener('click', () => {
+      ratingFilter.value = 'all';
+      feedbackSearch.value = '';
+      sortBy.value = 'date-desc';
+      applyFiltersAndSort();
+    });
+    refreshFeedbackBtn.addEventListener('click', loadFeedbacks);
+
+    // Initial load
+    loadFeedbacks();
+  }, 100); // Small delay to ensure DOM is rendered
+  break;
 
     default:
       area.innerHTML = '<h1>Welcome</h1><p>Select a menu option from the sidebar.</p>';
@@ -948,4 +1532,3 @@
 </div>
 </body>
 </html>
-
