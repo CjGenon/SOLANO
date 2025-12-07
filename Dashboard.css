@@ -248,3 +248,37 @@ body {
 .hidden {
   display: none;
 }
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feedback-form .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-form select,
+.feedback-form textarea {
+  padding: 10px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  color: #2e2e2e;
+}
+
+.feedback-form button {
+  padding: 10px 20px;
+  background-color: #8d6c39;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.feedback-form button:hover {
+  background-color: #a57934;
+}
