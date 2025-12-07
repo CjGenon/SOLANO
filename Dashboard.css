@@ -1,18 +1,35 @@
-/* ======================== SIDEBAR DASHBOARD LAYOUT – SOLANO THEME ======================== */
+/* ======================== DESIGN TOKENS ======================== */
+
+:root {
+  --solano-bg: #181818;
+  --solano-card: #262626;
+  --solano-card-alt: #202020;
+  --solano-accent: #c0933c;
+  --solano-accent-soft: rgba(192, 147, 60, 0.15);
+  --solano-border-soft: rgba(255, 255, 255, 0.08);
+  --solano-text-main: #f7f7f7;
+  --solano-text-muted: #cccccc;
+  --solano-radius-lg: 12px;
+  --solano-radius-md: 8px;
+}
+
+/* ======================== BASE LAYOUT ======================== */
+
 body {
   margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background-color: #000;
-  color: #f3efe9;
+  font-family: "Segoe UI", sans-serif;
+  background-color: var(--solano-bg);
+  color: var(--solano-text-main);
   display: flex;
   height: 100vh;
   overflow: hidden;
 }
 
 /* Sidebar */
+
 .sidebar {
   width: 240px;
-  background-color: #4a3728; /* rich brown */
+  background-color: #4a3728;
   color: #f3efe9;
   display: flex;
   flex-direction: column;
@@ -47,87 +64,164 @@ body {
   padding: 14px 20px;
   color: #f3efe9;
   text-decoration: none;
-  transition: background 0.3s;
+  transition: background 0.25s ease;
   font-weight: bold;
 }
 
 .sidebar nav ul li a:hover,
 .sidebar nav ul li a.active {
-  background-color: #8d6c39; /* gold highlight */
+  background-color: #8d6c39;
   color: #fff;
 }
 
-/* Main Content */
+/* Main content wrapper */
+
 .main-content {
   margin-left: 240px;
-  padding: 40px;
+  padding: 32px 40px;
   flex-grow: 1;
   overflow-y: auto;
-  background: linear-gradient(to bottom right, #1e1e1e, #000);
+  background: radial-gradient(circle at top left, #242424 0%, #000 55%);
+  box-sizing: border-box;
 }
 
 #mainContent {
-  background: #2e2e2e; /* soft charcoal */
-  border-radius: 8px;
-  padding: 40px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-  min-height: 80vh;
+  background: var(--solano-card);
+  border-radius: var(--solano-radius-lg);
+  padding: 28px 28px 32px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  min-height: calc(100vh - 96px);
 }
 
-#content-area h1 {
-  color: #cfa85b;
+/* Tab header */
+
+.tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-#content-area p {
-  color: #e0e0e0;
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--solano-accent);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  body {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    height: auto;
-    flex-direction: row;
-    justify-content: space-around;
-    position: relative;
-  }
-
-  .main-content {
-    margin-left: 0;
-    padding: 20px;
-  }
-
-  .sidebar nav ul {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .sidebar nav ul li a {
-    padding: 10px 14px;
-    font-size: 14px;
-  }
+.page-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--solano-text-muted);
 }
-/* === Dashboard Layout === */
+
+/* Generic card */
+
+.card {
+  background: var(--solano-card);
+  border-radius: var(--solano-radius-lg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--solano-border-soft);
+  padding: 20px 20px 22px;
+}
+
+/* Section header inside cards */
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--solano-text-muted);
+}
+
+/* Small select for filters */
+
+.select-sm {
+  padding: 6px 8px;
+  border-radius: var(--solano-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--solano-card-alt);
+  color: var(--solano-text-main);
+  font-size: 0.85rem;
+}
+
+.select-sm:focus {
+  outline: none;
+  border-color: var(--solano-accent);
+  box-shadow: 0 0 0 1px var(--solano-accent-soft);
+}
+
+/* Primary button */
+
+.btn-primary {
+  padding: 9px 22px;
+  border-radius: var(--solano-radius-md);
+  border: none;
+  background: var(--solano-accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #d9a747;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Status text (small inline messages) */
+
+.status-text {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+/* ======================== DASHBOARD ======================== */
+
 .dashboard-container {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 20px;
-  margin-top: 20px;
+  margin-top: 4px;
 }
 
-/* === Welcome Slider === */
+.dashboard-container .dashboard-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Welcome slider */
+
 .welcome-slider {
   flex: 2;
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .welcome-slider img {
@@ -136,8 +230,12 @@ body {
   display: block;
 }
 
-.slide { display: none; }
-.prev, .next {
+.slide {
+  display: none;
+}
+
+.prev,
+.next {
   cursor: pointer;
   position: absolute;
   top: 50%;
@@ -145,22 +243,23 @@ body {
   color: white;
   font-weight: bold;
   font-size: 20px;
-  background-color: rgba(0,0,0,0.5);
+  background-color: rgba(0, 0, 0, 0.5);
   border: none;
   border-radius: 50%;
   padding: 8px 12px;
 }
-.prev { left: 10px; }
-.next { right: 10px; }
+.prev {
+  left: 10px;
+}
+.next {
+  right: 10px;
+}
 
-/* === Calendar === */
+/* Calendar & inbox cards */
+
 .calendar-card {
-  flex: 1;
   background-color: #4a3728;
   color: #fff;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 .calendar-card table {
@@ -171,7 +270,7 @@ body {
 }
 
 .calendar-card th {
-  color: #8d6c39;
+  color: #f0c86e;
   padding-bottom: 10px;
 }
 
@@ -186,14 +285,9 @@ body {
   font-weight: bold;
 }
 
-/* === Inbox Shortcut Card === */
 .inbox-card {
-  margin-top: 25px;
   background-color: #4a3728;
-  padding: 20px;
-  border-radius: 12px;
   color: #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
 .inbox-card button {
@@ -205,14 +299,345 @@ body {
   cursor: pointer;
   margin-top: 8px;
 }
-/* Custom Popup */
+
+/* Community feedback section */
+
+.community-card {
+  margin-top: 26px;
+  background: linear-gradient(135deg, #4a3728 0%, #8d6c39 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.community-card .section-title {
+  color: #fff;
+}
+
+.community-stats {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.community-stats div + div {
+  margin-top: 4px;
+}
+
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.community-empty {
+  color: #fff;
+  text-align: center;
+  grid-column: 1 / -1;
+}
+
+.community-expand {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.community-expand-inner {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: inline-block;
+  font-size: 0.85rem;
+}
+
+.community-note {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  border-left: 5px solid #f3e0b1;
+  color: #4a3728;
+  font-size: 0.85rem;
+}
+
+/* ======================== MAINTENANCE TAB ======================== */
+
+.maintenance-tab {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.maintenance-left {
+  flex: 2;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.maintenance-right {
+  flex: 1.3;
+  min-width: 320px;
+}
+
+.maintenance-history-card {
+  max-height: 620px;
+  overflow-y: auto;
+}
+
+/* labels & inputs */
+
+.maintenance-form label {
+  font-size: 0.9rem;
+  color: var(--solano-text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.maintenance-form select,
+.maintenance-form textarea,
+.maintenance-form input[type="datetime-local"],
+.maintenance-form input[type="file"] {
+  width: 100%;
+  border-radius: var(--solano-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--solano-card-alt);
+  color: var(--solano-text-main);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.maintenance-form select:focus,
+.maintenance-form textarea:focus,
+.maintenance-form input[type="datetime-local"]:focus {
+  outline: none;
+  border-color: var(--solano-accent);
+  box-shadow: 0 0 0 1px var(--solano-accent-soft);
+}
+
+/* Service rates table */
+
+.rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.rate-table th,
+.rate-table td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 10px;
+}
+
+.rate-table th {
+  background: #3a2a18;
+  color: #f6e6c1;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.rate-table tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.service-rates-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* Request history / conversation */
+
+.history-header {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.request-meta {
+  font-size: 0.8rem;
+  color: var(--solano-text-muted);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+/* status pill */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-pill.pending {
+  background: rgba(255, 193, 7, 0.12);
+  color: #ffc107;
+}
+.status-pill.in-progress {
+  background: rgba(33, 150, 243, 0.15);
+  color: #4fc3f7;
+}
+.status-pill.completed {
+  background: rgba(76, 175, 80, 0.18);
+  color: #9be186;
+}
+.status-pill.rejected {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ff8a80;
+}
+
+/* Chat thread */
+
+.history-thread {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--solano-accent-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-bubble {
+  max-width: 90%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+.chat-bubble.tenant {
+  align-self: flex-end;
+  background: var(--solano-accent);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-bubble.staff {
+  align-self: flex-start;
+  background: #303030;
+  color: var(--solano-text-main);
+  border-bottom-left-radius: 2px;
+}
+
+.chat-meta {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* Reply box */
+
+.history-reply {
+  margin-top: 10px;
+  padding-left: 10px;
+}
+
+.history-reply textarea {
+  width: 100%;
+  border-radius: var(--solano-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #1f1f1f;
+  color: var(--solano-text-main);
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.history-reply textarea:focus {
+  outline: none;
+  border-color: var(--solano-accent);
+  box-shadow: 0 0 0 1px var(--solano-accent-soft);
+}
+
+.history-reply button {
+  margin-top: 6px;
+}
+
+/* ======================== BILLING ======================== */
+
+.billing-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 22px;
+}
+
+.payment-tab p {
+  font-size: 0.9rem;
+  color: var(--solano-text-muted);
+}
+
+.payment-stats {
+  padding: 8px 12px;
+  border-radius: var(--solano-radius-md);
+  margin-bottom: 12px;
+  background: var(--solano-card-alt);
+  font-size: 0.85rem;
+  color: var(--solano-text-muted);
+}
+
+.payment-history-scroll {
+  max-height: 380px;
+  overflow-y: auto;
+  font-size: 0.88rem;
+}
+
+/* ======================== FEEDBACK ======================== */
+
+.feedback-container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.feedback-card {
+  margin-top: 4px;
+}
+
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feedback-form .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-form label {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--solano-text-muted);
+}
+
+.feedback-form select,
+.feedback-form textarea {
+  padding: 10px;
+  font-size: 0.9rem;
+  border-radius: var(--solano-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: var(--solano-card-alt);
+  color: var(--solano-text-main);
+}
+
+.feedback-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* ======================== POPUP ======================== */
+
 .popup {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.6);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -225,7 +650,7 @@ body {
   padding: 30px 40px;
   border-radius: 10px;
   text-align: center;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
 }
 
 .popup-content button {
@@ -244,41 +669,85 @@ body {
   background-color: #a57934;
 }
 
-/* Hide popup */
 .hidden {
   display: none;
 }
-.feedback-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+
+/* ======================== SCROLLBARS ======================== */
+
+.maintenance-history-card,
+.service-rates-scroll,
+.payment-history-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--solano-accent) #141414;
 }
 
-.feedback-form .form-group {
-  display: flex;
-  flex-direction: column;
+.maintenance-history-card::-webkit-scrollbar,
+.service-rates-scroll::-webkit-scrollbar,
+.payment-history-scroll::-webkit-scrollbar {
+  width: 6px;
 }
 
-.feedback-form select,
-.feedback-form textarea {
-  padding: 10px;
-  font-size: 15px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  background-color: #fff;
-  color: #2e2e2e;
+.maintenance-history-card::-webkit-scrollbar-track,
+.service-rates-scroll::-webkit-scrollbar-track,
+.payment-history-scroll::-webkit-scrollbar-track {
+  background: #141414;
 }
 
-.feedback-form button {
-  padding: 10px 20px;
-  background-color: #8d6c39;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
+.maintenance-history-card::-webkit-scrollbar-thumb,
+.service-rates-scroll::-webkit-scrollbar-thumb,
+.payment-history-scroll::-webkit-scrollbar-thumb {
+  background: var(--solano-accent);
+  border-radius: 999px;
 }
 
-.feedback-form button:hover {
-  background-color: #a57934;
+/* ======================== RESPONSIVE ======================== */
+
+@media (max-width: 1024px) {
+  .billing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    justify-content: space-around;
+    position: relative;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 20px;
+  }
+
+  #mainContent {
+    padding: 20px;
+    min-height: auto;
+  }
+
+  .sidebar nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .sidebar nav ul li a {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .dashboard-container {
+    flex-direction: column;
+  }
+
+  .maintenance-tab {
+    flex-direction: column;
+  }
 }
