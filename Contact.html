@@ -39,7 +39,9 @@
     <form id="contactForm">
       <input type="text" id="name" placeholder="Your Name" required />
       <input type="email" id="email" placeholder="Your Email" required />
-      <input type="tel" id="number" placeholder="Your Number" required />
+      <input type="text" id="number"placeholder="917 123 4567" 
+    maxlength="11" placeholder="Your Number" required inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
+/>
 
       <select id="Employement_Type" name="Employement_Type" required>
         <option value="" disabled selected>Select Employment Type</option>
@@ -471,4 +473,3 @@
   </script>
 </body>
 </html>
-
