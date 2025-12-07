@@ -838,7 +838,8 @@ case "inbox":
   // Load data initially
   loadData();
 
-  break;    
+  break; 
+     
   case "document":
   mainContent.innerHTML = `
     <h1>Upload Client Documents</h1>
@@ -1078,6 +1079,9 @@ case "inbox":
 
     statusDiv.textContent = "Sending email...";
 
+    // Prepare download URLs with fl_attachment to force download
+    const downloadUrls = uploadedUrls.map(url => url.replace('/upload/', '/upload/fl_attachment/'));
+
     // Prepare email
     const templateParams = {
       name,
@@ -1090,7 +1094,7 @@ case "inbox":
         <p>2 Bedroom Units: ${num2Bedroom}</p>
         <p>Payment Terms: ${paymentTerms}</p>
         <p>Files:</p>
-        ${uploadedUrls.map((u, i) => `<a href="${u}">${uploadedFileNames[i]}</a>`).join("<br>")}
+        ${downloadUrls.map((u, i) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${uploadedFileNames[i]}</a>`).join("<br>")}
       `
     };
 
