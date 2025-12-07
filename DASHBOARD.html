@@ -96,115 +96,420 @@
       }
 
       switch(section) {
-         case "dashboard":
-          mainContent.innerHTML = `
-            <h1 id="Greeting1">Dashboard</h1>
-            <div class="dashboard-container">
-              <div class="welcome-slider">
-                <div class="slide fade"><img src="1Entertainment room.jpg" alt="Welcome Slide 1" /></div>
-                <div class="slide fade"><img src="1Fitness Gym.jpg" alt="Welcome Slide 2" /></div>
-                <div class="slide fade"><img src="1Roof Garden.jpg" alt="Welcome Slide 3" /></div>
-                <button class="prev" id="sliderPrev">&#10094;</button>
-                <button class="next" id="sliderNext">&#10095;</button>
-              </div>
-              <div class="right-side">
-                <div class="calendar-card">
-                  <h3>📅 Calendar</h3>
-                  <div id="calendar"></div>
-                </div>
-                <div class="inbox-card">
-                  <h3>My Unit List</h3>
-                  <p>Unit(s) you own:</p>
-                  <div id="myUnitList" style="padding:10px; border-radius:6px; border:1px solid #ccc; max-width:280px; margin-top:10px;">
-                    Loading units...
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
+       case "dashboard":
+  mainContent.innerHTML = `
+    <h1 id="Greeting1">Dashboard</h1>
+    <div class="dashboard-container">
+      <div class="welcome-slider">
+        <div class="slide fade"><img src="1Entertainment room.jpg" alt="Welcome Slide 1" /></div>
+        <div class="slide fade"><img src="1Fitness Gym.jpg" alt="Welcome Slide 2" /></div>
+        <div class="slide fade"><img src="1Roof Garden.jpg" alt="Welcome Slide 3" /></div>
+        <button class="prev" id="sliderPrev">&#10094;</button>
+        <button class="next" id="sliderNext">&#10095;</button>
+      </div>
+      <div class="right-side">
+        <div class="calendar-card">
+          <h3>📅 Calendar</h3>
+          <div id="calendar"></div>
+        </div>
+        <div class="inbox-card">
+          <h3>My Unit List</h3>
+          <p>Unit(s) you own:</p>
+          <div id="myUnitList" style="padding:10px; border-radius:6px; border:1px solid #ccc; max-width:280px; margin-top:10px;">
+            Loading units...
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top: 30px; padding: 25px; background: linear-gradient(135deg, #4a3728 0%, #8d6c39 100%); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);">🏘️ Community Feedback</h2>
+        <div>
+          <label style="font-size:14px; margin-right:5px; color: white;">Sort by:</label>
+          <select id="feedbackSort" style="padding:8px; border:1px solid rgba(255,255,255,0.3); border-radius:6px; background: rgba(255,255,255,0.9);">
+            <option value="date-desc">Date (Newest First)</option>
+            <option value="date-asc">Date (Oldest First)</option>
+            <option value="rating-desc">Rating (High to Low)</option>
+            <option value="rating-asc">Rating (Low to High)</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+      </div>
+      
+      <div id="communityStats" style="background: rgba(255,255,255,0.9); padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.5); backdrop-filter: blur(5px);">
+        <div style="display: flex; gap: 25px; flex-wrap: wrap;">
+          <div>
+            <strong style="color: #4a3728;">Total Feedback:</strong> <span id="totalFeedback" style="color: #8d6c39; font-weight: bold;">0</span>
+          </div>
+          <div>
+            <strong style="color: #4a3728;">Average Rating:</strong> <span id="avgRating" style="color: #8d6c39; font-weight: bold;">0.0</span>/5
+          </div>
+          <div>
+            <strong style="color: #4a3728;">Rating Distribution:</strong>
+            <span id="rating5" style="color: #ffd700; font-weight: bold;">0</span> ⭐⭐⭐⭐⭐ |
+            <span id="rating4" style="color: #ffc107; font-weight: bold;">0</span> ⭐⭐⭐⭐ |
+            <span id="rating3" style="color: #ff9800; font-weight: bold;">0</span> ⭐⭐⭐ |
+            <span id="rating2" style="color: #ff5722; font-weight: bold;">0</span> ⭐⭐ |
+            <span id="rating1" style="color: #f44336; font-weight: bold;">0</span> ⭐
+          </div>
+        </div>
+      </div>
+      
+      <div id="communityFeedback" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+        <p style="color: white; text-align: center; grid-column: 1 / -1;">Loading community feedback...</p>
+      </div>
+      
+      <!-- Expand Button (initially hidden) -->
+      <div id="expandControls" style="display: none; margin-top: 25px; text-align: center;">
+        <div style="background: rgba(255,255,255,0.15); padding: 15px; border-radius: 8px; display: inline-block;">
+          <p style="color: white; margin: 0 0 10px 0; font-size: 14px;">
+            Showing <span id="showingCount">4</span> of <span id="totalCount">0</span> feedback items
+          </p>
+          <button id="expandAllBtn" style="padding: 10px 25px; background: white; color: #4a3728; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.3s;">
+            Show All Feedback
+          </button>
+        </div>
+      </div>
+      
+      <div id="feedbackMessage" style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.85); border-radius: 8px; border-left: 5px solid #8d6c39;">
+        <strong style="color: #4a3728;">Note:</strong> <span style="color: #5a4738;">These are anonymous feedback from other unit owners. Your own feedback is not shown here to maintain privacy.</span>
+      </div>
+    </div>
+  `;
 
-        // Populate "My Unit List" from Firestore
-        async function populateMyUnits() {
-          try {
-            const currentUser = auth.currentUser;
-            if (!currentUser) return;
+  // Define escapeHtml function
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-            const tenantDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
-            if (!tenantDocSnap.exists()) {
-              document.getElementById('myUnitList').textContent = 'No units found.';
-              return;
-            }
+  // Store feedback data globally for this dashboard instance
+  let communityFeedbackData = [];
+  let showingAllFeedback = false; // Track if we're showing all feedback
 
-            const units = tenantDocSnap.data().unitNumbers || [];
-            if (units.length === 0) {
-              document.getElementById('myUnitList').textContent = 'No units assigned.';
-              return;
-            }
+  // Populate "My Unit List" from Firestore
+  async function populateMyUnits() {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
 
-            document.getElementById('myUnitList').innerHTML = units
-              .map(u => `<div style="padding:5px 0;">${u}</div>`)
-              .join('');
-          } catch (e) {
-            console.error('Error fetching units:', e);
-            document.getElementById('myUnitList').textContent = 'Failed to load units.';
-          }
+      const tenantDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      if (!tenantDocSnap.exists()) {
+        document.getElementById('myUnitList').textContent = 'No units found.';
+        return;
+      }
+
+      const units = tenantDocSnap.data().unitNumbers || [];
+      if (units.length === 0) {
+        document.getElementById('myUnitList').textContent = 'No units assigned.';
+        return;
+      }
+
+      document.getElementById('myUnitList').innerHTML = units
+        .map(u => `<div style="padding:5px 0;">${u}</div>`)
+        .join('');
+    } catch (e) {
+      console.error('Error fetching units:', e);
+      document.getElementById('myUnitList').textContent = 'Failed to load units.';
+    }
+  }
+  populateMyUnits();
+
+  // Load community feedback
+  async function loadCommunityFeedback() {
+    const communityFeedback = document.getElementById('communityFeedback');
+    const currentUserEmail = auth.currentUser ? auth.currentUser.email : null;
+    
+    try {
+      // Get all feedback except the current user's
+      const snapshot = await getDocs(collection(db, "feedback"));
+      
+      if (snapshot.empty) {
+        communityFeedback.innerHTML = '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available yet.</p>';
+        document.getElementById('feedbackMessage').style.display = 'none';
+        return;
+      }
+
+      communityFeedbackData = [];
+      let totalRating = 0;
+      const ratingCounts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        
+        // Skip current user's feedback
+        if (data.tenantEmail === currentUserEmail) return;
+        
+        communityFeedbackData.push({
+          id: docSnap.id,
+          ...data
+        });
+        
+        // Update statistics
+        const rating = data.rating || 0;
+        if (rating >= 1 && rating <= 5) {
+          totalRating += rating;
+          ratingCounts[rating]++;
         }
-        populateMyUnits();
-
-        // Slider logic
-        (function () {
-          let slideIndexLocal = 1;
-          const slides = () => document.querySelectorAll(".welcome-slider .slide");
-
-          function showSlidesLocal(n) {
-            const nodeList = slides();
-            if (!nodeList || nodeList.length === 0) return;
-            if (n > nodeList.length) slideIndexLocal = 1;
-            if (n < 1) slideIndexLocal = nodeList.length;
-            nodeList.forEach(s => (s.style.display = "none"));
-            nodeList[slideIndexLocal - 1].style.display = "block";
-          }
-
-          showSlidesLocal(slideIndexLocal);
-          document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
-          document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
-
-          const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
-          const sliderEl = document.querySelector(".welcome-slider");
-          if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
-        })();
-
-        // Calendar generation logic
-        (function () {
-          function generateCalendar() {
-            const calendar = document.getElementById("calendar");
-            if (!calendar) return;
-
-            const today = new Date();
-            const monthName = today.toLocaleString("default", { month: "long" });
-            const year = today.getFullYear();
-            const firstDay = new Date(year, today.getMonth(), 1);
-            const lastDay = new Date(year, today.getMonth() + 1, 0);
-            const startDay = firstDay.getDay();
-
-            let html = "<table class='cal-table'>";
-            html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
-            html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
-
-            for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
-
-            for (let day = 1; day <= lastDay.getDate(); day++) {
-              const isToday = day === today.getDate();
-              html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
-              if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
-            }
-            html += "</tr></table>";
-            calendar.innerHTML = html;
-          }
-          generateCalendar();
-        })();
+      });
+      
+      if (communityFeedbackData.length === 0) {
+        communityFeedback.innerHTML = '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback from other unit owners yet.</p>';
+        document.getElementById('feedbackMessage').style.display = 'block';
+        return;
+      }
+      
+      // Update statistics
+      document.getElementById('totalFeedback').textContent = communityFeedbackData.length;
+      document.getElementById('avgRating').textContent = (totalRating / communityFeedbackData.length).toFixed(1);
+      document.getElementById('rating5').textContent = ratingCounts[5];
+      document.getElementById('rating4').textContent = ratingCounts[4];
+      document.getElementById('rating3').textContent = ratingCounts[3];
+      document.getElementById('rating2').textContent = ratingCounts[2];
+      document.getElementById('rating1').textContent = ratingCounts[1];
+      
+      // Show expand controls if we have more than 4 feedback items
+      if (communityFeedbackData.length > 4) {
+        document.getElementById('expandControls').style.display = 'block';
+        document.getElementById('totalCount').textContent = communityFeedbackData.length;
+      }
+      
+      // Apply initial sorting and show first 4 items
+      applyFeedbackSorting();
+      
+      document.getElementById('feedbackMessage').style.display = 'block';
+      
+    } catch (error) {
+      console.error('Error loading community feedback:', error);
+      communityFeedback.innerHTML = `<p style="color: white; text-align: center; grid-column: 1 / -1; color: #ffcccc;">Error loading community feedback: ${error.message}</p>`;
+    }
+  }
+  
+  function applyFeedbackSorting() {
+    const sortValue = document.getElementById('feedbackSort').value;
+    
+    if (communityFeedbackData.length === 0) return;
+    
+    let sortedFeedback = [...communityFeedbackData];
+    
+    switch(sortValue) {
+      case 'date-desc':
+        sortedFeedback.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0));
         break;
+      case 'date-asc':
+        sortedFeedback.sort((a, b) => (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0));
+        break;
+      case 'rating-desc':
+        sortedFeedback.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        break;
+      case 'rating-asc':
+        sortedFeedback.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+        break;
+      case 'random':
+        // Fisher-Yates shuffle
+        for (let i = sortedFeedback.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [sortedFeedback[i], sortedFeedback[j]] = [sortedFeedback[j], sortedFeedback[i]];
+        }
+        break;
+    }
+    
+    renderCommunityFeedback(sortedFeedback);
+  }
+  
+  function renderCommunityFeedback(feedbackArray) {
+    const communityFeedback = document.getElementById('communityFeedback');
+    
+    if (feedbackArray.length === 0) {
+      communityFeedback.innerHTML = '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available.</p>';
+      return;
+    }
+    
+    communityFeedback.innerHTML = '';
+    
+    // Determine how many items to show
+    let itemsToShow = feedbackArray;
+    if (!showingAllFeedback && feedbackArray.length > 4) {
+      itemsToShow = feedbackArray.slice(0, 4);
+      document.getElementById('showingCount').textContent = '4';
+    } else {
+      document.getElementById('showingCount').textContent = feedbackArray.length;
+    }
+    
+    // Update expand button text
+    const expandBtn = document.getElementById('expandAllBtn');
+    if (expandBtn) {
+      if (showingAllFeedback) {
+        expandBtn.textContent = 'Show Less (First 4)';
+        expandBtn.style.background = '#4a3728';
+        expandBtn.style.color = 'white';
+      } else {
+        expandBtn.textContent = `Show All ${feedbackArray.length} Feedback Items`;
+        expandBtn.style.background = 'white';
+        expandBtn.style.color = '#4a3728';
+      }
+    }
+    
+    itemsToShow.forEach(feedback => {
+      const timeText = feedback.timestamp?.toDate
+        ? feedback.timestamp.toDate().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          })
+        : 'Recent';
+      
+      const stars = "⭐".repeat(feedback.rating || 0);
+      const emptyStars = "☆".repeat(5 - (feedback.rating || 0));
+      
+      // Determine background color based on rating with brown palette
+      let bgColor = '#f5f1e8'; // Light beige for neutral
+      let borderColor = '#d4c9b8';
+      
+      if (feedback.rating >= 4) {
+        bgColor = '#e8e0d1'; // Warm beige for good reviews
+        borderColor = '#c9b89c';
+      } 
+      if (feedback.rating <= 2) {
+        bgColor = '#f0e6d6'; // Soft beige for bad reviews
+        borderColor = '#d9c6a9';
+      }
+      
+      const card = document.createElement('div');
+      card.style.background = bgColor;
+      card.style.border = `2px solid ${borderColor}`;
+      card.style.borderRadius = '10px';
+      card.style.padding = '18px';
+      card.style.boxShadow = '0 3px 8px rgba(74, 55, 40, 0.15)';
+      card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+      
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div style="color: #8d6c39; font-size: 20px;">
+            ${stars}${emptyStars}
+            <span style="color: #4a3728; font-size: 15px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
+          </div>
+          <div style="color: #8d6c39; font-size: 13px; font-weight: 500;">
+            ${timeText}
+          </div>
+        </div>
+        
+        <div style="margin-top: 12px;">
+          <div style="margin-bottom: 12px;">
+            <strong style="color: #4a3728; font-size: 14px;">What do you like about our services, unit, and facilities?</strong>
+            <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #8d6c39;">
+              ${escapeHtml(feedback.question2 || "No answer provided")}
+            </div>
+          </div>
+          
+          <div>
+            <strong style="color: #4a3728; font-size: 14px;">What can we improve in our unit, services, or facilities?</strong>
+            <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #4a3728;">
+              ${escapeHtml(feedback.question3 || "No answer provided")}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Add hover effect
+      card.addEventListener('mouseenter', () => {
+        card.style.transform = 'translateY(-2px)';
+        card.style.boxShadow = '0 5px 15px rgba(74, 55, 40, 0.25)';
+      });
+      
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = 'translateY(0)';
+        card.style.boxShadow = '0 3px 8px rgba(74, 55, 40, 0.15)';
+      });
+      
+      communityFeedback.appendChild(card);
+    });
+  }
+  
+  // Event listener for sorting
+  document.getElementById('feedbackSort').addEventListener('change', () => {
+    applyFeedbackSorting();
+  });
 
+  // Expand All button functionality
+  document.getElementById('expandAllBtn').addEventListener('click', function() {
+    showingAllFeedback = !showingAllFeedback;
+    applyFeedbackSorting();
+    
+    // Scroll to feedback section if showing all
+    if (showingAllFeedback) {
+      document.querySelector('#communityFeedback').scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
+
+  // Slider logic
+  (function () {
+    let slideIndexLocal = 1;
+    const slides = () => document.querySelectorAll(".welcome-slider .slide");
+
+    function showSlidesLocal(n) {
+      const nodeList = slides();
+      if (!nodeList || nodeList.length === 0) return;
+      if (n > nodeList.length) slideIndexLocal = 1;
+      if (n < 1) slideIndexLocal = nodeList.length;
+      nodeList.forEach(s => (s.style.display = "none"));
+      nodeList[slideIndexLocal - 1].style.display = "block";
+    }
+
+    showSlidesLocal(slideIndexLocal);
+    document.getElementById("sliderPrev").addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
+    document.getElementById("sliderNext").addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
+
+    const sliderInterval = setInterval(() => showSlidesLocal(++slideIndexLocal), 5000);
+    const sliderEl = document.querySelector(".welcome-slider");
+    if (sliderEl) sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
+  })();
+
+  // Calendar generation logic
+  (function () {
+    function generateCalendar() {
+      const calendar = document.getElementById("calendar");
+      if (!calendar) return;
+
+      const today = new Date();
+      const monthName = today.toLocaleString("default", { month: "long" });
+      const year = today.getFullYear();
+      const firstDay = new Date(year, today.getMonth(), 1);
+      const lastDay = new Date(year, today.getMonth() + 1, 0);
+      const startDay = firstDay.getDay();
+
+      let html = "<table class='cal-table'>";
+      html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+      html += "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+      for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const isToday = day === today.getDate();
+        html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+        if ((day + startDay) % 7 === 0 && day !== lastDay.getDate()) html += "</tr><tr>";
+      }
+      html += "</tr></table>";
+      calendar.innerHTML = html;
+    }
+    generateCalendar();
+  })();
+  
+  // Load community feedback
+  setTimeout(() => {
+    loadCommunityFeedback();
+  }, 100);
+  break;
+  
       case 'maintenance':
         mainContent.innerHTML = `
           <div class="maintenance-tab" style="display:flex; gap:20px; flex-wrap: wrap;">
@@ -511,255 +816,286 @@
 
       break;
           
-    case 'billing':
-      mainContent.innerHTML = `
-        <div class="payment-tab">
-          <h2>Billing and Payments</h2>
-          <p>Pay your monthly dues securely or send a cash receipt.</p>
+case 'billing':
+  mainContent.innerHTML = `
+    <div class="payment-tab">
+      <h2>Billing and Payments</h2>
+      <p>Pay your monthly dues securely via PayPal.</p>
 
-          <div id="invoiceSection" style="margin-top:20px;">
-            <h3>Your Current Invoice</h3>
-            <p id="invoiceDetails">Loading your invoice...</p>
+      <div id="invoiceSection" style="margin-top:20px;">
+        <h3>Your Current Invoice</h3>
+        <p id="invoiceDetails">Loading your invoice...</p>
+      </div>
+
+      <hr style="margin:25px 0;">
+
+      <h3>Payment Method</h3>
+      <p>Payments are processed securely through PayPal.</p>
+
+      <div id="paypal-section" style="margin-top:20px;">
+        <div id="paypal-button-container"></div>
+      </div>
+
+      <hr style="margin:25px 0;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin: 0;">Payment History</h3>
+        <div>
+          <label style="font-size:14px; margin-right:5px;">Sort by:</label>
+          <select id="historySort" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+            <option value="date-desc">Date (Newest First)</option>
+            <option value="date-asc">Date (Oldest First)</option>
+          </select>
+        </div>
+      </div>
+      
+      <div id="paymentStats" style="padding:10px; border-radius:6px; margin-bottom:15px; display:none;">
+        <span style="font-weight:bold;">Showing:</span> 
+        <span id="paymentCount">0</span> payments | 
+        <span style="font-weight:bold;">Total Paid:</span> ₱<span id="totalPaid">0.00</span>
+      </div>
+      
+      <div id="paymentHistory" style="max-height:400px; overflow-y:auto; font-size:14px;">
+        <p>Loading your payment history...</p>
+      </div>
+    </div>
+  `;
+
+  const invoiceDetails = document.getElementById('invoiceDetails');
+  const paymentHistory = document.getElementById('paymentHistory');
+  const paypalContainer = document.getElementById('paypal-button-container');
+  const historySort = document.getElementById('historySort');
+  const paymentStats = document.getElementById('paymentStats');
+  const paymentCount = document.getElementById('paymentCount');
+  const totalPaid = document.getElementById('totalPaid');
+
+  const unitPricing = { "1B": 10, "2B": 20 };
+  let computedAmount = 0;
+  let tenantUnits = [];
+  let allPayments = [];
+  let filteredPayments = [];
+
+  async function loadInvoice() {
+    const tenantEmail = await getCurrentUserEmail();
+    const uid = auth.currentUser.uid;
+    const userDoc = await getDoc(doc(db, "users", uid));
+    tenantUnits = userDoc.data()?.unitNumbers || [];
+
+    computedAmount = tenantUnits.reduce((total, unit) => {
+      const type = unit.split("-")[0];
+      return total + (unitPricing[type] || 0);
+    }, 0);
+
+    invoiceDetails.innerHTML = `
+      <strong>Tenant:</strong> ${tenantEmail}<br>
+      <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
+      <strong>Amount Due:</strong> ₱${computedAmount}<br>
+      <strong>Due Date:</strong> 25th of this month
+    `;
+  }
+
+  async function loadAllPayments() {
+    const tenantEmail = await getCurrentUserEmail();
+    
+    try {
+      const q = query(collection(db, "payments"), where("tenantEmail", "==", tenantEmail), orderBy("timestamp", "desc"));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        allPayments = [];
+        applySorting();
+        return;
+      }
+
+      allPayments = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }));
+      
+      applySorting();
+      
+    } catch (error) {
+      console.error("Error loading payments:", error);
+      paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
+    }
+  }
+
+  function applySorting() {
+    const sortValue = historySort.value;
+    
+    // Start with all payments
+    filteredPayments = [...allPayments];
+    
+    // Apply sorting
+    filteredPayments.sort((a, b) => {
+      switch(sortValue) {
+        case 'date-desc':
+          return (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0);
+        case 'date-asc':
+          return (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0);
+        case 'amount-desc':
+          return (b.amount || 0) - (a.amount || 0);
+        case 'amount-asc':
+          return (a.amount || 0) - (b.amount || 0);
+        case 'status':
+          // Pending/Verification first, then Paid/Completed
+          if (a.status === 'Pending Verification' && b.status !== 'Pending Verification') return -1;
+          if (a.status !== 'Pending Verification' && b.status === 'Pending Verification') return 1;
+          return 0;
+        case 'method':
+          return (a.method || '').localeCompare(b.method || '');
+        default:
+          return 0;
+      }
+    });
+    
+    renderPaymentHistory();
+  }
+
+  function renderPaymentHistory() {
+    if (filteredPayments.length === 0) {
+      paymentHistory.innerHTML = '<p>No payment records found.</p>';
+      paymentStats.style.display = 'none';
+      return;
+    }
+    
+    paymentHistory.innerHTML = "";
+    
+    let total = 0;
+    let paidPayments = 0;
+    
+    filteredPayments.forEach(payment => {
+      const d = payment;
+      const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
+
+      let receipt = "";
+      if (d.method === "Cash on Hand" && d.receiptUrl) {
+        receipt = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" style="max-width:150px; border-radius:6px;">`;
+      }
+      
+      let statusColor = "#666";
+      if (d.status === "Paid" || d.status === "Approved") statusColor = "#4CAF50";
+      if (d.status === "Pending Verification") statusColor = "#FF9800";
+      if (d.status === "Rejected") statusColor = "#F44336";
+
+      const div = document.createElement('div');
+      div.style.borderBottom = "1px solid #ccc";
+      div.style.padding = "12px 0";
+      div.style.marginBottom = "10px";
+      div.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1;">
+            <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
+            <strong>Amount:</strong> ₱${d.amount}<br>
+            <strong>Status:</strong> <span style="color:${statusColor};">${d.status}</span><br>
+            <strong>Date:</strong> ${time}<br>
+            <strong>Method:</strong> ${d.method}
+            ${receipt}
           </div>
-
-          <hr style="margin:25px 0;">
-
-          <h3>Choose Payment Method</h3>
-          <label>
-            <input type="radio" name="paymentMethod" value="paypal" checked /> PayPal
-          </label>
-          <label style="margin-left: 20px;">
-            <input type="radio" name="paymentMethod" value="cash" /> Cash on Hand
-          </label>
-
-          <div id="paypal-section" style="margin-top:20px;">
-            <div id="paypal-button-container"></div>
-          </div>
-
-          <div id="cash-section" style="margin-top:20px; display:none;">
-            <p>Please upload a photo of your cash payment receipt (JPEG only):</p>
-            <input type="file" id="cashReceipt" accept="image/jpeg" />
-            <button id="submitCashPayment" style="margin-top:10px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer;">Submit Cash Receipt</button>
-            <p id="cashStatus" style="margin-top:10px; color:green;"></p>
-          </div>
-
-          <hr style="margin:25px 0;">
-
-          <h3>Payment History</h3>
-          <div id="paymentHistory" style="max-height:300px; overflow-y:auto; font-size:14px;">
-            <p>Loading your payment history...</p>
+          <div style="min-width: 150px; text-align: right;">
+            ${d.transactionId ? `<strong>Transaction ID:</strong><br><small>${d.transactionId}</small><br>` : ''}
+            ${d.payerEmail ? `<strong>Paid with:</strong><br><small>${d.payerEmail}</small>` : ''}
           </div>
         </div>
       `;
+      paymentHistory.appendChild(div);
+      
+      // Calculate totals for paid/completed payments
+      if (d.status === "Paid" || d.status === "Approved" || d.status === "Completed") {
+        total += Number(d.amount) || 0;
+        paidPayments++;
+      }
+    });
+    
+    // Update stats
+    paymentCount.textContent = filteredPayments.length;
+    totalPaid.textContent = total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    paymentStats.style.display = 'block';
+  }
 
-      const invoiceDetails = document.getElementById('invoiceDetails');
-      const paymentHistory = document.getElementById('paymentHistory');
-      const paypalContainer = document.getElementById('paypal-button-container');
-      const cashSection = document.getElementById('cash-section');
-      const paypalSection = document.getElementById('paypal-section');
-      const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
-      const cashReceiptInput = document.getElementById('cashReceipt');
-      const submitCashPaymentBtn = document.getElementById('submitCashPayment');
-      const cashStatus = document.getElementById('cashStatus');
+  // EmailJS receipt sender
+  async function sendEmailReceipt(paymentData) {
+    try {
+      const templateParams = {
+        from_name: "Solano Hills Admin",
+        to_email: paymentData.payerEmail,
+        invoice_id: paymentData.invoiceId,
+        amount: paymentData.amount,
+        payment_method: paymentData.method,
+        transaction_id: paymentData.transactionId,
+        payment_date: new Date().toLocaleString(),
+      };
+      await emailjs.send('service_izx63bb', 'template_asn4687', templateParams);
+      console.log("Email receipt sent successfully");
+    } catch (error) {
+      console.error("Failed to send email receipt:", error);
+    }
+  }
 
-      const unitPricing = { "1B": 10, "2B": 20 };
-      let computedAmount = 0;
-      let tenantUnits = [];
+  async function setupPayPal() {
+    const tenantEmail = await getCurrentUserEmail();
+    const invoiceId = "INV-" + Date.now();
 
-      paymentMethodRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-          if (radio.value === 'cash') {
-            cashSection.style.display = 'block';
-            paypalSection.style.display = 'none';
-          } else {
-            cashSection.style.display = 'none';
-            paypalSection.style.display = 'block';
-          }
+    paypal.Buttons({
+      style: { color: "gold", shape: "rect", label: "pay", height: 40 },
+
+      createOrder: function(data, actions) {
+        return actions.order.create({
+          purchase_units: [{
+            reference_id: invoiceId,
+            description: "Monthly Dues Payment",
+            amount: { currency_code: "PHP", value: computedAmount.toString() }
+          }]
         });
-      });
+      },
 
-      async function loadInvoice() {
-        const tenantEmail = await getCurrentUserEmail();
-        const uid = auth.currentUser.uid;
-        const userDoc = await getDoc(doc(db, "users", uid));
-        tenantUnits = userDoc.data()?.unitNumbers || [];
+      onApprove: async function(data, actions) {
+        const order = await actions.order.capture();
 
-        computedAmount = tenantUnits.reduce((total, unit) => {
-          const type = unit.split("-")[0];
-          return total + (unitPricing[type] || 0);
-        }, 0);
+        const paymentRecord = {
+          tenantEmail,
+          invoiceId,
+          amount: computedAmount,
+          method: "PayPal",
+          status: "Paid",
+          transactionId: order.id,
+          payerEmail: order.payer.email_address,
+          timestamp: serverTimestamp()
+        };
 
-        invoiceDetails.innerHTML = `
-          <strong>Tenant:</strong> ${tenantEmail}<br>
-          <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
-          <strong>Amount Due:</strong> ₱${computedAmount}<br>
-          <strong>Due Date:</strong> 25th of this month
-        `;
+        await addDoc(collection(db, "payments"), paymentRecord);
+
+        showPopup("✅ Payment successful!");
+        
+        // Reload payments to show new payment
+        await loadAllPayments();
+        
+        // **Send email receipt here**
+        await sendEmailReceipt(paymentRecord);
+      },
+
+      onCancel: async function() {
+        showPopup("⚠️ Payment cancelled by user.");
+      },
+
+      onError: async function(err) {
+        console.error("PayPal error:", err);
+        showPopup("❌ Payment failed. Please try again later.");
       }
 
-      async function loadPaymentHistory() {
-        paymentHistory.innerHTML = '<p>Loading your payment history...</p>';
-        const tenantEmail = await getCurrentUserEmail();
+    }).render(paypalContainer);
+  }
 
-        try {
-          const q = query(collection(db, "payments"), where("tenantEmail", "==", tenantEmail), orderBy("timestamp", "desc"));
-          const snapshot = await getDocs(q);
+  // Event listener for sorting
+  historySort.addEventListener('change', applySorting);
 
-          if (snapshot.empty) {
-            paymentHistory.innerHTML = '<p>No payment records found.</p>';
-            return;
-          }
+  (async () => {
+    await loadInvoice();
+    await loadAllPayments();
+    await setupPayPal();
+  })();
 
-          paymentHistory.innerHTML = "";
-          snapshot.forEach(doc => {
-            const d = doc.data();
-            const time = d.timestamp ? d.timestamp.toDate().toLocaleString() : "N/A";
-
-            let receipt = "";
-            if (d.method === "Cash on Hand" && d.receiptUrl) {
-              receipt = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" style="max-width:150px; border-radius:6px;">`;
-            }
-
-            const div = document.createElement('div');
-            div.style.borderBottom = "1px solid #ccc";
-            div.style.padding = "8px 0";
-            div.innerHTML = `
-              <strong>Invoice ID:</strong> ${d.invoiceId || '-'}<br>
-              <strong>Amount:</strong> ₱${d.amount}<br>
-              <strong>Status:</strong> ${d.status}<br>
-              <strong>Date:</strong> ${time}<br>
-              <strong>Method:</strong> ${d.method}
-              ${receipt}
-            `;
-            paymentHistory.appendChild(div);
-          });
-        } catch (error) {
-          paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
-        }
-      }
-
-      // EmailJS receipt sender
-      async function sendEmailReceipt(paymentData) {
-        try {
-          const templateParams = {
-            from_name: "Solano Hills Admin",
-            to_email: paymentData.payerEmail,
-            invoice_id: paymentData.invoiceId,
-            amount: paymentData.amount,
-            payment_method: paymentData.method,
-            transaction_id: paymentData.transactionId,
-            payment_date: new Date().toLocaleString(),
-          };
-          await emailjs.send('service_izx63bb', 'template_asn4687', templateParams);
-          console.log("Email receipt sent successfully");
-        } catch (error) {
-          console.error("Failed to send email receipt:", error);
-        }
-      }
-
-      async function setupPayPal() {
-        const tenantEmail = await getCurrentUserEmail();
-        const invoiceId = "INV-" + Date.now();
-
-        paypal.Buttons({
-          style: { color: "gold", shape: "rect", label: "pay", height: 40 },
-
-          createOrder: function(data, actions) {
-            return actions.order.create({
-              purchase_units: [{
-                reference_id: invoiceId,
-                description: "Monthly Dues Payment",
-                amount: { currency_code: "PHP", value: computedAmount.toString() }
-              }]
-            });
-          },
-
-          onApprove: async function(data, actions) {
-            const order = await actions.order.capture();
-
-            const paymentRecord = {
-              tenantEmail,
-              invoiceId,
-              amount: computedAmount,
-              method: "PayPal",
-              status: "Paid",
-              transactionId: order.id,
-              payerEmail: order.payer.email_address,
-              timestamp: serverTimestamp()
-            };
-
-            await addDoc(collection(db, "payments"), paymentRecord);
-
-            showPopup("✅ Payment successful!");
-            await loadPaymentHistory();
-
-            // **Send email receipt here**
-            await sendEmailReceipt(paymentRecord);
-          },
-
-          onCancel: async function() {
-            showPopup("⚠️ Payment cancelled by user.");
-          },
-
-          onError: async function(err) {
-            console.error("PayPal error:", err);
-            showPopup("❌ Payment failed. Please try again later.");
-          }
-
-        }).render(paypalContainer);
-      }
-
-      submitCashPaymentBtn.addEventListener('click', async () => {
-        cashStatus.style.color = 'gray';
-        cashStatus.textContent = '';
-
-        const file = cashReceiptInput.files[0];
-        if (!file) {
-          await showPopup("Please upload a JPEG receipt image first.");
-          return;
-        }
-        if (file.type !== 'image/jpeg') {
-          await showPopup("Only JPEG images are allowed.");
-          return;
-        }
-
-        cashStatus.textContent = 'Uploading receipt... Please wait.';
-
-        try {
-          const tenantEmail = await getCurrentUserEmail();
-          const invoiceId = "INV-" + Date.now();
-          const receiptUrl = await uploadToCloudinary(file);
-
-          await addDoc(collection(db, "payments"), {
-            tenantEmail,
-            invoiceId,
-            amount: computedAmount,
-            method: "Cash on Hand",
-            status: "Pending Verification",
-            receiptUrl,
-            timestamp: serverTimestamp()
-          });
-
-          cashStatus.style.color = 'green';
-          cashStatus.textContent = "Receipt uploaded! Waiting for admin confirmation.";
-          cashReceiptInput.value = "";
-          await loadPaymentHistory();
-
-        } catch (error) {
-          console.error(error);
-          cashStatus.style.color = 'red';
-          cashStatus.textContent = "Failed to upload receipt: " + error.message;
-        }
-      });
-
-      (async () => {
-        await loadInvoice();
-        await loadPaymentHistory();
-        await setupPayPal();
-      })();
-
-      break;
-  
+  break;
     case 'feedback':
       loadFeedbackForm();
       break;
@@ -784,10 +1120,10 @@
           </div>
           <input type="hidden" id="ratingValue" name="ratingValue" required />
 
-          <label for="question2" style="margin-top:15px;">2. What do you like about our community?</label>
-          <textarea id="question2" name="question2" placeholder="Your answer..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
+          <label for="question2" style="margin-top:15px;">2. What do you like about our services, unit, and facilities?</label>
+          <textarea id="question2" name="question2" placeholder="Share you thoughts to others" style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
 
-          <label for="question3" style="margin-top:15px;">3. What can we improve?</label>
+          <label for="question3" style="margin-top:15px;">3. What can we improve in our unit, services, or facilities?</label>
           <textarea id="question3" name="question3" placeholder="Your suggestions..." style="width:100%; height:80px; padding:8px; border-radius:6px; border:1px solid #ccc;" required></textarea>
 
           <button id="sendFeedbackBtn" type="submit" style="margin-top:15px; padding:10px 20px; background:#8d6c39; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px;">Send Feedback</button>
