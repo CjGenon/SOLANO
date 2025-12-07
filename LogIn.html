@@ -5,6 +5,266 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Log In – Solano Hills</title>
   <link rel="stylesheet" href="Login.css" />
+  <style>
+    /* Forgot Password Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal-content {
+      background-color: #4a3728;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .modal-title {
+      color: #f3efe9;
+      font-size: 20px;
+      margin: 0;
+    }
+    
+    .close-modal {
+      background: none;
+      border: none;
+      color: #f3efe9;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .close-modal:hover {
+      color: #cfa85b;
+    }
+    
+    .modal-body {
+      color: #f3efe9;
+    }
+    
+    .modal-input, .modal-select {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border: 1px solid #b2956f;
+      border-radius: 6px;
+      font-size: 14px;
+      background-color: #f3efe9;
+      color: #4a3728;
+    }
+    
+    .modal-button {
+      padding: 12px 24px;
+      background-color: #cfa85b;
+      border: none;
+      border-radius: 6px;
+      color: #4a3728;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    
+    .modal-button:hover {
+      background-color: #a57934;
+    }
+    
+    .modal-button:disabled {
+      background-color: #9ca3af;
+      cursor: not-allowed;
+    }
+    
+    .modal-status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      text-align: center;
+    }
+    
+    .modal-success {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    
+    .modal-error {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    /* Two Panel Layout */
+    .setup-container {
+      margin-top: 20px;
+    }
+    
+    .setup-progress {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+      position: relative;
+    }
+    
+    .setup-progress::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(179, 149, 111, 0.3);
+      z-index: 1;
+    }
+    
+    .progress-step {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      flex: 1;
+    }
+    
+    .progress-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(179, 149, 111, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 10px;
+      color: #f3efe9;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    
+    .progress-circle.active {
+      background: #cfa85b;
+      border-color: #cfa85b;
+      color: #4a3728;
+    }
+    
+    .progress-label {
+      font-size: 12px;
+      color: #b2956f;
+    }
+    
+    .setup-panel {
+      display: none;
+    }
+    
+    .setup-panel.active {
+      display: block;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .panel-title {
+      color: #f3efe9;
+      margin-bottom: 20px;
+      font-size: 18px;
+      text-align: center;
+    }
+    
+    .security-questions {
+      margin-top: 15px;
+      padding: 15px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      border: 1px solid rgba(179, 149, 111, 0.3);
+    }
+    
+    .security-question-item {
+      margin-bottom: 20px;
+    }
+    
+    .security-question-label {
+      display: block;
+      color: #f3efe9;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    
+    .navigation-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+    }
+    
+    .btn-back {
+      background: rgba(255,255,255,0.1);
+      color: #f3efe9;
+      border: 1px solid rgba(179, 149, 111, 0.5);
+    }
+    
+    .btn-back:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    .tab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(179, 149, 111, 0.3);
+      padding-bottom: 10px;
+    }
+    
+    .tab-button {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(179, 149, 111, 0.3);
+      border-radius: 6px;
+      color: #f3efe9;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .tab-button.active {
+      background: #cfa85b;
+      color: #4a3728;
+      font-weight: bold;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+  </style>
 </head>
 <body class="login-body">
 
@@ -23,28 +283,214 @@
 
         <div class="login-options">
           <label><input type="checkbox" /> Remember Me</label>
-          <a href="changepasspage.html">Forgot Password?</a>
+          <a href="#" id="forgotPasswordLink">Forgot Password?</a>
         </div>
 
         <button id="submit" type="submit">Log In</button>
       </form>
 
+      <!-- First Login Setup - 2 Panel Layout -->
       <div id="changePasswordSection" style="display: none; margin-top: 20px;">
-        <h3>Change Your Password</h3>
-        <form id="changePasswordForm">
-          <input type="password" id="newPassword" placeholder="New Password" required />
-          <button type="submit">Update Password</button>
-        </form>
+        <h3 style="color: #f3efe9; margin-bottom: 10px; text-align: center;">Set Up Your Account</h3>
+        <p style="color: #b2956f; font-size: 13px; text-align: center; margin-bottom: 30px;">
+          Complete these two steps to secure your account
+        </p>
+        
+        <!-- Progress Bar -->
+        <div class="setup-progress">
+          <div class="progress-step">
+            <div class="progress-circle active" id="step1Circle">1</div>
+            <div class="progress-label">Set Password</div>
+          </div>
+          <div class="progress-step">
+            <div class="progress-circle" id="step2Circle">2</div>
+            <div class="progress-label">Security Questions</div>
+          </div>
+        </div>
+        
+        <!-- Panel 1: Set Password -->
+        <div id="panel1" class="setup-panel active">
+          <h4 class="panel-title">Set Your Password</h4>
+          
+          <form id="passwordForm">
+            <input type="password" id="newPassword" placeholder="New Password" required class="modal-input" style="margin-bottom: 10px;" />
+            <input type="password" id="confirmPassword" placeholder="Confirm New Password" required class="modal-input" style="margin-bottom: 10px;" />
+            
+            <!-- Password Requirements Display -->
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid rgba(179, 149, 111, 0.3);">
+              <p style="color: #f3efe9; margin-bottom: 10px; font-size: 14px; font-weight: bold;">Password Requirements:</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <div id="reqLength" style="font-size: 12px; color: #9ca3af;">
+                  <span style="margin-right: 5px;">○</span> 8+ characters
+                </div>
+                <div id="reqUppercase" style="font-size: 12px; color: #9ca3af;">
+                  <span style="margin-right: 5px;">○</span> Uppercase (A-Z)
+                </div>
+                <div id="reqLowercase" style="font-size: 12px; color: #9ca3af;">
+                  <span style="margin-right: 5px;">○</span> Lowercase (a-z)
+                </div>
+                <div id="reqNumber" style="font-size: 12px; color: #9ca3af;">
+                  <span style="margin-right: 5px;">○</span> Number (0-9)
+                </div>
+                <div id="reqSpecial" style="font-size: 12px; color: #9ca3af;">
+                  <span style="margin-right: 5px;">○</span> Special (!@#$%^&*._())
+                </div>
+              </div>
+            </div>
+            
+            <div id="matchStatus" style="font-size: 13px; margin-bottom: 15px; min-height: 20px;"></div>
+            
+            <div class="navigation-buttons">
+              <button type="button" class="modal-button btn-back" style="visibility: hidden;">Back</button>
+              <button type="button" id="nextToPanel2" class="modal-button" disabled>Next: Security Questions</button>
+            </div>
+          </form>
+        </div>
+        
+        <!-- Panel 2: Security Questions -->
+        <div id="panel2" class="setup-panel">
+          <h4 class="panel-title">Set Security Questions</h4>
+          <p style="color: #b2956f; font-size: 13px; margin-bottom: 20px; text-align: center;">
+            These questions will help you recover your account if you forget your password
+          </p>
+          
+          <form id="securityForm">
+            <div class="security-questions">
+              <!-- Question 1 -->
+              <div class="security-question-item">
+                <label class="security-question-label">Security Question 1:</label>
+                <select id="securityQuestion1" class="modal-select" required>
+                  <option value="">Select a question</option>
+                  <option value="mother_maiden_name">What is your mother's maiden name?</option>
+                  <option value="first_pet">What was the name of your first pet?</option>
+                  <option value="birth_city">In what city were you born?</option>
+                  <option value="elementary_school">What was the name of your elementary school?</option>
+                  <option value="first_car">What was the make and model of your first car?</option>
+                  <option value="childhood_nickname">What was your childhood nickname?</option>
+                </select>
+                <input type="text" id="securityAnswer1" placeholder="Your answer" required style="margin-top: 8px;" class="modal-input" />
+              </div>
+              
+              <!-- Question 2 -->
+              <div class="security-question-item">
+                <label class="security-question-label">Security Question 2:</label>
+                <select id="securityQuestion2" class="modal-select" required>
+                  <option value="">Select a question</option>
+                  <option value="father_middle_name">What is your father's middle name?</option>
+                  <option value="favorite_teacher">Who was your favorite teacher in school?</option>
+                  <option value="first_job">Where was your first job?</option>
+                  <option value="childhood_friend">What is the name of your childhood best friend?</option>
+                  <option value="favorite_movie">What is your favorite movie?</option>
+                  <option value="dream_vacation">Where is your dream vacation destination?</option>
+                </select>
+                <input type="text" id="securityAnswer2" placeholder="Your answer" required style="margin-top: 8px;" class="modal-input" />
+              </div>
+              
+              <!-- Question 3 -->
+              <div class="security-question-item">
+                <label class="security-question-label">Security Question 3:</label>
+                <select id="securityQuestion3" class="modal-select" required>
+                  <option value="">Select a question</option>
+                  <option value="spouse_birth_city">In what city did you meet your spouse/partner?</option>
+                  <option value="favorite_book">What is your favorite book?</option>
+                  <option value="first_concert">What was your first concert?</option>
+                  <option value="favorite_sport">What is your favorite sport?</option>
+                  <option value="grandmother_name">What is your maternal grandmother's first name?</option>
+                  <option value="childhood_street">What street did you live on as a child?</option>
+                </select>
+                <input type="text" id="securityAnswer3" placeholder="Your answer" required style="margin-top: 8px;" class="modal-input" />
+              </div>
+            </div>
+            
+            <p style="color: #b2956f; font-size: 12px; margin-top: 15px; font-style: italic; text-align: center;">
+              Note: Answers are case-sensitive. Make sure to remember your answers!
+            </p>
+            
+            <div class="navigation-buttons">
+              <button type="button" id="backToPanel1" class="modal-button btn-back">Back to Password</button>
+              <button type="submit" id="completeSetupBtn" class="modal-button">Complete Setup</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <p id="status" style="color: red; margin-top: 10px;"></p>
     </div>
   </div>
 
+  <!-- Forgot Password Modal -->
+  <div id="forgotPasswordModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Reset Password</h3>
+        <button class="close-modal" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tab-buttons">
+          <button class="tab-button active" data-tab="email-tab">Email Reset</button>
+          <button class="tab-button" data-tab="security-tab">Security Questions</button>
+        </div>
+        
+        <!-- Email Tab -->
+        <div id="email-tab" class="tab-content active">
+          <p style="margin-bottom: 20px; font-size: 14px;">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
+          
+          <form id="forgotPasswordForm">
+            <input type="email" id="resetEmail" class="modal-input" placeholder="Enter your email" required />
+            
+            <button type="submit" id="resetPasswordBtn" class="modal-button">
+              Send Reset Link
+            </button>
+          </form>
+          
+          <div id="resetStatus" class="modal-status"></div>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #b2956f;">
+            <strong>Note:</strong> Check your email inbox and spam folder for the reset link.
+          </p>
+        </div>
+        
+        <!-- Security Questions Tab -->
+        <div id="security-tab" class="tab-content">
+          <p style="margin-bottom: 20px; font-size: 14px;">
+            Answer your security questions to reset your password.
+          </p>
+          
+          <form id="securityQuestionsForm">
+            <input type="email" id="securityEmail" class="modal-input" placeholder="Enter your email" required />
+            
+            <div id="securityQuestionsContainer" class="security-questions" style="display: none;">
+              <!-- Questions will be loaded here dynamically -->
+            </div>
+            
+            <div id="newPasswordSection" style="display: none; margin-top: 20px;">
+              <h4 style="color: #f3efe9; margin-bottom: 10px;">Set New Password</h4>
+              <input type="password" id="securityNewPassword" class="modal-input" placeholder="New Password" required />
+              <input type="password" id="securityConfirmPassword" class="modal-input" placeholder="Confirm New Password" required />
+            </div>
+            
+            <button type="submit" id="securityResetBtn" class="modal-button" style="display: none;">
+              Reset Password
+            </button>
+          </form>
+          
+          <div id="securityStatus" class="modal-status"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  updatePassword,
+  sendPasswordResetEmail 
+} from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
@@ -59,6 +505,581 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// ==================== TWO PANEL NAVIGATION ====================
+let currentPanel = 1;
+let userPassword = '';
+let securityQuestionsData = null;
+
+// Next button - Panel 1 to Panel 2
+document.getElementById('nextToPanel2').addEventListener('click', function() {
+  // Validate password before proceeding
+  const newPassword = document.getElementById('newPassword').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const requirements = validatePassword(newPassword);
+  const allValid = allRequirementsMet(requirements);
+  
+  if (!allValid) {
+    document.getElementById('status').textContent = "Please meet all password requirements.";
+    document.getElementById('status').style.color = "red";
+    return;
+  }
+  
+  if (newPassword !== confirmPassword) {
+    document.getElementById('status').textContent = "Passwords do not match.";
+    document.getElementById('status').style.color = "red";
+    return;
+  }
+  
+  // Save password for later
+  userPassword = newPassword;
+  
+  // Switch to panel 2
+  document.getElementById('panel1').classList.remove('active');
+  document.getElementById('panel2').classList.add('active');
+  document.getElementById('step1Circle').classList.remove('active');
+  document.getElementById('step2Circle').classList.add('active');
+  currentPanel = 2;
+  
+  // Clear any previous status
+  document.getElementById('status').textContent = '';
+});
+
+// Back button - Panel 2 to Panel 1
+document.getElementById('backToPanel1').addEventListener('click', function() {
+  // Switch to panel 1
+  document.getElementById('panel2').classList.remove('active');
+  document.getElementById('panel1').classList.add('active');
+  document.getElementById('step2Circle').classList.remove('active');
+  document.getElementById('step1Circle').classList.add('active');
+  currentPanel = 1;
+});
+
+// ==================== PASSWORD VALIDATION FUNCTIONS ====================
+function validatePassword(password) {
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*._()]/.test(password)
+  };
+}
+
+function updateRequirements(requirements) {
+  const requirementElements = {
+    length: document.getElementById('reqLength'),
+    uppercase: document.getElementById('reqUppercase'),
+    lowercase: document.getElementById('reqLowercase'),
+    number: document.getElementById('reqNumber'),
+    special: document.getElementById('reqSpecial')
+  };
+  
+  Object.keys(requirements).forEach(req => {
+    const element = requirementElements[req];
+    if (element) {
+      const icon = element.querySelector('span');
+      if (requirements[req]) {
+        element.style.color = '#10b981';
+        icon.textContent = '✓';
+      } else {
+        element.style.color = '#9ca3af';
+        icon.textContent = '○';
+      }
+    }
+  });
+}
+
+function allRequirementsMet(requirements) {
+  return Object.values(requirements).every(req => req === true);
+}
+
+function checkPasswordMatch(password, confirmPassword) {
+  const matchStatus = document.getElementById('matchStatus');
+  const nextButton = document.getElementById('nextToPanel2');
+  
+  if (!password || !confirmPassword) {
+    matchStatus.textContent = '';
+    nextButton.disabled = true;
+    nextButton.style.opacity = '0.6';
+    return false;
+  }
+  
+  if (password === confirmPassword) {
+    matchStatus.textContent = '✓ Passwords match';
+    matchStatus.style.color = '#10b981';
+    
+    // Only enable next button if password requirements are also met
+    const requirements = validatePassword(password);
+    nextButton.disabled = !allRequirementsMet(requirements);
+    nextButton.style.opacity = allRequirementsMet(requirements) ? '1' : '0.6';
+    return true;
+  } else {
+    matchStatus.textContent = '✗ Passwords do not match';
+    matchStatus.style.color = '#ef4444';
+    nextButton.disabled = true;
+    nextButton.style.opacity = '0.6';
+    return false;
+  }
+}
+
+// ==================== PASSWORD VALIDATION EVENT LISTENERS ====================
+document.addEventListener('DOMContentLoaded', function() {
+  const newPasswordInput = document.getElementById('newPassword');
+  const confirmPasswordInput = document.getElementById('confirmPassword');
+  
+  if (newPasswordInput) {
+    newPasswordInput.addEventListener('input', function() {
+      const password = this.value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const requirements = validatePassword(password);
+      
+      updateRequirements(requirements);
+      const passwordsMatch = checkPasswordMatch(password, confirmPassword);
+      
+      // Update next button based on both requirements and match
+      const nextButton = document.getElementById('nextToPanel2');
+      const allValid = allRequirementsMet(requirements) && passwordsMatch;
+      nextButton.disabled = !allValid;
+      nextButton.style.opacity = allValid ? '1' : '0.6';
+    });
+  }
+  
+  if (confirmPasswordInput) {
+    confirmPasswordInput.addEventListener('input', function() {
+      const password = document.getElementById('newPassword').value;
+      const confirmPassword = this.value;
+      const requirements = validatePassword(password);
+      
+      const passwordsMatch = checkPasswordMatch(password, confirmPassword);
+      
+      // Update next button based on both requirements and match
+      const nextButton = document.getElementById('nextToPanel2');
+      const allValid = allRequirementsMet(requirements) && passwordsMatch;
+      nextButton.disabled = !allValid;
+      nextButton.style.opacity = allValid ? '1' : '0.6';
+    });
+  }
+});
+
+// ==================== SECURITY QUESTIONS FORM SUBMISSION ====================
+const securityForm = document.getElementById('securityForm');
+if (securityForm) {
+  securityForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const status = document.getElementById('status');
+    const completeBtn = document.getElementById('completeSetupBtn');
+    
+    // Get security questions and answers
+    const securityQuestions = {
+      question1: {
+        question: document.getElementById('securityQuestion1').options[document.getElementById('securityQuestion1').selectedIndex].text,
+        answer: document.getElementById('securityAnswer1').value.trim()
+      },
+      question2: {
+        question: document.getElementById('securityQuestion2').options[document.getElementById('securityQuestion2').selectedIndex].text,
+        answer: document.getElementById('securityAnswer2').value.trim()
+      },
+      question3: {
+        question: document.getElementById('securityQuestion3').options[document.getElementById('securityQuestion3').selectedIndex].text,
+        answer: document.getElementById('securityAnswer3').value.trim()
+      }
+    };
+
+    // Validate security questions
+    if (!securityQuestions.question1.answer || !securityQuestions.question2.answer || !securityQuestions.question3.answer) {
+      status.textContent = "Please answer all security questions.";
+      status.style.color = "red";
+      return;
+    }
+
+    // Check for duplicate questions
+    const questionValues = [
+      document.getElementById('securityQuestion1').value,
+      document.getElementById('securityQuestion2').value,
+      document.getElementById('securityQuestion3').value
+    ];
+    const uniqueQuestions = [...new Set(questionValues)];
+    if (uniqueQuestions.length < 3) {
+      status.textContent = "Please select different security questions.";
+      status.style.color = "red";
+      return;
+    }
+
+    // Save security questions data
+    securityQuestionsData = {
+      q1: {
+        id: document.getElementById('securityQuestion1').value,
+        question: securityQuestions.question1.question,
+        answer: securityQuestions.question1.answer.toLowerCase()
+      },
+      q2: {
+        id: document.getElementById('securityQuestion2').value,
+        question: securityQuestions.question2.question,
+        answer: securityQuestions.question2.answer.toLowerCase()
+      },
+      q3: {
+        id: document.getElementById('securityQuestion3').value,
+        question: securityQuestions.question3.question,
+        answer: securityQuestions.question3.answer.toLowerCase()
+      }
+    };
+
+    // Disable button and show loading
+    completeBtn.disabled = true;
+    completeBtn.textContent = "Setting up account...";
+    status.textContent = "Setting up your account...";
+    status.style.color = "#8d6c39";
+
+    try {
+      // Update password in Firebase
+      await updatePassword(window.loggedInUser, userPassword);
+      
+      // Save security questions to Firestore
+      await updateDoc(doc(db, "users", window.loggedInUser.uid), {
+        mustChangePassword: false,
+        lastPasswordChange: new Date(),
+        securityQuestions: securityQuestionsData,
+        accountSetupComplete: true
+      });
+      
+      // Success!
+      status.textContent = "✓ Account setup complete! Redirecting...";
+      status.style.color = "green";
+      completeBtn.textContent = "Setup Complete ✓";
+      
+      // Redirect after 2 seconds
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 2000);
+      
+    } catch (error) {
+      console.error("Error setting up account:", error);
+      
+      // Handle Firebase errors
+      let errorMessage = "Error: " + error.message;
+      
+      if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use a stronger password.";
+      } else if (error.code === 'auth/requires-recent-login') {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
+      status.textContent = errorMessage;
+      status.style.color = "red";
+      
+      // Re-enable button
+      completeBtn.disabled = false;
+      completeBtn.textContent = "Complete Setup";
+    }
+  });
+}
+
+// ==================== MODAL FUNCTIONALITY ====================
+const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+const closeModal = document.getElementById('closeModal');
+const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+const resetPasswordBtn = document.getElementById('resetPasswordBtn');
+const resetStatus = document.getElementById('resetStatus');
+const securityQuestionsForm = document.getElementById('securityQuestionsForm');
+const securityResetBtn = document.getElementById('securityResetBtn');
+const securityStatus = document.getElementById('securityStatus');
+
+// Tab switching
+document.querySelectorAll('.tab-button').forEach(button => {
+  button.addEventListener('click', function() {
+    // Update active tab button
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    this.classList.add('active');
+    
+    // Show corresponding tab content
+    const tabId = this.getAttribute('data-tab');
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.classList.remove('active');
+    });
+    document.getElementById(tabId).classList.add('active');
+    
+    // Reset forms
+    if (tabId === 'email-tab') {
+      forgotPasswordForm.reset();
+      resetStatus.textContent = '';
+    } else {
+      securityQuestionsForm.reset();
+      securityStatus.textContent = '';
+      document.getElementById('securityQuestionsContainer').style.display = 'none';
+      document.getElementById('newPasswordSection').style.display = 'none';
+      securityResetBtn.style.display = 'none';
+    }
+  });
+});
+
+// Open modal when "Forgot Password" is clicked
+forgotPasswordLink.addEventListener('click', function(e) {
+  e.preventDefault();
+  forgotPasswordModal.style.display = 'flex';
+  resetStatus.textContent = '';
+  resetStatus.className = 'modal-status';
+  securityStatus.textContent = '';
+  securityStatus.className = 'modal-status';
+  forgotPasswordForm.reset();
+  securityQuestionsForm.reset();
+  document.getElementById('securityQuestionsContainer').style.display = 'none';
+  document.getElementById('newPasswordSection').style.display = 'none';
+  securityResetBtn.style.display = 'none';
+});
+
+// Close modal when X is clicked
+closeModal.addEventListener('click', function() {
+  forgotPasswordModal.style.display = 'none';
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+  if (e.target === forgotPasswordModal) {
+    forgotPasswordModal.style.display = 'none';
+  }
+});
+
+// Handle email reset form submission
+forgotPasswordForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('resetEmail').value;
+  const resetBtn = document.getElementById('resetPasswordBtn');
+  
+  if (!email) {
+    resetStatus.textContent = 'Please enter your email address.';
+    resetStatus.className = 'modal-status modal-error';
+    return;
+  }
+  
+  // Disable button and show loading
+  resetBtn.disabled = true;
+  resetBtn.textContent = 'Sending...';
+  resetStatus.textContent = 'Sending reset link...';
+  resetStatus.className = 'modal-status';
+  
+  try {
+    await sendPasswordResetEmail(auth, email);
+    
+    // Success
+    resetStatus.textContent = '✓ Password reset link sent! Check your email.';
+    resetStatus.className = 'modal-status modal-success';
+    resetBtn.textContent = 'Link Sent ✓';
+    
+    // Auto-close modal after 3 seconds
+    setTimeout(() => {
+      forgotPasswordModal.style.display = 'none';
+      resetBtn.disabled = false;
+      resetBtn.textContent = 'Send Reset Link';
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Password reset error:', error);
+    
+    // Handle different Firebase errors
+    let errorMessage = 'Error sending reset link. Please try again.';
+    
+    if (error.code === 'auth/user-not-found') {
+      errorMessage = 'No account found with this email address.';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage = 'Invalid email address format.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many attempts. Please try again later.';
+    } else if (error.code === 'auth/network-request-failed') {
+      errorMessage = 'Network error. Please check your connection.';
+    }
+    
+    resetStatus.textContent = errorMessage;
+    resetStatus.className = 'modal-status modal-error';
+    
+    // Re-enable button
+    resetBtn.disabled = false;
+    resetBtn.textContent = 'Send Reset Link';
+  }
+});
+
+// Handle security questions form - email input
+document.getElementById('securityEmail').addEventListener('input', async function() {
+  const email = this.value;
+  
+  if (email) {
+    try {
+      // Find user by email in Firestore
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", email));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        if (userData.securityQuestions && Object.keys(userData.securityQuestions).length >= 2) {
+          // User has security questions set up
+          document.getElementById('securityQuestionsContainer').style.display = 'block';
+          document.getElementById('securityQuestionsContainer').innerHTML = '';
+          
+          // Load security questions (show 2 random ones)
+          const questions = userData.securityQuestions;
+          const questionKeys = Object.keys(questions);
+          const selectedQuestions = [];
+          
+          // Randomly select 2 questions
+          while (selectedQuestions.length < 2 && selectedQuestions.length < questionKeys.length) {
+            const randomKey = questionKeys[Math.floor(Math.random() * questionKeys.length)];
+            if (!selectedQuestions.includes(randomKey)) {
+              selectedQuestions.push(randomKey);
+            }
+          }
+          
+          // Display selected questions
+          selectedQuestions.forEach((questionKey, index) => {
+            const container = document.createElement('div');
+            container.className = 'security-question-item';
+            container.innerHTML = `
+              <label class="security-question-label">${questions[questionKey].question}</label>
+              <input type="text" 
+                     class="modal-input security-answer-input" 
+                     placeholder="Your answer" 
+                     required 
+                     data-question="${questionKey}"
+                     style="margin-top: 8px;" />
+            `;
+            document.getElementById('securityQuestionsContainer').appendChild(container);
+          });
+          
+          securityStatus.textContent = `Please answer ${selectedQuestions.length} security questions.`;
+          securityStatus.className = 'modal-status';
+          
+        } else {
+          securityStatus.textContent = 'No security questions found for this account. Please use email reset.';
+          securityStatus.className = 'modal-status modal-error';
+        }
+      } else {
+        securityStatus.textContent = 'No account found with this email address.';
+        securityStatus.className = 'modal-status modal-error';
+      }
+    } catch (error) {
+      console.error('Error checking security questions:', error);
+      securityStatus.textContent = 'Error checking account. Please try again.';
+      securityStatus.className = 'modal-status modal-error';
+    }
+  }
+});
+
+// Handle security question answers
+document.getElementById('securityQuestionsContainer').addEventListener('input', function() {
+  const answers = document.querySelectorAll('.security-answer-input');
+  let allAnswered = true;
+  
+  answers.forEach(input => {
+    if (!input.value.trim()) {
+      allAnswered = false;
+    }
+  });
+  
+  if (allAnswered && answers.length >= 2) {
+    document.getElementById('newPasswordSection').style.display = 'block';
+    securityResetBtn.style.display = 'block';
+  }
+});
+
+// Handle security questions password reset
+securityQuestionsForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('securityEmail').value;
+  const newPassword = document.getElementById('securityNewPassword').value;
+  const confirmPassword = document.getElementById('securityConfirmPassword').value;
+  
+  if (!email) {
+    securityStatus.textContent = 'Please enter your email address.';
+    securityStatus.className = 'modal-status modal-error';
+    return;
+  }
+  
+  // Check password strength
+  const requirements = validatePassword(newPassword);
+  if (!allRequirementsMet(requirements)) {
+    securityStatus.textContent = 'Password does not meet requirements.';
+    securityStatus.className = 'modal-status modal-error';
+    return;
+  }
+  
+  if (newPassword !== confirmPassword) {
+    securityStatus.textContent = 'Passwords do not match.';
+    securityStatus.className = 'modal-status modal-error';
+    return;
+  }
+  
+  // Disable button and show loading
+  securityResetBtn.disabled = true;
+  securityResetBtn.textContent = 'Verifying...';
+  securityStatus.textContent = 'Verifying answers...';
+  securityStatus.className = 'modal-status';
+  
+  try {
+    // Find user and verify answers
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      const user = auth.currentUser;
+      
+      if (userData.securityQuestions) {
+        const answers = document.querySelectorAll('.security-answer-input');
+        let allCorrect = true;
+        
+        answers.forEach(input => {
+          const questionKey = input.getAttribute('data-question');
+          const userAnswer = input.value.trim().toLowerCase();
+          const correctAnswer = userData.securityQuestions[questionKey]?.answer?.toLowerCase();
+          
+          if (userAnswer !== correctAnswer) {
+            allCorrect = false;
+          }
+        });
+        
+        if (allCorrect) {
+          // Answers are correct, update password
+          await updatePassword(user, newPassword);
+          
+          securityStatus.textContent = '✓ Password reset successfully!';
+          securityStatus.className = 'modal-status modal-success';
+          securityResetBtn.textContent = 'Reset Successful ✓';
+          
+          setTimeout(() => {
+            forgotPasswordModal.style.display = 'none';
+            securityResetBtn.disabled = false;
+            securityResetBtn.textContent = 'Reset Password';
+          }, 2000);
+          
+        } else {
+          securityStatus.textContent = 'Incorrect answers. Please try again.';
+          securityStatus.className = 'modal-status modal-error';
+          securityResetBtn.disabled = false;
+          securityResetBtn.textContent = 'Reset Password';
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Security questions reset error:', error);
+    securityStatus.textContent = 'Error resetting password. Please try again.';
+    securityStatus.className = 'modal-status modal-error';
+    securityResetBtn.disabled = false;
+    securityResetBtn.textContent = 'Reset Password';
+  }
+});
+
+// ==================== LOGIN FORM SUBMISSION ====================
 const loginForm = document.getElementById('loginForm');
 loginForm.addEventListener('submit', async function(e) {
   e.preventDefault();
@@ -89,7 +1110,7 @@ loginForm.addEventListener('submit', async function(e) {
           window.location.href = "PM-dashboard.html";
           break;
         default:
-          window.location.href = "DASHBOARD.html";
+          window.location.href = "dashboard.html";
       }
     } else {
       status.innerText = "No role found for this user.";
@@ -98,28 +1119,6 @@ loginForm.addEventListener('submit', async function(e) {
     status.innerText = "Email or Password is incorrect please try again";
   }
 });
-
-const changePasswordForm = document.getElementById('changePasswordForm');
-changePasswordForm.addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const newPassword = document.getElementById('newPassword').value;
-  const status = document.getElementById('status');
-
-  try {
-    await updatePassword(window.loggedInUser, newPassword);
-    await updateDoc(doc(db, "users", window.loggedInUser.uid), {
-      mustChangePassword: false
-    });
-    status.textContent = "Password changed successfully! Redirecting...";
-    setTimeout(() => {
-      window.location.href = "DASHBOARD.html";
-    }, 1500);
-  } catch (error) {
-    status.textContent = "Error: " + error.message;
-  }
-});
 </script>
-
 </body>
 </html>
-
