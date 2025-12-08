@@ -1078,466 +1078,557 @@
 
     // ======================== MAINTENANCE REQUESTS LOGIC ========================
     function initMaintenanceRequests() {
-      const maintenanceList = document.getElementById("maintenanceList");
-      const statusFilter = document.getElementById("statusFilter");
-      const personnelFilter = document.getElementById("personnelFilter");
-      const maintenanceSearch = document.getElementById("maintenanceSearch");
-      const sortBy = document.getElementById("sortBy");
-      const resetFilters = document.getElementById("resetFilters");
-      const maintenanceStats = document.getElementById("maintenanceStats");
-      const requestCount = document.getElementById("requestCount");
-      const pendingCountEl = document.getElementById("pendingCount");
-      const completeCountEl = document.getElementById("completeCount");
+        const maintenanceList = document.getElementById("maintenanceList");
+        const statusFilter = document.getElementById("statusFilter");
+        const personnelFilter = document.getElementById("personnelFilter");
+        const maintenanceSearch = document.getElementById("maintenanceSearch");
+        const sortBy = document.getElementById("sortBy");
+        const resetFilters = document.getElementById("resetFilters");
+        const maintenanceStats = document.getElementById("maintenanceStats");
+        const requestCount = document.getElementById("requestCount");
+        const pendingCountEl = document.getElementById("pendingCount");
+        const completeCountEl = document.getElementById("completeCount");
 
-      let allRequests = [];
-      let filteredRequests = [];
-      let assignedPersonnel = new Set();
+        let allRequests = [];
+        let filteredRequests = [];
+        let assignedPersonnel = new Set();
 
-      const drill = window.adminDashboardDrilldown || {};
-      if (drill.maintenanceStatus) {
-        statusFilter.value = drill.maintenanceStatus;
-      }
-      window.adminDashboardDrilldown = null;
+        const drill = window.adminDashboardDrilldown || {};
+        if (drill.maintenanceStatus) {
+            statusFilter.value = drill.maintenanceStatus;
+        }
+        window.adminDashboardDrilldown = null;
 
-      function formatDateTimeAMPM(date) {
-        if (!date) return "N/A";
-        const d = date.toDate ? date.toDate() : date;
-        let hours = d.getHours();
-        const minutes = d.getMinutes().toString().padStart(2, "0");
-        const ampm = hours >= 12 ? "PM" : "AM";
-        hours = hours % 12 || 12;
-        const month = (d.getMonth() + 1).toString().padStart(2, "0");
-        const day = d.getDate().toString().padStart(2, "0");
-        const year = d.getFullYear();
-        return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-      }
+        // Quick Reply Templates - Simple maintenance responses
+        const quickReplies = [
+            "Our maintenance team is on the way.",
+            "A technician has been assigned and will be there soon",
+            "We have scheduled your maintenance as for you request date and time.",
+            "Thank you for your patience we have resolve this matter."
+        ];
 
-      function applyFiltersAndSort() {
-        const statusValue = statusFilter.value;
-        const personnelValue = personnelFilter.value;
-        const searchValue = maintenanceSearch.value.toLowerCase();
-        const sortValue = sortBy.value;
-
-        filteredRequests = [...allRequests];
-
-        if (statusValue !== "all") {
-          filteredRequests = filteredRequests.filter(
-            (r) => r.status === statusValue
-          );
+        function formatDateTimeAMPM(date) {
+            if (!date) return "N/A";
+            const d = date.toDate ? date.toDate() : date;
+            let hours = d.getHours();
+            const minutes = d.getMinutes().toString().padStart(2, "0");
+            const ampm = hours >= 12 ? "PM" : "AM";
+            hours = hours % 12 || 12;
+            const month = (d.getMonth() + 1).toString().padStart(2, "0");
+            const day = d.getDate().toString().padStart(2, "0");
+            const year = d.getFullYear();
+            return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
         }
 
-        if (personnelValue !== "all") {
-          if (personnelValue === "unassigned") {
-            filteredRequests = filteredRequests.filter(
-              (r) => !r.maintenanceName || !r.maintenanceName.trim()
-            );
-          } else {
-            filteredRequests = filteredRequests.filter(
-              (r) => r.maintenanceName === personnelValue
-            );
-          }
-        }
+        function applyFiltersAndSort() {
+            const statusValue = statusFilter.value;
+            const personnelValue = personnelFilter.value;
+            const searchValue = maintenanceSearch.value.toLowerCase();
+            const sortValue = sortBy.value;
 
-        if (searchValue) {
-          filteredRequests = filteredRequests.filter((r) => {
-            const emailMatch =
-              r.tenantEmail &&
-              r.tenantEmail.toLowerCase().includes(searchValue);
-            const unitMatch =
-              r.unitNumber &&
-              r.unitNumber.toLowerCase().includes(searchValue);
-            const problemMatch =
-              r.problem &&
-              r.problem.toLowerCase().includes(searchValue);
-            const commentMatch =
-              r.comment &&
-              r.comment.toLowerCase().includes(searchValue);
-            return emailMatch || unitMatch || problemMatch || commentMatch;
-          });
-        }
+            filteredRequests = [...allRequests];
 
-        filteredRequests.sort((a, b) => {
-          const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
-          const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
-          switch (sortValue) {
-            case "date-desc":
-              return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
-            case "date-asc":
-              return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-            case "unit-asc":
-              return (a.unitNumber || "").localeCompare(
-                b.unitNumber || ""
-              );
-            case "unit-desc":
-              return (b.unitNumber || "").localeCompare(
-                a.unitNumber || ""
-              );
-            case "email-asc":
-              return (a.tenantEmail || "").localeCompare(
-                b.tenantEmail || ""
-              );
-            case "email-desc":
-              return (b.tenantEmail || "").localeCompare(
-                a.tenantEmail || ""
-              );
-            default:
-              return 0;
-          }
-        });
-
-        renderMaintenanceRequests();
-      }
-
-      function renderMaintenanceRequests() {
-        if (!filteredRequests.length) {
-          maintenanceList.innerHTML =
-            "<p>No maintenance requests found matching your criteria.</p>";
-          maintenanceStats.style.display = "none";
-          return;
-        }
-
-        maintenanceList.innerHTML = "";
-        assignedPersonnel.clear();
-
-        let pending = 0;
-        let complete = 0;
-
-        filteredRequests.forEach((request) => {
-          const data = request;
-          const id = data.id;
-
-          if (data.status === "Pending") pending++;
-          if (data.status === "Complete") complete++;
-
-          const card = document.createElement("div");
-          card.className = "maintenance-card";
-
-          const attachmentsHTML =
-            data.imageUrls &&
-            Array.isArray(data.imageUrls) &&
-            data.imageUrls.length > 0
-              ? `
-              <div style="margin-top:6px;">
-                <strong>Attachments:</strong><br/>
-                <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                  <img src="${
-                    data.imageUrls[0]
-                  }" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                  ${
-                    data.imageUrls.length > 1
-                      ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
-                          background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                        <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
-                          background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
-                      : ""
-                  }
-                </div>
-              </div>`
-              : "";
-
-          card.innerHTML = `
-            <h3>${data.problem || "Unknown Issue"}</h3>
-            <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-              <div style="flex:1; min-width:220px;">
-                <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                <p><strong>Unit Number:</strong> ${data.unitNumber|| "N/A"}</p>
-                <p><strong>Details:</strong> ${
-                  data.comment || "No additional details."
-                }</p>
-                <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(
-                  data.preferredVisitTime
-                )}</p>
-                <p><strong>Status:</strong> ${data.status || "Pending"}</p>
-                <p><strong>Maintenance Personnel:</strong> ${
-                  data.maintenanceName || "Not assigned"
-                }</p>
-                <p><strong>Submitted:</strong> ${formatDateTimeAMPM(
-                  data.timestamp
-                )}</p>
-              </div>
-              <div style="min-width:220px;">
-                ${attachmentsHTML}
-              </div>
-            </div>
-          `;
-
-          const actionsDiv = document.createElement("div");
-          actionsDiv.className = "maintenance-card-actions";
-
-          const statusSelect = document.createElement("select");
-          ["Pending", "Complete"].forEach((option) => {
-            const opt = document.createElement("option");
-            opt.value = option;
-            opt.textContent = option;
-            if (data.status === option) opt.selected = true;
-            statusSelect.appendChild(opt);
-          });
-
-          const personnelSelect = document.createElement("select");
-          const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
-          personnelNames.forEach((name) => {
-            const opt = document.createElement("option");
-            opt.value = name;
-            opt.textContent = name;
-            if (
-              assignedPersonnel.has(name) &&
-              data.maintenanceName !== name &&
-              data.status !== "Complete"
-            ) {
-              opt.disabled = true;
-              opt.textContent += " (Assigned)";
+            if (statusValue !== "all") {
+                filteredRequests = filteredRequests.filter(
+                    (r) => r.status === statusValue
+                );
             }
-            if (data.maintenanceName === name) opt.selected = true;
-            personnelSelect.appendChild(opt);
-          });
 
-          if (
-            data.status !== "Complete" &&
-            data.maintenanceName &&
-            !assignedPersonnel.has(data.maintenanceName)
-          ) {
-            assignedPersonnel.add(data.maintenanceName);
-          }
-
-          const updateBtn = document.createElement("button");
-          updateBtn.textContent = "Update";
-          updateBtn.className = "btn-primary";
-
-          if (data.status === "Complete") {
-            statusSelect.disabled = true;
-            personnelSelect.disabled = true;
-            updateBtn.disabled = true;
-            updateBtn.style.backgroundColor = "#777";
-            updateBtn.style.cursor = "not-allowed";
-          }
-
-          updateBtn.addEventListener("click", async () => {
-            try {
-              await db.collection("maintenanceRequests").doc(id).update({
-                status: statusSelect.value,
-                maintenanceName: personnelSelect.value.trim(),
-                updatedAt:
-                  firebase.firestore.FieldValue.serverTimestamp(),
-              });
-              showPopup("Request updated successfully!");
-            } catch (error) {
-              showPopup("Error updating request: " + error.message);
-            }
-          });
-
-          const respondBtn = document.createElement("button");
-          respondBtn.textContent = "Respond";
-          respondBtn.className = "btn-primary";
-          respondBtn.style.background = "#4a90e2";
-
-          const responseContainer = document.createElement("div");
-          responseContainer.style.marginTop = "8px";
-          responseContainer.style.display = "none";
-
-          const responseTextarea = document.createElement("textarea");
-          responseTextarea.placeholder =
-            "Enter your response message here...";
-          responseTextarea.style.width = "100%";
-          responseTextarea.style.height = "60px";
-          responseTextarea.style.marginBottom = "8px";
-          responseTextarea.style.resize = "vertical";
-
-          const sendResponseBtn = document.createElement("button");
-          sendResponseBtn.textContent = "Send Response";
-          sendResponseBtn.className = "btn-primary";
-          sendResponseBtn.style.background = "#4a90e2";
-
-          responseContainer.appendChild(responseTextarea);
-          responseContainer.appendChild(sendResponseBtn);
-
-          respondBtn.addEventListener("click", () => {
-            responseContainer.style.display =
-              responseContainer.style.display === "none"
-                ? "block"
-                : "none";
-            if (responseContainer.style.display === "block") {
-              responseTextarea.focus();
-            }
-          });
-
-          sendResponseBtn.addEventListener("click", async () => {
-            const msg = responseTextarea.value.trim();
-            if (!msg) {
-              showPopup("Response message cannot be empty.");
-              return;
-            }
-            try {
-              const requestDocRef = db
-                .collection("maintenanceRequests")
-                .doc(id);
-              await requestDocRef.collection("responses").add({
-                adminEmail: auth.currentUser.email,
-                message: msg,
-                timestamp:
-                  firebase.firestore.FieldValue.serverTimestamp(),
-              });
-              await requestDocRef.update({
-                responseTime:
-                  firebase.firestore.FieldValue.serverTimestamp(),
-              });
-              showPopup("Response sent successfully!");
-              responseTextarea.value = "";
-              responseContainer.style.display = "none";
-            } catch (error) {
-              showPopup("Failed to send response: " + error.message);
-            }
-          });
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.textContent = "Delete";
-          deleteBtn.className = "btn-danger";
-
-          deleteBtn.addEventListener("click", () => {
-            showPopup(`
-              <strong>Are you sure?</strong><br>
-              This maintenance request will be permanently deleted.<br><br>
-              <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-                Delete
-              </button>
-              <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-                Cancel
-              </button>
-            `);
-
-            setTimeout(() => {
-              const confirmBtn =
-                document.getElementById("confirmDeleteBtn");
-              if (!confirmBtn) return;
-              confirmBtn.addEventListener("click", async () => {
-                try {
-                  await db.collection("maintenanceRequests")
-                    .doc(id)
-                    .delete();
-                  closePopup();
-                  showPopup("Maintenance request deleted.");
-                } catch (error) {
-                  closePopup();
-                  showPopup("Failed to delete: " + error.message);
+            if (personnelValue !== "all") {
+                if (personnelValue === "unassigned") {
+                    filteredRequests = filteredRequests.filter(
+                        (r) => !r.maintenanceName || !r.maintenanceName.trim()
+                    );
+                } else {
+                    filteredRequests = filteredRequests.filter(
+                        (r) => r.maintenanceName === personnelValue
+                    );
                 }
-              });
-            }, 50);
-          });
-
-          actionsDiv.appendChild(statusSelect);
-          actionsDiv.appendChild(personnelSelect);
-          actionsDiv.appendChild(updateBtn);
-          actionsDiv.appendChild(respondBtn);
-          actionsDiv.appendChild(deleteBtn);
-
-          card.appendChild(actionsDiv);
-          card.appendChild(responseContainer);
-
-          const responsesContainer = document.createElement("div");
-          responsesContainer.style.marginTop = "10px";
-          responsesContainer.style.borderTop = "1px dashed #555";
-          responsesContainer.style.paddingTop = "6px";
-          responsesContainer.innerHTML =
-            "<strong>Response History:</strong><p>Loading...</p>";
-
-          card.appendChild(responsesContainer);
-
-          db.collection("maintenanceRequests")
-            .doc(id)
-            .collection("responses")
-            .orderBy("timestamp", "asc")
-            .onSnapshot((snapshotResp) => {
-              responsesContainer.innerHTML =
-                "<strong>Response History:</strong>";
-              if (snapshotResp.empty) {
-                responsesContainer.innerHTML +=
-                  "<p>No responses yet.</p>";
-              } else {
-                snapshotResp.forEach((r) => {
-                  const rData = r.data();
-                  const rEl = document.createElement("div");
-                  rEl.style.borderBottom = "1px solid #444";
-                  rEl.style.padding = "4px 0";
-                  rEl.innerHTML = `
-                    <strong>${rData.adminEmail || data.tenantEmail}:</strong> ${
-                    rData.message || ""
-                  }<br>
-                    <small style="color:#bdbdbd;">${formatDateTimeAMPM(
-                      rData.timestamp
-                    )}</small>
-                  `;
-                  responsesContainer.appendChild(rEl);
-                });
-              }
-            });
-
-          maintenanceList.appendChild(card);
-
-          // image slider
-          if (
-            data.imageUrls &&
-            Array.isArray(data.imageUrls) &&
-            data.imageUrls.length > 1
-          ) {
-            let currentIndex = 0;
-            const imgEl = card.querySelector(`#img-${id}`);
-            const prevBtn = card.querySelector(".prev-btn");
-            const nextBtn = card.querySelector(".next-btn");
-
-            prevBtn.addEventListener("click", () => {
-              currentIndex =
-                (currentIndex - 1 + data.imageUrls.length) %
-                data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-
-            nextBtn.addEventListener("click", () => {
-              currentIndex =
-                (currentIndex + 1) % data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-          }
-        });
-
-        requestCount.textContent = filteredRequests.length;
-        pendingCountEl.textContent = pending;
-        completeCountEl.textContent = complete;
-        maintenanceStats.style.display = "block";
-      }
-
-      db.collection("maintenanceRequests")
-        .orderBy("timestamp", "desc")
-        .onSnapshot(
-          (snapshot) => {
-            if (snapshot.empty) {
-              allRequests = [];
-              filteredRequests = [];
-              maintenanceList.innerHTML =
-                "<p>No maintenance requests found.</p>";
-              maintenanceStats.style.display = "none";
-              return;
             }
-            allRequests = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            }));
-            applyFiltersAndSort();
-          },
-          (error) => {
-            maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-          }
-        );
 
-      statusFilter.addEventListener("change", applyFiltersAndSort);
-      personnelFilter.addEventListener("change", applyFiltersAndSort);
-      maintenanceSearch.addEventListener("input", applyFiltersAndSort);
-      sortBy.addEventListener("change", applyFiltersAndSort);
-      resetFilters.addEventListener("click", () => {
-        statusFilter.value = "all";
-        personnelFilter.value = "all";
-        maintenanceSearch.value = "";
-        sortBy.value = "date-desc";
-        applyFiltersAndSort();
-      });
+            if (searchValue) {
+                filteredRequests = filteredRequests.filter((r) => {
+                    const emailMatch =
+                        r.tenantEmail &&
+                        r.tenantEmail.toLowerCase().includes(searchValue);
+                    const unitMatch =
+                        r.unitNumber &&
+                        r.unitNumber.toLowerCase().includes(searchValue);
+                    const problemMatch =
+                        r.problem &&
+                        r.problem.toLowerCase().includes(searchValue);
+                    const commentMatch =
+                        r.comment &&
+                        r.comment.toLowerCase().includes(searchValue);
+                    return emailMatch || unitMatch || problemMatch || commentMatch;
+                });
+            }
+
+            filteredRequests.sort((a, b) => {
+                const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+                const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+                switch (sortValue) {
+                    case "date-desc":
+                        return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+                    case "date-asc":
+                        return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+                    case "unit-asc":
+                        return (a.unitNumber || "").localeCompare(
+                            b.unitNumber || ""
+                        );
+                    case "unit-desc":
+                        return (b.unitNumber || "").localeCompare(
+                            a.unitNumber || ""
+                        );
+                    case "email-asc":
+                        return (a.tenantEmail || "").localeCompare(
+                            b.tenantEmail || ""
+                        );
+                    case "email-desc":
+                        return (b.tenantEmail || "").localeCompare(
+                            a.tenantEmail || ""
+                        );
+                    default:
+                        return 0;
+                }
+            });
+
+            renderMaintenanceRequests();
+        }
+
+        function renderMaintenanceRequests() {
+            if (!filteredRequests.length) {
+                maintenanceList.innerHTML =
+                    "<p>No maintenance requests found matching your criteria.</p>";
+                maintenanceStats.style.display = "none";
+                return;
+            }
+
+            maintenanceList.innerHTML = "";
+            assignedPersonnel.clear();
+
+            let pending = 0;
+            let complete = 0;
+
+            filteredRequests.forEach((request) => {
+                const data = request;
+                const id = data.id;
+
+                if (data.status === "Pending") pending++;
+                if (data.status === "Complete") complete++;
+
+                const card = document.createElement("div");
+                card.className = "maintenance-card";
+
+                const attachmentsHTML =
+                    data.imageUrls &&
+                    Array.isArray(data.imageUrls) &&
+                    data.imageUrls.length > 0
+                        ? `
+                    <div style="margin-top:6px;">
+                        <strong>Attachments:</strong><br/>
+                        <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                            <img src="${
+                                data.imageUrls[0]
+                            }" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                            ${
+                                data.imageUrls.length > 1
+                                    ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
+                                    background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                                <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
+                                    background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
+                                    : ""
+                            }
+                        </div>
+                    </div>`
+                        : "";
+
+                card.innerHTML = `
+                    <h3>${data.problem || "Unknown Issue"}</h3>
+                    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:220px;">
+                            <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                            <p><strong>Unit Number:</strong> ${data.unitNumber|| "N/A"}</p>
+                            <p><strong>Details:</strong> ${
+                                data.comment || "No additional details."
+                            }</p>
+                            <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(
+                                data.preferredVisitTime
+                            )}</p>
+                            <p><strong>Status:</strong> ${data.status || "Pending"}</p>
+                            <p><strong>Maintenance Personnel:</strong> ${
+                                data.maintenanceName || "Not assigned"
+                            }</p>
+                            <p><strong>Submitted:</strong> ${formatDateTimeAMPM(
+                                data.timestamp
+                            )}</p>
+                        </div>
+                        <div style="min-width:220px;">
+                            ${attachmentsHTML}
+                        </div>
+                    </div>
+                `;
+
+                const actionsDiv = document.createElement("div");
+                actionsDiv.className = "maintenance-card-actions";
+
+                const statusSelect = document.createElement("select");
+                ["Pending", "Complete"].forEach((option) => {
+                    const opt = document.createElement("option");
+                    opt.value = option;
+                    opt.textContent = option;
+                    if (data.status === option) opt.selected = true;
+                    statusSelect.appendChild(opt);
+                });
+
+                const personnelSelect = document.createElement("select");
+                const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
+                personnelNames.forEach((name) => {
+                    const opt = document.createElement("option");
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (
+                        assignedPersonnel.has(name) &&
+                        data.maintenanceName !== name &&
+                        data.status !== "Complete"
+                    ) {
+                        opt.disabled = true;
+                        opt.textContent += " (Assigned)";
+                    }
+                    if (data.maintenanceName === name) opt.selected = true;
+                    personnelSelect.appendChild(opt);
+                });
+
+                if (
+                    data.status !== "Complete" &&
+                    data.maintenanceName &&
+                    !assignedPersonnel.has(data.maintenanceName)
+                ) {
+                    assignedPersonnel.add(data.maintenanceName);
+                }
+
+                const updateBtn = document.createElement("button");
+                updateBtn.textContent = "Update";
+                updateBtn.className = "btn-primary";
+
+                if (data.status === "Complete") {
+                    statusSelect.disabled = true;
+                    personnelSelect.disabled = true;
+                    updateBtn.disabled = true;
+                    updateBtn.style.backgroundColor = "#777";
+                    updateBtn.style.cursor = "not-allowed";
+                }
+
+                updateBtn.addEventListener("click", async () => {
+                    try {
+                        await db.collection("maintenanceRequests").doc(id).update({
+                            status: statusSelect.value,
+                            maintenanceName: personnelSelect.value.trim(),
+                            updatedAt:
+                                firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                        showPopup("Request updated successfully!");
+                    } catch (error) {
+                        showPopup("Error updating request: " + error.message);
+                    }
+                });
+
+                const respondBtn = document.createElement("button");
+                respondBtn.textContent = "Respond";
+                respondBtn.className = "btn-primary";
+                respondBtn.style.background = "#4a90e2";
+
+                const responseContainer = document.createElement("div");
+                responseContainer.style.marginTop = "8px";
+                responseContainer.style.display = "none";
+
+                // Quick Reply Templates - Matching inquiry tab style
+                const quickReplyContainer = document.createElement("div");
+                quickReplyContainer.style.marginBottom = "15px";
+                
+                const quickReplyTitle = document.createElement("p");
+                quickReplyTitle.innerHTML = "<strong style='color: #b3b3b3; font-size: 14px; margin: 0 0 8px 0;'>Quick Replies:</strong>";
+                quickReplyContainer.appendChild(quickReplyTitle);
+
+                // Create quick reply buttons - EXACT styling from inquiry tab
+                const quickReplyButtons = document.createElement("div");
+                quickReplyButtons.style.display = "flex";
+                quickReplyButtons.style.gap = "10px";
+                quickReplyButtons.style.flexWrap = "wrap";
+
+                quickReplies.forEach((replyText, index) => {
+                    const quickBtn = document.createElement("button");
+                    quickBtn.className = "maintenanceQuickReplyBtn";
+                    quickBtn.textContent = `Reply ${index + 1}`;
+                    quickBtn.title = replyText;
+                    quickBtn.setAttribute("data-template", index);
+                    
+                    // Apply exact same styling as inquiry tab buttons
+                    quickBtn.style.padding = "6px 12px";
+                    quickBtn.style.border = "1px solid";
+                    quickBtn.style.borderRadius = "4px";
+                    quickBtn.style.cursor = "pointer";
+                    quickBtn.style.fontSize = "12px";
+                    quickBtn.style.transition = "all 0.2s";
+                    
+                    // Different colors for different types (matching inquiry tab pattern)
+                    if (index === 0) { // "on the way"
+                        quickBtn.style.background = "#e8f5e9";
+                        quickBtn.style.color = "#2e7d32";
+                        quickBtn.style.borderColor = "#c8e6c9";
+                    } else if (index === 1) { // "assigned"
+                        quickBtn.style.background = "#e3f2fd";
+                        quickBtn.style.color = "#1565c0";
+                        quickBtn.style.borderColor = "#bbdefb";
+                    } else if (index === 2) { // "scheduled"
+                        quickBtn.style.background = "#fff3e0";
+                        quickBtn.style.color = "#a57934";
+                        quickBtn.style.borderColor = "#ffe0b2";
+                    } else if (index === 3) { // "details"
+                        quickBtn.style.background = "#e3f2fd";
+                        quickBtn.style.color = "#1976D2";
+                        quickBtn.style.borderColor = "#bbdefb";
+                    } else if (index === 4) { // "thank you"
+                        quickBtn.style.background = "#f3e5f5";
+                        quickBtn.style.color = "#7b1fa2";
+                        quickBtn.style.borderColor = "#e1bee7";
+                    }
+                    
+                    quickBtn.addEventListener("mouseenter", () => {
+                        quickBtn.style.opacity = "0.9";
+                        quickBtn.style.transform = "translateY(-1px)";
+                    });
+                    
+                    quickBtn.addEventListener("mouseleave", () => {
+                        quickBtn.style.opacity = "1";
+                        quickBtn.style.transform = "translateY(0)";
+                    });
+                    
+                    quickBtn.addEventListener("click", () => {
+                        responseTextarea.value = replyText;
+                        responseTextarea.focus();
+                        // Add slight feedback
+                        quickBtn.style.transform = "scale(0.98)";
+                        setTimeout(() => {
+                            quickBtn.style.transform = "scale(1)";
+                        }, 150);
+                    });
+                    
+                    quickReplyButtons.appendChild(quickBtn);
+                });
+                
+                quickReplyContainer.appendChild(quickReplyButtons);
+
+                const responseTextarea = document.createElement("textarea");
+                responseTextarea.placeholder =
+                    "Enter your response message here...";
+                responseTextarea.style.width = "100%";
+                responseTextarea.style.height = "60px";
+                responseTextarea.style.marginBottom = "8px";
+                responseTextarea.style.resize = "vertical";
+                responseTextarea.style.padding = "10px";
+                responseTextarea.style.border = "1px solid rgba(255,255,255,0.1)";
+                responseTextarea.style.borderRadius = "4px";
+                responseTextarea.style.background = "#181818";
+                responseTextarea.style.color = "#f7f7f7";
+
+                const sendResponseBtn = document.createElement("button");
+                sendResponseBtn.textContent = "Send Response";
+                sendResponseBtn.className = "btn-primary";
+                sendResponseBtn.style.background = "#4a90e2";
+
+                responseContainer.appendChild(quickReplyContainer);
+                responseContainer.appendChild(responseTextarea);
+                responseContainer.appendChild(sendResponseBtn);
+
+                respondBtn.addEventListener("click", () => {
+                    responseContainer.style.display =
+                        responseContainer.style.display === "none"
+                            ? "block"
+                            : "none";
+                    if (responseContainer.style.display === "block") {
+                        responseTextarea.focus();
+                    }
+                });
+
+                sendResponseBtn.addEventListener("click", async () => {
+                    const msg = responseTextarea.value.trim();
+                    if (!msg) {
+                        showPopup("Response message cannot be empty.");
+                        return;
+                    }
+                    try {
+                        const requestDocRef = db
+                            .collection("maintenanceRequests")
+                            .doc(id);
+                        await requestDocRef.collection("responses").add({
+                            adminEmail: auth.currentUser.email,
+                            message: msg,
+                            timestamp:
+                                firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                        await requestDocRef.update({
+                            responseTime:
+                                firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                        showPopup("Response sent successfully!");
+                        responseTextarea.value = "";
+                        responseContainer.style.display = "none";
+                    } catch (error) {
+                        showPopup("Failed to send response: " + error.message);
+                    }
+                });
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.textContent = "Delete";
+                deleteBtn.className = "btn-danger";
+
+                deleteBtn.addEventListener("click", () => {
+                    showPopup(`
+                        <strong>Are you sure?</strong><br>
+                        This maintenance request will be permanently deleted.<br><br>
+                        <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+                            Delete
+                        </button>
+                        <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+                            Cancel
+                        </button>
+                    `);
+
+                    setTimeout(() => {
+                        const confirmBtn =
+                            document.getElementById("confirmDeleteBtn");
+                        if (!confirmBtn) return;
+                        confirmBtn.addEventListener("click", async () => {
+                            try {
+                                await db.collection("maintenanceRequests")
+                                    .doc(id)
+                                    .delete();
+                                closePopup();
+                                showPopup("Maintenance request deleted.");
+                            } catch (error) {
+                                closePopup();
+                                showPopup("Failed to delete: " + error.message);
+                            }
+                        });
+                    }, 50);
+                });
+
+                actionsDiv.appendChild(statusSelect);
+                actionsDiv.appendChild(personnelSelect);
+                actionsDiv.appendChild(updateBtn);
+                actionsDiv.appendChild(respondBtn);
+                actionsDiv.appendChild(deleteBtn);
+
+                card.appendChild(actionsDiv);
+                card.appendChild(responseContainer);
+
+                const responsesContainer = document.createElement("div");
+                responsesContainer.style.marginTop = "10px";
+                responsesContainer.style.borderTop = "1px dashed #555";
+                responsesContainer.style.paddingTop = "6px";
+                responsesContainer.innerHTML =
+                    "<strong>Response History:</strong><p>Loading...</p>";
+
+                card.appendChild(responsesContainer);
+
+                db.collection("maintenanceRequests")
+                    .doc(id)
+                    .collection("responses")
+                    .orderBy("timestamp", "asc")
+                    .onSnapshot((snapshotResp) => {
+                        responsesContainer.innerHTML =
+                            "<strong>Response History:</strong>";
+                        if (snapshotResp.empty) {
+                            responsesContainer.innerHTML +=
+                                "<p>No responses yet.</p>";
+                        } else {
+                            snapshotResp.forEach((r) => {
+                                const rData = r.data();
+                                const rEl = document.createElement("div");
+                                rEl.style.borderBottom = "1px solid #444";
+                                rEl.style.padding = "4px 0";
+                                rEl.innerHTML = `
+                                    <strong>${rData.adminEmail || data.tenantEmail}:</strong> ${
+                                    rData.message || ""
+                                }<br>
+                                    <small style="color:#bdbdbd;">${formatDateTimeAMPM(
+                                        rData.timestamp
+                                    )}</small>
+                                `;
+                                responsesContainer.appendChild(rEl);
+                            });
+                        }
+                    });
+
+                maintenanceList.appendChild(card);
+
+                // image slider
+                if (
+                    data.imageUrls &&
+                    Array.isArray(data.imageUrls) &&
+                    data.imageUrls.length > 1
+                ) {
+                    let currentIndex = 0;
+                    const imgEl = card.querySelector(`#img-${id}`);
+                    const prevBtn = card.querySelector(".prev-btn");
+                    const nextBtn = card.querySelector(".next-btn");
+
+                    prevBtn.addEventListener("click", () => {
+                        currentIndex =
+                            (currentIndex - 1 + data.imageUrls.length) %
+                            data.imageUrls.length;
+                        imgEl.src = data.imageUrls[currentIndex];
+                    });
+
+                    nextBtn.addEventListener("click", () => {
+                        currentIndex =
+                            (currentIndex + 1) % data.imageUrls.length;
+                        imgEl.src = data.imageUrls[currentIndex];
+                    });
+                }
+            });
+
+            requestCount.textContent = filteredRequests.length;
+            pendingCountEl.textContent = pending;
+            completeCountEl.textContent = complete;
+            maintenanceStats.style.display = "block";
+        }
+
+        db.collection("maintenanceRequests")
+            .orderBy("timestamp", "desc")
+            .onSnapshot(
+                (snapshot) => {
+                    if (snapshot.empty) {
+                        allRequests = [];
+                        filteredRequests = [];
+                        maintenanceList.innerHTML =
+                            "<p>No maintenance requests found.</p>";
+                        maintenanceStats.style.display = "none";
+                        return;
+                    }
+                    allRequests = snapshot.docs.map((docSnap) => ({
+                        id: docSnap.id,
+                        ...docSnap.data(),
+                    }));
+                    applyFiltersAndSort();
+                },
+                (error) => {
+                    maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+                }
+            );
+
+        statusFilter.addEventListener("change", applyFiltersAndSort);
+        personnelFilter.addEventListener("change", applyFiltersAndSort);
+        maintenanceSearch.addEventListener("input", applyFiltersAndSort);
+        sortBy.addEventListener("change", applyFiltersAndSort);
+        resetFilters.addEventListener("click", () => {
+            statusFilter.value = "all";
+            personnelFilter.value = "all";
+            maintenanceSearch.value = "";
+            sortBy.value = "date-desc";
+            applyFiltersAndSort();
+        });
     }
 
     // ======================== UNIT OWNER CREATION LOGIC ========================
@@ -2152,3 +2243,4 @@
   </div>
 </body>
 </html>
+
