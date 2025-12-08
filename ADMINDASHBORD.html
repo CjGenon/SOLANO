@@ -42,6 +42,11 @@
   </main>
 
   <!-- ======================== FIREBASE & CHART.JS ======================== -->
+   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  emailjs.init("lqyGatNXQhoDJsu2B"); 
+</script>
+
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -353,8 +358,7 @@
                     <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
                       <option value="">-- Select Unit Number --</option>
                     </select>
-                    <button type="button" class="removeUnitBtn" class="btn-danger"
-                      style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
+                    <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">
                       X
                     </button>
                   </div>
@@ -370,10 +374,19 @@
                   </button>
                 </div>
               </form>
+
+              <!-- NEW: Container to show the list of created unit owners -->
+              <div id="unitOwnersList" style="margin-top: 20px;">
+                <h3>Created Unit Owners</h3>
+                <ul id="unitOwnersUl" style="list-style-type:none; padding-left:0; max-height:300px; overflow-y:auto; border:1px solid #ccc; padding:10px; border-radius:6px;">
+                  <li>Loading...</li>
+                </ul>
+              </div>
             </div>
           `;
           initUnitOwnerCreation();
           break;
+
 
         case "Feedback Received":
           area.innerHTML = `
@@ -1227,7 +1240,7 @@
             <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
               <div style="flex:1; min-width:220px;">
                 <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
+                <p><strong>Unit Number:</strong> ${data.unitNumber|| "N/A"}</p>
                 <p><strong>Details:</strong> ${
                   data.comment || "No additional details."
                 }</p>
@@ -1445,7 +1458,7 @@
                   rEl.style.borderBottom = "1px solid #444";
                   rEl.style.padding = "4px 0";
                   rEl.innerHTML = `
-                    <strong>${rData.adminEmail || "Admin"}:</strong> ${
+                    <strong>${rData.adminEmail || data.tenantEmail}:</strong> ${
                     rData.message || ""
                   }<br>
                     <small style="color:#bdbdbd;">${formatDateTimeAMPM(
@@ -1529,253 +1542,340 @@
 
     // ======================== UNIT OWNER CREATION LOGIC ========================
     function initUnitOwnerCreation() {
-      const adminEmail = "adminaccount@solano.com";
-      const adminPassword = "123456";
+    const adminEmail = "adminaccount@solano.com";
+    const adminPassword = "123456";
 
-      function generatePassword() {
-        const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const lowercase = "abcdefghijklmnopqrstuvwxyz";
-        const numbers = "0123456789";
+    // ⭐ EMAILJS INITIALIZATION
+    emailjs.init("lqyGatNXQhoDJsu2B");
 
-        let password = "";
-        password += uppercase[Math.floor(Math.random() * uppercase.length)];
-        password += lowercase[Math.floor(Math.random() * lowercase.length)];
-        password += numbers[Math.floor(Math.random() * numbers.length)];
+    // ⭐ SEND EMAIL TO TENANT AFTER ACCOUNT CREATION
+    async function sendAccountEmail(recipient, email, password, units) {
+      try {
+        await emailjs.send("service_izx63bb", "template_p7zetfj", {
+          to_email: recipient,
+          tenant_email: email,
+          tenant_password: password,
+          unit_numbers: units.join(", "),
+          login_link: "https://cjgenon.github.io/SOLANO/LogIn.html"  // <-- add your real login page URL here
+        });
+        console.log("Email sent successfully");
+      } catch (error) {
+        console.error("EmailJS Error:", error);
+      }
+    }
 
-        const allChars = uppercase + lowercase + numbers;
-        for (let i = 3; i < 8; i++) {
-          password += allChars[Math.floor(Math.random() * allChars.length)];
-        }
+    function generatePassword() {
+      const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const lowercase = "abcdefghijklmnopqrstuvwxyz";
+      const numbers = "0123456789";
 
-        return password
-          .split("")
-          .sort(() => Math.random() - 0.5)
-          .join("");
+      let password = "";
+      password += uppercase[Math.floor(Math.random() * uppercase.length)];
+      password += lowercase[Math.floor(Math.random() * lowercase.length)];
+      password += numbers[Math.floor(Math.random() * numbers.length)];
+
+      const allChars = uppercase + lowercase + numbers;
+      for (let i = 3; i < 8; i++) {
+        password += allChars[Math.floor(Math.random() * allChars.length)];
       }
 
-      async function getOccupiedUnits() {
-        try {
-          const usersSnapshot = await db
-            .collection("users")
-            .where("role", "==", "tenant")
-            .get();
+      return password
+        .split("")
+        .sort(() => Math.random() - 0.5)
+        .join("");
+    }
 
-          const occupiedUnits = [];
-          usersSnapshot.forEach((docSnap) => {
-            const userData = docSnap.data();
-            if (
-              userData.unitNumbers &&
-              Array.isArray(userData.unitNumbers)
-            ) {
-              occupiedUnits.push(...userData.unitNumbers);
-            }
-          });
-          return occupiedUnits;
-        } catch (error) {
-          console.error("Error fetching occupied units:", error);
-          return [];
+    // Master units array generation
+    const units = [];
+    const unitsPerBuilding = 144;
+    const floorsPerBuilding = 8;
+    const unitsPerFloor = unitsPerBuilding / floorsPerBuilding; // 18 units per floor
+
+    for (let i = 1; i <= 288; i++) {
+      const building = i <= unitsPerBuilding ? 1 : 2;
+      const floor = building === 1
+        ? Math.ceil(i / unitsPerFloor)
+        : Math.ceil((i - unitsPerBuilding) / unitsPerFloor);
+
+      const type = i % 2 === 1 ? "1B" : "2B";
+
+      units.push({ num: i, building, floor, type });
+    }
+
+    // Populate unit numbers dropdown excluding occupied units
+    function populateUnitNumbers(typeSelect, numberSelect, occupied) {
+      numberSelect.innerHTML = '<option value="">-- Select Unit Number --</option>';
+      if (!typeSelect.value) return;
+
+      const type = typeSelect.value;
+      const currentValue = numberSelect.value;
+      let currentStillAvailable = false;
+
+      units.forEach(unit => {
+        if (unit.type !== type) return;
+
+        const numStr = unit.num.toString().padStart(3, "0");
+        const unitValue = `${type}-${numStr}`;
+
+        if (occupied.includes(unitValue)) return;
+
+        const opt = document.createElement("option");
+        opt.value = unitValue;
+        opt.textContent = `${numStr} (Bldg ${unit.building} - Floor ${unit.floor})`;
+        numberSelect.appendChild(opt);
+
+        if (currentValue === unitValue) {
+          currentStillAvailable = true;
         }
+      });
+
+      if (currentStillAvailable) {
+        numberSelect.value = currentValue;
       }
+    }
 
-      function populateUnitNumbers(typeSelect, numberSelect, occupied) {
-        numberSelect.innerHTML =
-          '<option value="">-- Select Unit Number --</option>';
-        if (!typeSelect.value) return;
+    // Fetch occupied units from Firestore
+    async function getOccupiedUnits() {
+      try {
+        const usersSnapshot = await db
+          .collection("users")
+          .where("role", "==", "tenant")
+          .get();
 
-        const type = typeSelect.value;
-        let start = type === "1B" ? 1 : 50;
-        let end = type === "1B" ? 49 : 100;
-
-        const currentValue = numberSelect.value;
-        let currentStillAvailable = false;
-
-        for (let i = start; i <= end; i++) {
-          const num = i.toString().padStart(3, "0");
-          const unitValue = `${type}-${num}`;
-          if (occupied.includes(unitValue)) continue;
-
-          const opt = document.createElement("option");
-          opt.value = unitValue;
-          opt.textContent = num;
-          numberSelect.appendChild(opt);
-
-          if (currentValue === unitValue) {
-            currentStillAvailable = true;
+        const occupiedUnits = [];
+        usersSnapshot.forEach((docSnap) => {
+          const userData = docSnap.data();
+          if (userData.unitNumbers && Array.isArray(userData.unitNumbers)) {
+            occupiedUnits.push(...userData.unitNumbers);
           }
-        }
-
-        if (currentStillAvailable) {
-          numberSelect.value = currentValue;
-        }
+        });
+        console.log("Occupied units fetched:", occupiedUnits);
+        return occupiedUnits;
+      } catch (error) {
+        console.error("Error fetching occupied units:", error);
+        return [];
       }
+    }
 
-      (async () => {
-        let occupiedUnits = await getOccupiedUnits();
+    // Load and display list of created unit owners
+    async function loadAndDisplayUnitOwners() {
+      const ul = document.getElementById("unitOwnersUl");
+      ul.innerHTML = "<li>Loading...</li>";
+      try {
+        const snapshot = await db.collection("users").where("role", "==", "tenant").get();
+        if (snapshot.empty) {
+          ul.innerHTML = "<li>No unit owners found.</li>";
+          return;
+        }
 
-        const passwordInput = document.getElementById("tenantPassword");
-        const generateBtn = document.getElementById("generatePasswordBtn");
-        const form = document.getElementById("createTenantForm");
-        const unitContainer = document.getElementById("unitContainer");
-        const addUnitBtn = document.getElementById("addUnitBtn");
+        ul.innerHTML = ""; // clear loading
 
-        generateBtn.addEventListener("click", () => {
-          const newPassword = generatePassword();
-          passwordInput.value = newPassword;
-          passwordInput.style.background = "#e8f5e8";
-          passwordInput.style.border = "1px solid #4CAF50";
-          setTimeout(() => {
-            passwordInput.style.background = "#222";
-            passwordInput.style.border =
-              "1px solid rgba(255,255,255,0.18)";
-          }, 3000);
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const li = document.createElement("li");
+          li.style.padding = "6px 0";
+          li.style.borderBottom = "1px solid #eee";
+
+          const unitsText = data.unitNumbers ? data.unitNumbers.map(unitStr => {
+            const numPart = parseInt(unitStr.split("-")[1], 10);
+            const unitInfo = units.find(u => u.num === numPart);
+
+            if (unitInfo) {
+              return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
+            } else {
+              return unitStr;
+            }
+          }).join(", ") : "No units assigned";
+
+          li.textContent = `${data.email} — Units: ${unitsText}`;
+
+          ul.appendChild(li);
         });
 
-        const firstType = document.querySelector(".unitType");
-        const firstNumber = document.querySelector(".unitNumber");
-        firstType.addEventListener("change", () =>
-          populateUnitNumbers(firstType, firstNumber, occupiedUnits)
+      } catch (error) {
+        console.error("Error loading unit owners:", error);
+        ul.innerHTML = `<li style="color:red;">Error loading unit owners.</li>`;
+      }
+    }
+
+    (async () => {
+      let occupiedUnits = await getOccupiedUnits();
+
+      const passwordInput = document.getElementById("tenantPassword");
+      const generateBtn = document.getElementById("generatePasswordBtn");
+      const form = document.getElementById("createTenantForm");
+      const unitContainer = document.getElementById("unitContainer");
+      const addUnitBtn = document.getElementById("addUnitBtn");
+
+      generateBtn.addEventListener("click", () => {
+        const newPassword = generatePassword();
+        passwordInput.value = newPassword;
+        passwordInput.style.background = "#e8f5e8";
+        passwordInput.style.border = "1px solid #4CAF50";
+        setTimeout(() => {
+          passwordInput.style.background = "#222";
+          passwordInput.style.border = "1px solid rgba(255,255,255,0.18)";
+        }, 3000);
+      });
+
+      const firstType = document.querySelector(".unitType");
+      const firstNumber = document.querySelector(".unitNumber");
+      firstType.addEventListener("change", () =>
+        populateUnitNumbers(firstType, firstNumber, occupiedUnits)
+      );
+
+      addUnitBtn.addEventListener("click", () => {
+        const row = document.createElement("div");
+        row.classList.add("unit-row");
+        row.style = "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
+        row.innerHTML = `
+          <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+            <option value="">-- Select Type --</option>
+            <option value="1B">1B (1 Bedroom)</option>
+            <option value="2B">2B (2 Bedroom)</option>
+          </select>
+          <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+            <option value="">-- Select Unit Number --</option>
+          </select>
+          <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+        `;
+        unitContainer.appendChild(row);
+
+        const tSelect = row.querySelector(".unitType");
+        const nSelect = row.querySelector(".unitNumber");
+        tSelect.addEventListener("change", () =>
+          populateUnitNumbers(tSelect, nSelect, occupiedUnits)
         );
 
-        addUnitBtn.addEventListener("click", () => {
-          const row = document.createElement("div");
-          row.classList.add("unit-row");
-          row.style =
-            "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
-          row.innerHTML = `
-            <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-              <option value="">-- Select Type --</option>
-              <option value="1B">1B (1 Bedroom)</option>
-              <option value="2B">2B (2 Bedroom)</option>
-            </select>
-            <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-              <option value="">-- Select Unit Number --</option>
-            </select>
-            <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-          `;
-          unitContainer.appendChild(row);
+        row.querySelector(".removeUnitBtn").addEventListener("click", function () {
+          if (document.querySelectorAll(".unit-row").length > 1) {
+            row.remove();
+          }
+        });
+      });
 
-          const tSelect = row.querySelector(".unitType");
-          const nSelect = row.querySelector(".unitNumber");
-          tSelect.addEventListener("change", () =>
-            populateUnitNumbers(tSelect, nSelect, occupiedUnits)
+      // Initial remove button event for first unit row
+      document.querySelector(".removeUnitBtn").addEventListener("click", function () {
+        if (document.querySelectorAll(".unit-row").length > 1) {
+          this.parentElement.remove();
+        }
+      });
+
+      // Load and display existing unit owners at startup
+      await loadAndDisplayUnitOwners();
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("tenantEmail").value;
+        const password = passwordInput.value;
+        const unitNumbers = Array.from(document.querySelectorAll(".unitNumber"))
+          .map((i) => i.value)
+          .filter((v) => v !== "");
+
+        const occupiedSet = new Set(occupiedUnits);
+        const occupiedSelections = unitNumbers.filter((u) => occupiedSet.has(u));
+        if (occupiedSelections.length > 0) {
+          showPopup(
+            `Error: The following units are already occupied: ${occupiedSelections.join(
+              ", "
+            )}. Please select different units.`
+          );
+          return;
+        }
+
+        try {
+          const userCredential =
+            await auth.createUserWithEmailAndPassword(
+              email,
+              password
+            );
+          const user = userCredential.user;
+
+          await db.collection("users").doc(user.uid).set({
+            email,
+            role: "tenant",
+            unitNumbers,
+            mustChangePassword: true,
+            createdAt:
+              firebase.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Build detailed unit numbers with building and floor info for email
+          const unitsWithDetails = unitNumbers.map(unitStr => {
+            const numPart = parseInt(unitStr.split("-")[1], 10);
+            const unitInfo = units.find(u => u.num === numPart);
+
+            if (unitInfo) {
+              return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
+            } else {
+              return unitStr;
+            }
+          });
+
+          // ⭐ SEND EMAIL AFTER ACCOUNT CREATION
+          await sendAccountEmail(email, email, password, unitsWithDetails);
+
+          occupiedUnits.push(...unitNumbers);
+
+          await auth.signInWithEmailAndPassword(
+            adminEmail,
+            adminPassword
           );
 
-          row
+          showPopup(
+            "Unit Owner created successfully! Temporary password: " +
+            password
+          );
+
+          form.reset();
+          passwordInput.value = "";
+          passwordInput.style.background = "#222";
+          passwordInput.style.border =
+            "1px solid rgba(255,255,255,0.18)";
+
+          unitContainer.innerHTML = `
+            <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+              <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                <option value="">-- Select Type --</option>
+                <option value="1B">1B (1 Bedroom)</option>
+                <option value="2B">2B (2 Bedroom)</option>
+              </select>
+              <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                <option value="">-- Select Unit Number --</option>
+              </select>
+              <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+            </div>
+          `;
+
+          const newFirstType = document.querySelector(".unitType");
+          const newFirstNumber = document.querySelector(".unitNumber");
+          newFirstType.addEventListener("change", () =>
+            populateUnitNumbers(
+              newFirstType,
+              newFirstNumber,
+              occupiedUnits
+            )
+          );
+
+          document
             .querySelector(".removeUnitBtn")
             .addEventListener("click", function () {
               if (
                 document.querySelectorAll(".unit-row").length > 1
               ) {
-                row.remove();
+                this.parentElement.remove();
               }
             });
-        });
 
-        document
-          .querySelector(".removeUnitBtn")
-          .addEventListener("click", function () {
-            if (document.querySelectorAll(".unit-row").length > 1) {
-              this.parentElement.remove();
-            }
-          });
+          // Update the unit owners list display after adding a new user
+          await loadAndDisplayUnitOwners();
 
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const email = document.getElementById("tenantEmail").value;
-          const password = passwordInput.value;
-          const unitNumbers = Array.from(
-            document.querySelectorAll(".unitNumber")
-          )
-            .map((i) => i.value)
-            .filter((v) => v !== "");
-
-          const occupiedSet = new Set(occupiedUnits);
-          const occupiedSelections = unitNumbers.filter((u) =>
-            occupiedSet.has(u)
-          );
-          if (occupiedSelections.length > 0) {
-            showPopup(
-              `Error: The following units are already occupied: ${occupiedSelections.join(
-                ", "
-              )}. Please select different units.`
-            );
-            return;
-          }
-
-          try {
-            const userCredential =
-              await auth.createUserWithEmailAndPassword(
-                email,
-                password
-              );
-            const user = userCredential.user;
-
-            await db.collection("users").doc(user.uid).set({
-              email,
-              role: "tenant",
-              unitNumbers,
-              mustChangePassword: true,
-              createdAt:
-                firebase.firestore.FieldValue.serverTimestamp(),
-            });
-
-            occupiedUnits.push(...unitNumbers);
-
-            await auth.signInWithEmailAndPassword(
-              adminEmail,
-              adminPassword
-            );
-
-            showPopup(
-              "Unit Owner created successfully! Temporary password: " +
-                password
-            );
-
-            form.reset();
-            passwordInput.value = "";
-            passwordInput.style.background = "#222";
-            passwordInput.style.border =
-              "1px solid rgba(255,255,255,0.18)";
-
-            unitContainer.innerHTML = `
-              <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-                <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-                  <option value="">-- Select Type --</option>
-                  <option value="1B">1B (1 Bedroom)</option>
-                  <option value="2B">2B (2 Bedroom)</option>
-                </select>
-                <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-                  <option value="">-- Select Unit Number --</option>
-                </select>
-                <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-              </div>
-            `;
-
-            const newFirstType = document.querySelector(".unitType");
-            const newFirstNumber = document.querySelector(".unitNumber");
-            newFirstType.addEventListener("change", () =>
-              populateUnitNumbers(
-                newFirstType,
-                newFirstNumber,
-                occupiedUnits
-              )
-            );
-
-            document
-              .querySelector(".removeUnitBtn")
-              .addEventListener("click", function () {
-                if (
-                  document.querySelectorAll(".unit-row").length > 1
-                ) {
-                  this.parentElement.remove();
-                }
-              });
-          } catch (error) {
-            showPopup("Error: " + error.message);
-          }
-        });
-      })();
-    }
+        } catch (error) {
+          showPopup("Error: " + error.message);
+        }
+      });
+    })();
+  }
 
     // ======================== FEEDBACK RECEIVED LOGIC ========================
     function initFeedbackReceived() {
