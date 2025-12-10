@@ -1077,896 +1077,1038 @@
     }
 
     // ======================== MAINTENANCE REQUESTS LOGIC ========================
-    function initMaintenanceRequests() {
-        const maintenanceList = document.getElementById("maintenanceList");
-        const statusFilter = document.getElementById("statusFilter");
-        const personnelFilter = document.getElementById("personnelFilter");
-        const maintenanceSearch = document.getElementById("maintenanceSearch");
-        const sortBy = document.getElementById("sortBy");
-        const resetFilters = document.getElementById("resetFilters");
-        const maintenanceStats = document.getElementById("maintenanceStats");
-        const requestCount = document.getElementById("requestCount");
-        const pendingCountEl = document.getElementById("pendingCount");
-        const completeCountEl = document.getElementById("completeCount");
+  function initMaintenanceRequests() {
+    const maintenanceList = document.getElementById("maintenanceList");
+    const statusFilter = document.getElementById("statusFilter");
+    const personnelFilter = document.getElementById("personnelFilter");
+    const maintenanceSearch = document.getElementById("maintenanceSearch");
+    const sortBy = document.getElementById("sortBy");
+    const resetFilters = document.getElementById("resetFilters");
+    const maintenanceStats = document.getElementById("maintenanceStats");
+    const requestCount = document.getElementById("requestCount");
+    const pendingCountEl = document.getElementById("pendingCount");
+    const inProgressCountEl = document.getElementById("inProgressCount") || document.createElement("span");
+    const completeCountEl = document.getElementById("completeCount");
 
-        let allRequests = [];
-        let filteredRequests = [];
-        let assignedPersonnel = new Set();
+    let allRequests = [];
+    let filteredRequests = [];
+    let personnelAssignments = new Map(); // Tracks personnel -> requestId
+    let personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
 
-        const drill = window.adminDashboardDrilldown || {};
-        if (drill.maintenanceStatus) {
-            statusFilter.value = drill.maintenanceStatus;
+    const drill = window.adminDashboardDrilldown || {};
+    if (drill.maintenanceStatus) {
+        statusFilter.value = drill.maintenanceStatus;
+    }
+    window.adminDashboardDrilldown = null;
+
+    const quickReplies = [
+        "Our maintenance team is on the way.",
+        "A technician has been assigned and will be there soon",
+        "We have scheduled your maintenance as for you request date and time.",
+        "Thank you for your patience we have resolve this matter."
+    ];
+
+    function formatDateTimeAMPM(date) {
+        if (!date) return "N/A";
+        const d = date.toDate ? date.toDate() : date;
+        let hours = d.getHours();
+        const minutes = d.getMinutes().toString().padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        const month = (d.getMonth() + 1).toString().padStart(2, "0");
+        const day = d.getDate().toString().padStart(2, "0");
+        const year = d.getFullYear();
+        return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+    }
+
+    // Track personnel assignments
+    function updatePersonnelAssignments() {
+        personnelAssignments.clear();
+        allRequests.forEach(request => {
+            if (request.maintenanceName && 
+                request.maintenanceName.trim() !== "" && 
+                request.status === "In Progress") { // Only track In Progress assignments
+                personnelAssignments.set(request.maintenanceName, request.id);
+            }
+        });
+    }
+
+    // Check if personnel is available (only blocked if they're In Progress on another task)
+    function isPersonnelAvailable(personnelName) {
+        if (!personnelAssignments.has(personnelName)) return true;
+        
+        const assignedRequestId = personnelAssignments.get(personnelName);
+        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+        
+        // Only block if personnel is actively working (In Progress)
+        return !(assignedRequest && assignedRequest.status === "In Progress");
+    }
+
+    function getPersonnelStatus(personnelName) {
+        if (!personnelAssignments.has(personnelName)) {
+            return { available: true, status: "Available", workingOn: null };
         }
-        window.adminDashboardDrilldown = null;
+        
+        const assignedRequestId = personnelAssignments.get(personnelName);
+        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+        
+        if (!assignedRequest || assignedRequest.status !== "In Progress") {
+            personnelAssignments.delete(personnelName);
+            return { available: true, status: "Available", workingOn: null };
+        }
+        
+        return { 
+            available: false, 
+            status: "Currently Working", 
+            workingOn: assignedRequest.problem || "a task",
+            unitNumber: assignedRequest.unitNumber || "Unknown unit"
+        };
+    }
 
-        // Quick Reply Templates - Simple maintenance responses
-        const quickReplies = [
-            "Our maintenance team is on the way.",
-            "A technician has been assigned and will be there soon",
-            "We have scheduled your maintenance as for you request date and time.",
-            "Thank you for your patience we have resolve this matter."
-        ];
+    function applyFiltersAndSort() {
+        const statusValue = statusFilter.value;
+        const personnelValue = personnelFilter.value;
+        const searchValue = maintenanceSearch.value.toLowerCase();
+        const sortValue = sortBy.value;
 
-        function formatDateTimeAMPM(date) {
-            if (!date) return "N/A";
-            const d = date.toDate ? date.toDate() : date;
-            let hours = d.getHours();
-            const minutes = d.getMinutes().toString().padStart(2, "0");
-            const ampm = hours >= 12 ? "PM" : "AM";
-            hours = hours % 12 || 12;
-            const month = (d.getMonth() + 1).toString().padStart(2, "0");
-            const day = d.getDate().toString().padStart(2, "0");
-            const year = d.getFullYear();
-            return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+        filteredRequests = [...allRequests];
+
+        if (statusValue !== "all") {
+            filteredRequests = filteredRequests.filter(
+                (r) => r.status === statusValue
+            );
         }
 
-        function applyFiltersAndSort() {
-            const statusValue = statusFilter.value;
-            const personnelValue = personnelFilter.value;
-            const searchValue = maintenanceSearch.value.toLowerCase();
-            const sortValue = sortBy.value;
-
-            filteredRequests = [...allRequests];
-
-            if (statusValue !== "all") {
+        if (personnelValue !== "all") {
+            if (personnelValue === "unassigned") {
                 filteredRequests = filteredRequests.filter(
-                    (r) => r.status === statusValue
+                    (r) => !r.maintenanceName || !r.maintenanceName.trim()
+                );
+            } else {
+                filteredRequests = filteredRequests.filter(
+                    (r) => r.maintenanceName === personnelValue
                 );
             }
+        }
 
-            if (personnelValue !== "all") {
-                if (personnelValue === "unassigned") {
-                    filteredRequests = filteredRequests.filter(
-                        (r) => !r.maintenanceName || !r.maintenanceName.trim()
-                    );
-                } else {
-                    filteredRequests = filteredRequests.filter(
-                        (r) => r.maintenanceName === personnelValue
-                    );
-                }
+        if (searchValue) {
+            filteredRequests = filteredRequests.filter((r) => {
+                const emailMatch = r.tenantEmail && r.tenantEmail.toLowerCase().includes(searchValue);
+                const unitMatch = r.unitNumber && r.unitNumber.toLowerCase().includes(searchValue);
+                const problemMatch = r.problem && r.problem.toLowerCase().includes(searchValue);
+                const commentMatch = r.comment && r.comment.toLowerCase().includes(searchValue);
+                return emailMatch || unitMatch || problemMatch || commentMatch;
+            });
+        }
+
+        filteredRequests.sort((a, b) => {
+            const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+            const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+            switch (sortValue) {
+                case "date-desc": return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+                case "date-asc": return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+                case "unit-asc": return (a.unitNumber || "").localeCompare(b.unitNumber || "");
+                case "unit-desc": return (b.unitNumber || "").localeCompare(a.unitNumber || "");
+                case "email-asc": return (a.tenantEmail || "").localeCompare(b.tenantEmail || "");
+                case "email-desc": return (b.tenantEmail || "").localeCompare(a.tenantEmail || "");
+                default: return 0;
             }
+        });
 
-            if (searchValue) {
-                filteredRequests = filteredRequests.filter((r) => {
-                    const emailMatch =
-                        r.tenantEmail &&
-                        r.tenantEmail.toLowerCase().includes(searchValue);
-                    const unitMatch =
-                        r.unitNumber &&
-                        r.unitNumber.toLowerCase().includes(searchValue);
-                    const problemMatch =
-                        r.problem &&
-                        r.problem.toLowerCase().includes(searchValue);
-                    const commentMatch =
-                        r.comment &&
-                        r.comment.toLowerCase().includes(searchValue);
-                    return emailMatch || unitMatch || problemMatch || commentMatch;
+        renderMaintenanceRequests();
+    }
+
+    function renderMaintenanceRequests() {
+        if (!filteredRequests.length) {
+            maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
+            maintenanceStats.style.display = "none";
+            return;
+        }
+
+        maintenanceList.innerHTML = "";
+        updatePersonnelAssignments();
+
+        let pending = 0;
+        let inProgress = 0;
+        let complete = 0;
+
+        filteredRequests.forEach((request) => {
+            const data = request;
+            const id = data.id;
+
+            // Auto-update status based on personnel assignment
+            if (data.maintenanceName && data.status === "Pending") {
+                // If personnel is assigned and status is Pending, auto-update to In Progress
+                db.collection("maintenanceRequests").doc(id).update({
+                    status: "In Progress",
+                    startTime: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                data.status = "In Progress"; // Update local copy
             }
 
-            filteredRequests.sort((a, b) => {
-                const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
-                const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
-                switch (sortValue) {
-                    case "date-desc":
-                        return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
-                    case "date-asc":
-                        return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-                    case "unit-asc":
-                        return (a.unitNumber || "").localeCompare(
-                            b.unitNumber || ""
-                        );
-                    case "unit-desc":
-                        return (b.unitNumber || "").localeCompare(
-                            a.unitNumber || ""
-                        );
-                    case "email-asc":
-                        return (a.tenantEmail || "").localeCompare(
-                            b.tenantEmail || ""
-                        );
-                    case "email-desc":
-                        return (b.tenantEmail || "").localeCompare(
-                            a.tenantEmail || ""
-                        );
-                    default:
-                        return 0;
+            if (data.status === "Pending") pending++;
+            if (data.status === "In Progress") inProgress++;
+            if (data.status === "Complete") complete++;
+
+            const card = document.createElement("div");
+            card.className = "maintenance-card";
+            
+            let statusColor = "#f39c12"; // Orange for Pending
+            if (data.status === "In Progress") statusColor = "#3498db"; // Blue for In Progress
+            if (data.status === "Complete") statusColor = "#27ae60"; // Green for Complete
+            
+            card.style.borderLeft = `4px solid ${statusColor}`;
+
+            const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+                ? `
+                <div style="margin-top:6px;">
+                    <strong>Attachments:</strong><br/>
+                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                        <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                        ${data.imageUrls.length > 1 ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                        <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>` : ""}
+                    </div>
+                </div>`
+                : "";
+
+            card.innerHTML = `
+                <h3>${data.problem || "Unknown Issue"}</h3>
+                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:220px;">
+                        <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                        <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
+                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
+                        <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
+                        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
+                        <p><strong>Maintenance Personnel:</strong> <span style="color:#b08d35; font-weight:700;">${data.maintenanceName || "Not assigned"}</span></p>
+                        <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+                        ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
+                        ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
+                    </div>
+                    <div style="min-width:220px;">${attachmentsHTML}</div>
+                </div>
+            `;
+
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "maintenance-card-actions";
+
+            // --- SIMPLE ASSIGNMENT SECTION ---
+            const assignmentSection = document.createElement("div");
+            assignmentSection.style.marginBottom = "10px";
+            assignmentSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Assignment:</strong>`;
+
+            const assignmentContainer = document.createElement("div");
+            assignmentContainer.style.display = "flex";
+            assignmentContainer.style.gap = "10px";
+            assignmentContainer.style.alignItems = "center";
+            assignmentContainer.style.marginTop = "5px";
+
+            const personnelSelect = document.createElement("select");
+            personnelSelect.style.minWidth = "200px";
+            
+            const emptyOption = document.createElement("option");
+            emptyOption.value = "";
+            emptyOption.textContent = data.maintenanceName ? `Assigned: ${data.maintenanceName}` : "Assign Personnel";
+            personnelSelect.appendChild(emptyOption);
+            
+            personnelNames.forEach((name) => {
+                const opt = document.createElement("option");
+                opt.value = name;
+                
+                const personnelStatus = getPersonnelStatus(name);
+                
+                if (data.maintenanceName === name) {
+                    opt.selected = true;
+                    opt.textContent = `${name} ✓ (Assigned)`;
+                    opt.style.color = "#27ae60";
+                } else if (!personnelStatus.available) {
+                    opt.disabled = true;
+                    opt.textContent = `${name} ✗ (Working on ${personnelStatus.unitNumber})`;
+                    opt.style.color = "#e74c3c";
+                    opt.title = `Currently working on: ${personnelStatus.workingOn}`;
+                } else {
+                    opt.textContent = `${name} ✓ (Available)`;
+                    opt.style.color = "#27ae60";
+                }
+                
+                personnelSelect.appendChild(opt);
+            });
+
+            // Disable selection if already In Progress or Complete
+            if (data.status === "In Progress" || data.status === "Complete") {
+                personnelSelect.disabled = true;
+                personnelSelect.title = data.status === "In Progress" ? 
+                    "Cannot change personnel while work is in progress" : 
+                    "Request is already completed";
+            }
+
+            const assignBtn = document.createElement("button");
+            assignBtn.textContent = data.maintenanceName ? "Reassign" : "Assign";
+            assignBtn.className = "btn-primary";
+            assignBtn.style.padding = "6px 12px";
+            assignBtn.style.fontSize = "13px";
+            assignBtn.style.background = "#8d6c39";
+
+            // Disable assign button if Complete
+            if (data.status === "Complete") {
+                assignBtn.disabled = true;
+                assignBtn.style.backgroundColor = "#777";
+                assignBtn.style.cursor = "not-allowed";
+            }
+
+            assignmentContainer.appendChild(personnelSelect);
+            assignmentContainer.appendChild(assignBtn);
+            assignmentSection.appendChild(assignmentContainer);
+            actionsDiv.appendChild(assignmentSection);
+
+            // --- COMPLETE BUTTON (only shown when In Progress) ---
+            if (data.status === "In Progress") {
+                const completeSection = document.createElement("div");
+                completeSection.style.marginBottom = "10px";
+                completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
+
+                const completeBtn = document.createElement("button");
+                completeBtn.textContent = "Mark as Complete";
+                completeBtn.className = "btn-primary";
+                completeBtn.style.padding = "8px 16px";
+                completeBtn.style.fontSize = "14px";
+                completeBtn.style.background = "#27ae60";
+                completeBtn.style.color = "white";
+                completeBtn.style.border = "none";
+                completeBtn.style.borderRadius = "6px";
+                completeBtn.style.cursor = "pointer";
+                completeBtn.style.transition = "background-color 0.3s";
+                completeBtn.style.marginTop = "5px";
+
+                completeBtn.addEventListener("mouseenter", () => {
+                    completeBtn.style.background = "#219653";
+                });
+
+                completeBtn.addEventListener("mouseleave", () => {
+                    completeBtn.style.background = "#27ae60";
+                });
+
+                completeBtn.addEventListener("click", async () => {
+                    if (confirm("Are you sure you want to mark this maintenance request as complete?")) {
+                        try {
+                            // Mark as complete and free up personnel
+                            await db.collection("maintenanceRequests").doc(id).update({
+                                status: "Complete",
+                                completionTime: firebase.firestore.FieldValue.serverTimestamp(),
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            
+                            // Remove personnel from tracking
+                            if (data.maintenanceName) {
+                                personnelAssignments.delete(data.maintenanceName);
+                            }
+                            
+                            showPopup("Maintenance request marked as complete! Personnel is now available.");
+                            
+                            setTimeout(() => {
+                                applyFiltersAndSort();
+                            }, 500);
+                            
+                        } catch (error) {
+                            showPopup("Error marking as complete: " + error.message);
+                        }
+                    }
+                });
+
+                completeSection.appendChild(completeBtn);
+                actionsDiv.appendChild(completeSection);
+            }
+
+            // --- RESPOND SECTION (UNCHANGED) ---
+            const respondSection = document.createElement("div");
+            respondSection.style.marginTop = "10px";
+            respondSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Communication:</strong>`;
+
+            const respondBtn = document.createElement("button");
+            respondBtn.textContent = "Respond";
+            respondBtn.className = "btn-primary";
+            respondBtn.style.background = "#4a90e2";
+            respondBtn.style.padding = "6px 12px";
+            respondBtn.style.fontSize = "13px";
+            respondBtn.style.marginTop = "5px";
+
+            const responseContainer = document.createElement("div");
+            responseContainer.style.marginTop = "8px";
+            responseContainer.style.display = "none";
+
+            // Quick Reply Templates
+            const quickReplyContainer = document.createElement("div");
+            quickReplyContainer.style.marginBottom = "15px";
+            
+            const quickReplyTitle = document.createElement("p");
+            quickReplyTitle.innerHTML = "<strong style='color: #b3b3b3; font-size: 14px; margin: 0 0 8px 0;'>Quick Replies:</strong>";
+            quickReplyContainer.appendChild(quickReplyTitle);
+
+            const quickReplyButtons = document.createElement("div");
+            quickReplyButtons.style.display = "flex";
+            quickReplyButtons.style.gap = "10px";
+            quickReplyButtons.style.flexWrap = "wrap";
+
+            quickReplies.forEach((replyText, index) => {
+                const quickBtn = document.createElement("button");
+                quickBtn.className = "maintenanceQuickReplyBtn";
+                quickBtn.textContent = `Reply ${index + 1}`;
+                quickBtn.title = replyText;
+                quickBtn.setAttribute("data-template", index);
+                
+                quickBtn.style.padding = "6px 12px";
+                quickBtn.style.border = "1px solid";
+                quickBtn.style.borderRadius = "4px";
+                quickBtn.style.cursor = "pointer";
+                quickBtn.style.fontSize = "12px";
+                quickBtn.style.transition = "all 0.2s";
+                
+                if (index === 0) {
+                    quickBtn.style.background = "#e8f5e9";
+                    quickBtn.style.color = "#2e7d32";
+                    quickBtn.style.borderColor = "#c8e6c9";
+                } else if (index === 1) {
+                    quickBtn.style.background = "#e3f2fd";
+                    quickBtn.style.color = "#1565c0";
+                    quickBtn.style.borderColor = "#bbdefb";
+                } else if (index === 2) {
+                    quickBtn.style.background = "#fff3e0";
+                    quickBtn.style.color = "#a57934";
+                    quickBtn.style.borderColor = "#ffe0b2";
+                } else if (index === 3) {
+                    quickBtn.style.background = "#e3f2fd";
+                    quickBtn.style.color = "#1976D2";
+                    quickBtn.style.borderColor = "#bbdefb";
+                } else if (index === 4) {
+                    quickBtn.style.background = "#f3e5f5";
+                    quickBtn.style.color = "#7b1fa2";
+                    quickBtn.style.borderColor = "#e1bee7";
+                }
+                
+                quickBtn.addEventListener("mouseenter", () => {
+                    quickBtn.style.opacity = "0.9";
+                    quickBtn.style.transform = "translateY(-1px)";
+                });
+                
+                quickBtn.addEventListener("mouseleave", () => {
+                    quickBtn.style.opacity = "1";
+                    quickBtn.style.transform = "translateY(0)";
+                });
+                
+                quickBtn.addEventListener("click", () => {
+                    responseTextarea.value = replyText;
+                    responseTextarea.focus();
+                    quickBtn.style.transform = "scale(0.98)";
+                    setTimeout(() => {
+                        quickBtn.style.transform = "scale(1)";
+                    }, 150);
+                });
+                
+                quickReplyButtons.appendChild(quickBtn);
+            });
+            
+            quickReplyContainer.appendChild(quickReplyButtons);
+
+            const responseTextarea = document.createElement("textarea");
+            responseTextarea.placeholder = "Enter your response message here...";
+            responseTextarea.style.width = "100%";
+            responseTextarea.style.height = "60px";
+            responseTextarea.style.marginBottom = "8px";
+            responseTextarea.style.resize = "vertical";
+            responseTextarea.style.padding = "10px";
+            responseTextarea.style.border = "1px solid rgba(255,255,255,0.1)";
+            responseTextarea.style.borderRadius = "4px";
+            responseTextarea.style.background = "#181818";
+            responseTextarea.style.color = "#f7f7f7";
+
+            const sendResponseBtn = document.createElement("button");
+            sendResponseBtn.textContent = "Send Response";
+            sendResponseBtn.className = "btn-primary";
+            sendResponseBtn.style.background = "#4a90e2";
+            sendResponseBtn.style.padding = "6px 12px";
+            sendResponseBtn.style.fontSize = "13px";
+
+            responseContainer.appendChild(quickReplyContainer);
+            responseContainer.appendChild(responseTextarea);
+            responseContainer.appendChild(sendResponseBtn);
+
+            respondBtn.addEventListener("click", () => {
+                responseContainer.style.display = responseContainer.style.display === "none" ? "block" : "none";
+                if (responseContainer.style.display === "block") {
+                    responseTextarea.focus();
                 }
             });
 
-            renderMaintenanceRequests();
-        }
+            sendResponseBtn.addEventListener("click", async () => {
+                const msg = responseTextarea.value.trim();
+                if (!msg) {
+                    showPopup("Response message cannot be empty.");
+                    return;
+                }
+                try {
+                    const requestDocRef = db.collection("maintenanceRequests").doc(id);
+                    await requestDocRef.collection("responses").add({
+                        adminEmail: auth.currentUser.email,
+                        message: msg,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                    await requestDocRef.update({
+                        responseTime: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                    showPopup("Response sent successfully!");
+                    responseTextarea.value = "";
+                    responseContainer.style.display = "none";
+                } catch (error) {
+                    showPopup("Failed to send response: " + error.message);
+                }
+            });
 
-        function renderMaintenanceRequests() {
-            if (!filteredRequests.length) {
-                maintenanceList.innerHTML =
-                    "<p>No maintenance requests found matching your criteria.</p>";
-                maintenanceStats.style.display = "none";
-                return;
+            respondSection.appendChild(respondBtn);
+            respondSection.appendChild(responseContainer);
+            actionsDiv.appendChild(respondSection);
+
+            // --- DELETE BUTTON ---
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "Delete Request";
+            deleteBtn.className = "btn-danger";
+            deleteBtn.style.marginTop = "10px";
+            deleteBtn.style.padding = "6px 12px";
+            deleteBtn.style.fontSize = "13px";
+            
+            // Disable delete if In Progress
+            if (data.status === "In Progress") {
+                deleteBtn.disabled = true;
+                deleteBtn.style.backgroundColor = "#777";
+                deleteBtn.style.cursor = "not-allowed";
+                deleteBtn.title = "Cannot delete request while work is in progress";
             }
 
-            maintenanceList.innerHTML = "";
-            assignedPersonnel.clear();
-
-            let pending = 0;
-            let complete = 0;
-
-            filteredRequests.forEach((request) => {
-                const data = request;
-                const id = data.id;
-
-                if (data.status === "Pending") pending++;
-                if (data.status === "Complete") complete++;
-
-                const card = document.createElement("div");
-                card.className = "maintenance-card";
-
-                const attachmentsHTML =
-                    data.imageUrls &&
-                    Array.isArray(data.imageUrls) &&
-                    data.imageUrls.length > 0
-                        ? `
-                    <div style="margin-top:6px;">
-                        <strong>Attachments:</strong><br/>
-                        <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                            <img src="${
-                                data.imageUrls[0]
-                            }" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                            ${
-                                data.imageUrls.length > 1
-                                    ? `<button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%);
-                                    background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                                <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%);
-                                    background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>`
-                                    : ""
-                            }
-                        </div>
-                    </div>`
-                        : "";
-
-                card.innerHTML = `
-                    <h3>${data.problem || "Unknown Issue"}</h3>
-                    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:220px;">
-                            <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                            <p><strong>Unit Number:</strong> ${data.unitNumber|| "N/A"}</p>
-                            <p><strong>Details:</strong> ${
-                                data.comment || "No additional details."
-                            }</p>
-                            <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(
-                                data.preferredVisitTime
-                            )}</p>
-                            <p><strong>Status:</strong> ${data.status || "Pending"}</p>
-                            <p><strong>Maintenance Personnel:</strong> ${
-                                data.maintenanceName || "Not assigned"
-                            }</p>
-                            <p><strong>Submitted:</strong> ${formatDateTimeAMPM(
-                                data.timestamp
-                            )}</p>
-                        </div>
-                        <div style="min-width:220px;">
-                            ${attachmentsHTML}
-                        </div>
-                    </div>
-                `;
-
-                const actionsDiv = document.createElement("div");
-                actionsDiv.className = "maintenance-card-actions";
-
-                const statusSelect = document.createElement("select");
-                ["Pending", "Complete"].forEach((option) => {
-                    const opt = document.createElement("option");
-                    opt.value = option;
-                    opt.textContent = option;
-                    if (data.status === option) opt.selected = true;
-                    statusSelect.appendChild(opt);
-                });
-
-                const personnelSelect = document.createElement("select");
-                const personnelNames = ["John Doe", "Jane Smith", "Mike Johnson"];
-                personnelNames.forEach((name) => {
-                    const opt = document.createElement("option");
-                    opt.value = name;
-                    opt.textContent = name;
-                    if (
-                        assignedPersonnel.has(name) &&
-                        data.maintenanceName !== name &&
-                        data.status !== "Complete"
-                    ) {
-                        opt.disabled = true;
-                        opt.textContent += " (Assigned)";
-                    }
-                    if (data.maintenanceName === name) opt.selected = true;
-                    personnelSelect.appendChild(opt);
-                });
-
-                if (
-                    data.status !== "Complete" &&
-                    data.maintenanceName &&
-                    !assignedPersonnel.has(data.maintenanceName)
-                ) {
-                    assignedPersonnel.add(data.maintenanceName);
+            deleteBtn.addEventListener("click", () => {
+                if (data.status === "In Progress") {
+                    showPopup("Cannot delete request while work is in progress.");
+                    return;
                 }
-
-                const updateBtn = document.createElement("button");
-                updateBtn.textContent = "Update";
-                updateBtn.className = "btn-primary";
-
-                if (data.status === "Complete") {
-                    statusSelect.disabled = true;
-                    personnelSelect.disabled = true;
-                    updateBtn.disabled = true;
-                    updateBtn.style.backgroundColor = "#777";
-                    updateBtn.style.cursor = "not-allowed";
-                }
-
-                updateBtn.addEventListener("click", async () => {
-                    try {
-                        await db.collection("maintenanceRequests").doc(id).update({
-                            status: statusSelect.value,
-                            maintenanceName: personnelSelect.value.trim(),
-                            updatedAt:
-                                firebase.firestore.FieldValue.serverTimestamp(),
-                        });
-                        showPopup("Request updated successfully!");
-                    } catch (error) {
-                        showPopup("Error updating request: " + error.message);
-                    }
-                });
-
-                const respondBtn = document.createElement("button");
-                respondBtn.textContent = "Respond";
-                respondBtn.className = "btn-primary";
-                respondBtn.style.background = "#4a90e2";
-
-                const responseContainer = document.createElement("div");
-                responseContainer.style.marginTop = "8px";
-                responseContainer.style.display = "none";
-
-                // Quick Reply Templates - Matching inquiry tab style
-                const quickReplyContainer = document.createElement("div");
-                quickReplyContainer.style.marginBottom = "15px";
                 
-                const quickReplyTitle = document.createElement("p");
-                quickReplyTitle.innerHTML = "<strong style='color: #b3b3b3; font-size: 14px; margin: 0 0 8px 0;'>Quick Replies:</strong>";
-                quickReplyContainer.appendChild(quickReplyTitle);
+                showPopup(`
+                    <strong>Are you sure?</strong><br>
+                    This maintenance request will be permanently deleted.<br><br>
+                    <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+                        Delete
+                    </button>
+                    <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+                        Cancel
+                    </button>
+                `);
 
-                // Create quick reply buttons - EXACT styling from inquiry tab
-                const quickReplyButtons = document.createElement("div");
-                quickReplyButtons.style.display = "flex";
-                quickReplyButtons.style.gap = "10px";
-                quickReplyButtons.style.flexWrap = "wrap";
-
-                quickReplies.forEach((replyText, index) => {
-                    const quickBtn = document.createElement("button");
-                    quickBtn.className = "maintenanceQuickReplyBtn";
-                    quickBtn.textContent = `Reply ${index + 1}`;
-                    quickBtn.title = replyText;
-                    quickBtn.setAttribute("data-template", index);
-                    
-                    // Apply exact same styling as inquiry tab buttons
-                    quickBtn.style.padding = "6px 12px";
-                    quickBtn.style.border = "1px solid";
-                    quickBtn.style.borderRadius = "4px";
-                    quickBtn.style.cursor = "pointer";
-                    quickBtn.style.fontSize = "12px";
-                    quickBtn.style.transition = "all 0.2s";
-                    
-                    // Different colors for different types (matching inquiry tab pattern)
-                    if (index === 0) { // "on the way"
-                        quickBtn.style.background = "#e8f5e9";
-                        quickBtn.style.color = "#2e7d32";
-                        quickBtn.style.borderColor = "#c8e6c9";
-                    } else if (index === 1) { // "assigned"
-                        quickBtn.style.background = "#e3f2fd";
-                        quickBtn.style.color = "#1565c0";
-                        quickBtn.style.borderColor = "#bbdefb";
-                    } else if (index === 2) { // "scheduled"
-                        quickBtn.style.background = "#fff3e0";
-                        quickBtn.style.color = "#a57934";
-                        quickBtn.style.borderColor = "#ffe0b2";
-                    } else if (index === 3) { // "details"
-                        quickBtn.style.background = "#e3f2fd";
-                        quickBtn.style.color = "#1976D2";
-                        quickBtn.style.borderColor = "#bbdefb";
-                    } else if (index === 4) { // "thank you"
-                        quickBtn.style.background = "#f3e5f5";
-                        quickBtn.style.color = "#7b1fa2";
-                        quickBtn.style.borderColor = "#e1bee7";
-                    }
-                    
-                    quickBtn.addEventListener("mouseenter", () => {
-                        quickBtn.style.opacity = "0.9";
-                        quickBtn.style.transform = "translateY(-1px)";
-                    });
-                    
-                    quickBtn.addEventListener("mouseleave", () => {
-                        quickBtn.style.opacity = "1";
-                        quickBtn.style.transform = "translateY(0)";
-                    });
-                    
-                    quickBtn.addEventListener("click", () => {
-                        responseTextarea.value = replyText;
-                        responseTextarea.focus();
-                        // Add slight feedback
-                        quickBtn.style.transform = "scale(0.98)";
-                        setTimeout(() => {
-                            quickBtn.style.transform = "scale(1)";
-                        }, 150);
-                    });
-                    
-                    quickReplyButtons.appendChild(quickBtn);
-                });
-                
-                quickReplyContainer.appendChild(quickReplyButtons);
-
-                const responseTextarea = document.createElement("textarea");
-                responseTextarea.placeholder =
-                    "Enter your response message here...";
-                responseTextarea.style.width = "100%";
-                responseTextarea.style.height = "60px";
-                responseTextarea.style.marginBottom = "8px";
-                responseTextarea.style.resize = "vertical";
-                responseTextarea.style.padding = "10px";
-                responseTextarea.style.border = "1px solid rgba(255,255,255,0.1)";
-                responseTextarea.style.borderRadius = "4px";
-                responseTextarea.style.background = "#181818";
-                responseTextarea.style.color = "#f7f7f7";
-
-                const sendResponseBtn = document.createElement("button");
-                sendResponseBtn.textContent = "Send Response";
-                sendResponseBtn.className = "btn-primary";
-                sendResponseBtn.style.background = "#4a90e2";
-
-                responseContainer.appendChild(quickReplyContainer);
-                responseContainer.appendChild(responseTextarea);
-                responseContainer.appendChild(sendResponseBtn);
-
-                respondBtn.addEventListener("click", () => {
-                    responseContainer.style.display =
-                        responseContainer.style.display === "none"
-                            ? "block"
-                            : "none";
-                    if (responseContainer.style.display === "block") {
-                        responseTextarea.focus();
-                    }
-                });
-
-                sendResponseBtn.addEventListener("click", async () => {
-                    const msg = responseTextarea.value.trim();
-                    if (!msg) {
-                        showPopup("Response message cannot be empty.");
-                        return;
-                    }
-                    try {
-                        const requestDocRef = db
-                            .collection("maintenanceRequests")
-                            .doc(id);
-                        await requestDocRef.collection("responses").add({
-                            adminEmail: auth.currentUser.email,
-                            message: msg,
-                            timestamp:
-                                firebase.firestore.FieldValue.serverTimestamp(),
-                        });
-                        await requestDocRef.update({
-                            responseTime:
-                                firebase.firestore.FieldValue.serverTimestamp(),
-                        });
-                        showPopup("Response sent successfully!");
-                        responseTextarea.value = "";
-                        responseContainer.style.display = "none";
-                    } catch (error) {
-                        showPopup("Failed to send response: " + error.message);
-                    }
-                });
-
-                const deleteBtn = document.createElement("button");
-                deleteBtn.textContent = "Delete";
-                deleteBtn.className = "btn-danger";
-
-                deleteBtn.addEventListener("click", () => {
-                    showPopup(`
-                        <strong>Are you sure?</strong><br>
-                        This maintenance request will be permanently deleted.<br><br>
-                        <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-                            Delete
-                        </button>
-                        <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-                            Cancel
-                        </button>
-                    `);
-
-                    setTimeout(() => {
-                        const confirmBtn =
-                            document.getElementById("confirmDeleteBtn");
-                        if (!confirmBtn) return;
-                        confirmBtn.addEventListener("click", async () => {
-                            try {
-                                await db.collection("maintenanceRequests")
-                                    .doc(id)
-                                    .delete();
-                                closePopup();
-                                showPopup("Maintenance request deleted.");
-                            } catch (error) {
-                                closePopup();
-                                showPopup("Failed to delete: " + error.message);
+                setTimeout(() => {
+                    const confirmBtn = document.getElementById("confirmDeleteBtn");
+                    if (!confirmBtn) return;
+                    confirmBtn.addEventListener("click", async () => {
+                        try {
+                            if (data.maintenanceName) {
+                                personnelAssignments.delete(data.maintenanceName);
                             }
-                        });
-                    }, 50);
-                });
-
-                actionsDiv.appendChild(statusSelect);
-                actionsDiv.appendChild(personnelSelect);
-                actionsDiv.appendChild(updateBtn);
-                actionsDiv.appendChild(respondBtn);
-                actionsDiv.appendChild(deleteBtn);
-
-                card.appendChild(actionsDiv);
-                card.appendChild(responseContainer);
-
-                const responsesContainer = document.createElement("div");
-                responsesContainer.style.marginTop = "10px";
-                responsesContainer.style.borderTop = "1px dashed #555";
-                responsesContainer.style.paddingTop = "6px";
-                responsesContainer.innerHTML =
-                    "<strong>Response History:</strong><p>Loading...</p>";
-
-                card.appendChild(responsesContainer);
-
-                db.collection("maintenanceRequests")
-                    .doc(id)
-                    .collection("responses")
-                    .orderBy("timestamp", "asc")
-                    .onSnapshot((snapshotResp) => {
-                        responsesContainer.innerHTML =
-                            "<strong>Response History:</strong>";
-                        if (snapshotResp.empty) {
-                            responsesContainer.innerHTML +=
-                                "<p>No responses yet.</p>";
-                        } else {
-                            snapshotResp.forEach((r) => {
-                                const rData = r.data();
-                                const rEl = document.createElement("div");
-                                rEl.style.borderBottom = "1px solid #444";
-                                rEl.style.padding = "4px 0";
-                                rEl.innerHTML = `
-                                    <strong>${rData.adminEmail || data.tenantEmail}:</strong> ${
-                                    rData.message || ""
-                                }<br>
-                                    <small style="color:#bdbdbd;">${formatDateTimeAMPM(
-                                        rData.timestamp
-                                    )}</small>
-                                `;
-                                responsesContainer.appendChild(rEl);
-                            });
+                            
+                            await db.collection("maintenanceRequests").doc(id).delete();
+                            closePopup();
+                            showPopup("Maintenance request deleted.");
+                            
+                            setTimeout(() => {
+                                applyFiltersAndSort();
+                            }, 500);
+                        } catch (error) {
+                            closePopup();
+                            showPopup("Failed to delete: " + error.message);
                         }
                     });
+                }, 50);
+            });
 
-                maintenanceList.appendChild(card);
+            actionsDiv.appendChild(deleteBtn);
 
-                // image slider
-                if (
-                    data.imageUrls &&
-                    Array.isArray(data.imageUrls) &&
-                    data.imageUrls.length > 1
-                ) {
-                    let currentIndex = 0;
-                    const imgEl = card.querySelector(`#img-${id}`);
-                    const prevBtn = card.querySelector(".prev-btn");
-                    const nextBtn = card.querySelector(".next-btn");
-
-                    prevBtn.addEventListener("click", () => {
-                        currentIndex =
-                            (currentIndex - 1 + data.imageUrls.length) %
-                            data.imageUrls.length;
-                        imgEl.src = data.imageUrls[currentIndex];
-                    });
-
-                    nextBtn.addEventListener("click", () => {
-                        currentIndex =
-                            (currentIndex + 1) % data.imageUrls.length;
-                        imgEl.src = data.imageUrls[currentIndex];
-                    });
+            // --- ASSIGN BUTTON EVENT HANDLER ---
+            assignBtn.addEventListener("click", async () => {
+                const selectedPersonnel = personnelSelect.value;
+                
+                if (!selectedPersonnel) {
+                    showPopup("Please select a personnel to assign.");
+                    return;
+                }
+                
+                // Check if personnel is available (only blocked if they're In Progress)
+                const personnelStatus = getPersonnelStatus(selectedPersonnel);
+                if (!personnelStatus.available) {
+                    showPopup(`Cannot assign ${selectedPersonnel}. They are currently working on ${personnelStatus.unitNumber}.`);
+                    return;
+                }
+                
+                try {
+                    const updateData = {
+                        maintenanceName: selectedPersonnel,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    };
+                    
+                    // If reassigning different personnel
+                    if (data.maintenanceName && data.maintenanceName !== selectedPersonnel) {
+                        // Remove old personnel from tracking if they were In Progress
+                        if (data.status === "In Progress") {
+                            personnelAssignments.delete(data.maintenanceName);
+                        }
+                    }
+                    
+                    // Add new personnel to tracking (status will auto-update to In Progress)
+                    personnelAssignments.set(selectedPersonnel, id);
+                    
+                    await db.collection("maintenanceRequests").doc(id).update(updateData);
+                    
+                    showPopup(`Personnel assigned successfully! ${selectedPersonnel} will start working on this request.`);
+                    
+                    setTimeout(() => {
+                        applyFiltersAndSort();
+                    }, 500);
+                    
+                } catch (error) {
+                    showPopup("Error assigning personnel: " + error.message);
                 }
             });
 
-            requestCount.textContent = filteredRequests.length;
-            pendingCountEl.textContent = pending;
-            completeCountEl.textContent = complete;
-            maintenanceStats.style.display = "block";
-        }
+            card.appendChild(actionsDiv);
 
-        db.collection("maintenanceRequests")
-            .orderBy("timestamp", "desc")
-            .onSnapshot(
-                (snapshot) => {
-                    if (snapshot.empty) {
-                        allRequests = [];
-                        filteredRequests = [];
-                        maintenanceList.innerHTML =
-                            "<p>No maintenance requests found.</p>";
-                        maintenanceStats.style.display = "none";
-                        return;
+            // Response history (unchanged)
+            const responsesContainer = document.createElement("div");
+            responsesContainer.style.marginTop = "10px";
+            responsesContainer.style.borderTop = "1px dashed #555";
+            responsesContainer.style.paddingTop = "6px";
+            responsesContainer.innerHTML = "<strong>Response History:</strong><p>Loading...</p>";
+
+            card.appendChild(responsesContainer);
+
+            db.collection("maintenanceRequests")
+                .doc(id)
+                .collection("responses")
+                .orderBy("timestamp", "asc")
+                .onSnapshot((snapshotResp) => {
+                    responsesContainer.innerHTML = "<strong>Response History:</strong>";
+                    if (snapshotResp.empty) {
+                        responsesContainer.innerHTML += "<p>No responses yet.</p>";
+                    } else {
+                        snapshotResp.forEach((r) => {
+                            const rData = r.data();
+                            const rEl = document.createElement("div");
+                            rEl.style.borderBottom = "1px solid #444";
+                            rEl.style.padding = "4px 0";
+                            rEl.innerHTML = `
+                                <strong>${rData.adminEmail || data.tenantEmail}:</strong> ${rData.message || ""}<br>
+                                <small style="color:#bdbdbd;">${formatDateTimeAMPM(rData.timestamp)}</small>
+                            `;
+                            responsesContainer.appendChild(rEl);
+                        });
                     }
-                    allRequests = snapshot.docs.map((docSnap) => ({
-                        id: docSnap.id,
-                        ...docSnap.data(),
-                    }));
-                    applyFiltersAndSort();
-                },
-                (error) => {
-                    maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-                }
-            );
+                });
 
-        statusFilter.addEventListener("change", applyFiltersAndSort);
-        personnelFilter.addEventListener("change", applyFiltersAndSort);
-        maintenanceSearch.addEventListener("input", applyFiltersAndSort);
-        sortBy.addEventListener("change", applyFiltersAndSort);
-        resetFilters.addEventListener("click", () => {
-            statusFilter.value = "all";
-            personnelFilter.value = "all";
-            maintenanceSearch.value = "";
-            sortBy.value = "date-desc";
-            applyFiltersAndSort();
-        });
-    }
+            maintenanceList.appendChild(card);
 
-    // ======================== UNIT OWNER CREATION LOGIC ========================
-    function initUnitOwnerCreation() {
-    const adminEmail = "adminaccount@solano.com";
-    const adminPassword = "123456";
+            // Image slider
+            if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
+                let currentIndex = 0;
+                const imgEl = card.querySelector(`#img-${id}`);
+                const prevBtn = card.querySelector(".prev-btn");
+                const nextBtn = card.querySelector(".next-btn");
 
-    // ⭐ EMAILJS INITIALIZATION
-    emailjs.init("lqyGatNXQhoDJsu2B");
+                prevBtn.addEventListener("click", () => {
+                    currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
+                    imgEl.src = data.imageUrls[currentIndex];
+                });
 
-    // ⭐ SEND EMAIL TO TENANT AFTER ACCOUNT CREATION
-    async function sendAccountEmail(recipient, email, password, units) {
-      try {
-        await emailjs.send("service_izx63bb", "template_p7zetfj", {
-          to_email: recipient,
-          tenant_email: email,
-          tenant_password: password,
-          unit_numbers: units.join(", "),
-          login_link: "https://cjgenon.github.io/SOLANO/LogIn.html"  // <-- add your real login page URL here
-        });
-        console.log("Email sent successfully");
-      } catch (error) {
-        console.error("EmailJS Error:", error);
-      }
-    }
-
-    function generatePassword() {
-      const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const lowercase = "abcdefghijklmnopqrstuvwxyz";
-      const numbers = "0123456789";
-
-      let password = "";
-      password += uppercase[Math.floor(Math.random() * uppercase.length)];
-      password += lowercase[Math.floor(Math.random() * lowercase.length)];
-      password += numbers[Math.floor(Math.random() * numbers.length)];
-
-      const allChars = uppercase + lowercase + numbers;
-      for (let i = 3; i < 8; i++) {
-        password += allChars[Math.floor(Math.random() * allChars.length)];
-      }
-
-      return password
-        .split("")
-        .sort(() => Math.random() - 0.5)
-        .join("");
-    }
-
-    // Master units array generation
-    const units = [];
-    const unitsPerBuilding = 144;
-    const floorsPerBuilding = 8;
-    const unitsPerFloor = unitsPerBuilding / floorsPerBuilding; // 18 units per floor
-
-    for (let i = 1; i <= 288; i++) {
-      const building = i <= unitsPerBuilding ? 1 : 2;
-      const floor = building === 1
-        ? Math.ceil(i / unitsPerFloor)
-        : Math.ceil((i - unitsPerBuilding) / unitsPerFloor);
-
-      const type = i % 2 === 1 ? "1B" : "2B";
-
-      units.push({ num: i, building, floor, type });
-    }
-
-    // Populate unit numbers dropdown excluding occupied units
-    function populateUnitNumbers(typeSelect, numberSelect, occupied) {
-      numberSelect.innerHTML = '<option value="">-- Select Unit Number --</option>';
-      if (!typeSelect.value) return;
-
-      const type = typeSelect.value;
-      const currentValue = numberSelect.value;
-      let currentStillAvailable = false;
-
-      units.forEach(unit => {
-        if (unit.type !== type) return;
-
-        const numStr = unit.num.toString().padStart(3, "0");
-        const unitValue = `${type}-${numStr}`;
-
-        if (occupied.includes(unitValue)) return;
-
-        const opt = document.createElement("option");
-        opt.value = unitValue;
-        opt.textContent = `${numStr} (Bldg ${unit.building} - Floor ${unit.floor})`;
-        numberSelect.appendChild(opt);
-
-        if (currentValue === unitValue) {
-          currentStillAvailable = true;
-        }
-      });
-
-      if (currentStillAvailable) {
-        numberSelect.value = currentValue;
-      }
-    }
-
-    // Fetch occupied units from Firestore
-    async function getOccupiedUnits() {
-      try {
-        const usersSnapshot = await db
-          .collection("users")
-          .where("role", "==", "tenant")
-          .get();
-
-        const occupiedUnits = [];
-        usersSnapshot.forEach((docSnap) => {
-          const userData = docSnap.data();
-          if (userData.unitNumbers && Array.isArray(userData.unitNumbers)) {
-            occupiedUnits.push(...userData.unitNumbers);
-          }
-        });
-        console.log("Occupied units fetched:", occupiedUnits);
-        return occupiedUnits;
-      } catch (error) {
-        console.error("Error fetching occupied units:", error);
-        return [];
-      }
-    }
-
-    // Load and display list of created unit owners
-    async function loadAndDisplayUnitOwners() {
-      const ul = document.getElementById("unitOwnersUl");
-      ul.innerHTML = "<li>Loading...</li>";
-      try {
-        const snapshot = await db.collection("users").where("role", "==", "tenant").get();
-        if (snapshot.empty) {
-          ul.innerHTML = "<li>No unit owners found.</li>";
-          return;
-        }
-
-        ul.innerHTML = ""; // clear loading
-
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const li = document.createElement("li");
-          li.style.padding = "6px 0";
-          li.style.borderBottom = "1px solid #eee";
-
-          const unitsText = data.unitNumbers ? data.unitNumbers.map(unitStr => {
-            const numPart = parseInt(unitStr.split("-")[1], 10);
-            const unitInfo = units.find(u => u.num === numPart);
-
-            if (unitInfo) {
-              return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
-            } else {
-              return unitStr;
+                nextBtn.addEventListener("click", () => {
+                    currentIndex = (currentIndex + 1) % data.imageUrls.length;
+                    imgEl.src = data.imageUrls[currentIndex];
+                });
             }
-          }).join(", ") : "No units assigned";
-
-          li.textContent = `${data.email} — Units: ${unitsText}`;
-
-          ul.appendChild(li);
         });
 
-      } catch (error) {
-        console.error("Error loading unit owners:", error);
-        ul.innerHTML = `<li style="color:red;">Error loading unit owners.</li>`;
-      }
+        requestCount.textContent = filteredRequests.length;
+        pendingCountEl.textContent = pending;
+        if (inProgressCountEl && inProgressCountEl.textContent !== undefined) {
+            inProgressCountEl.textContent = inProgress;
+        }
+        completeCountEl.textContent = complete;
+        maintenanceStats.style.display = "block";
     }
 
-    (async () => {
-      let occupiedUnits = await getOccupiedUnits();
-
-      const passwordInput = document.getElementById("tenantPassword");
-      const generateBtn = document.getElementById("generatePasswordBtn");
-      const form = document.getElementById("createTenantForm");
-      const unitContainer = document.getElementById("unitContainer");
-      const addUnitBtn = document.getElementById("addUnitBtn");
-
-      generateBtn.addEventListener("click", () => {
-        const newPassword = generatePassword();
-        passwordInput.value = newPassword;
-        passwordInput.style.background = "#e8f5e8";
-        passwordInput.style.border = "1px solid #4CAF50";
-        setTimeout(() => {
-          passwordInput.style.background = "#222";
-          passwordInput.style.border = "1px solid rgba(255,255,255,0.18)";
-        }, 3000);
-      });
-
-      const firstType = document.querySelector(".unitType");
-      const firstNumber = document.querySelector(".unitNumber");
-      firstType.addEventListener("change", () =>
-        populateUnitNumbers(firstType, firstNumber, occupiedUnits)
-      );
-
-      addUnitBtn.addEventListener("click", () => {
-        const row = document.createElement("div");
-        row.classList.add("unit-row");
-        row.style = "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
-        row.innerHTML = `
-          <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-            <option value="">-- Select Type --</option>
-            <option value="1B">1B (1 Bedroom)</option>
-            <option value="2B">2B (2 Bedroom)</option>
-          </select>
-          <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-            <option value="">-- Select Unit Number --</option>
-          </select>
-          <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-        `;
-        unitContainer.appendChild(row);
-
-        const tSelect = row.querySelector(".unitType");
-        const nSelect = row.querySelector(".unitNumber");
-        tSelect.addEventListener("change", () =>
-          populateUnitNumbers(tSelect, nSelect, occupiedUnits)
+    // Initial load
+    db.collection("maintenanceRequests")
+        .orderBy("timestamp", "desc")
+        .onSnapshot(
+            (snapshot) => {
+                if (snapshot.empty) {
+                    allRequests = [];
+                    filteredRequests = [];
+                    maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
+                    maintenanceStats.style.display = "none";
+                    return;
+                }
+                allRequests = snapshot.docs.map((docSnap) => ({
+                    id: docSnap.id,
+                    ...docSnap.data(),
+                }));
+                applyFiltersAndSort();
+            },
+            (error) => {
+                maintenanceList.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+            }
         );
 
-        row.querySelector(".removeUnitBtn").addEventListener("click", function () {
-          if (document.querySelectorAll(".unit-row").length > 1) {
-            row.remove();
+    // Filter event listeners
+    statusFilter.addEventListener("change", applyFiltersAndSort);
+    personnelFilter.addEventListener("change", applyFiltersAndSort);
+    maintenanceSearch.addEventListener("input", applyFiltersAndSort);
+    sortBy.addEventListener("change", applyFiltersAndSort);
+    resetFilters.addEventListener("click", () => {
+        statusFilter.value = "all";
+        personnelFilter.value = "all";
+        maintenanceSearch.value = "";
+        sortBy.value = "date-desc";
+        applyFiltersAndSort();
+    });
+}
+    // ======================== UNIT OWNER CREATION LOGIC ========================
+      function initUnitOwnerCreation() {
+      const adminEmail = "adminaccount@solano.com";
+      const adminPassword = "123456";
+
+      // ⭐ EMAILJS INITIALIZATION
+      emailjs.init("lqyGatNXQhoDJsu2B");
+
+      // ⭐ SEND EMAIL TO TENANT AFTER ACCOUNT CREATION
+      async function sendAccountEmail(recipient, email, password, units) {
+        try {
+          await emailjs.send("service_izx63bb", "template_p7zetfj", {
+            to_email: recipient,
+            tenant_email: email,
+            tenant_password: password,
+            unit_numbers: units.join(", "),
+            login_link: "https://cjgenon.github.io/SOLANO/LogIn.html"  // <-- add your real login page URL here
+          });
+          console.log("Email sent successfully");
+        } catch (error) {
+          console.error("EmailJS Error:", error);
+        }
+      }
+
+      function generatePassword() {
+        const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const lowercase = "abcdefghijklmnopqrstuvwxyz";
+        const numbers = "0123456789";
+
+        let password = "";
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+
+        const allChars = uppercase + lowercase + numbers;
+        for (let i = 3; i < 8; i++) {
+          password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+
+        return password
+          .split("")
+          .sort(() => Math.random() - 0.5)
+          .join("");
+      }
+
+      // Master units array generation
+      const units = [];
+      const unitsPerBuilding = 144;
+      const floorsPerBuilding = 8;
+      const unitsPerFloor = unitsPerBuilding / floorsPerBuilding; // 18 units per floor
+
+      for (let i = 1; i <= 288; i++) {
+        const building = i <= unitsPerBuilding ? 1 : 2;
+        const floor = building === 1
+          ? Math.ceil(i / unitsPerFloor)
+          : Math.ceil((i - unitsPerBuilding) / unitsPerFloor);
+
+        const type = i % 2 === 1 ? "1B" : "2B";
+
+        units.push({ num: i, building, floor, type });
+      }
+
+      // Populate unit numbers dropdown excluding occupied units
+      function populateUnitNumbers(typeSelect, numberSelect, occupied) {
+        numberSelect.innerHTML = '<option value="">-- Select Unit Number --</option>';
+        if (!typeSelect.value) return;
+
+        const type = typeSelect.value;
+        const currentValue = numberSelect.value;
+        let currentStillAvailable = false;
+
+        units.forEach(unit => {
+          if (unit.type !== type) return;
+
+          const numStr = unit.num.toString().padStart(3, "0");
+          const unitValue = `${type}-${numStr}`;
+
+          if (occupied.includes(unitValue)) return;
+
+          const opt = document.createElement("option");
+          opt.value = unitValue;
+          opt.textContent = `${numStr} (Bldg ${unit.building} - Floor ${unit.floor})`;
+          numberSelect.appendChild(opt);
+
+          if (currentValue === unitValue) {
+            currentStillAvailable = true;
           }
         });
-      });
 
-      // Initial remove button event for first unit row
-      document.querySelector(".removeUnitBtn").addEventListener("click", function () {
-        if (document.querySelectorAll(".unit-row").length > 1) {
-          this.parentElement.remove();
+        if (currentStillAvailable) {
+          numberSelect.value = currentValue;
         }
-      });
+      }
 
-      // Load and display existing unit owners at startup
-      await loadAndDisplayUnitOwners();
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("tenantEmail").value;
-        const password = passwordInput.value;
-        const unitNumbers = Array.from(document.querySelectorAll(".unitNumber"))
-          .map((i) => i.value)
-          .filter((v) => v !== "");
-
-        const occupiedSet = new Set(occupiedUnits);
-        const occupiedSelections = unitNumbers.filter((u) => occupiedSet.has(u));
-        if (occupiedSelections.length > 0) {
-          showPopup(
-            `Error: The following units are already occupied: ${occupiedSelections.join(
-              ", "
-            )}. Please select different units.`
-          );
-          return;
-        }
-
+      // Fetch occupied units from Firestore
+      async function getOccupiedUnits() {
         try {
-          const userCredential =
-            await auth.createUserWithEmailAndPassword(
-              email,
-              password
-            );
-          const user = userCredential.user;
+          const usersSnapshot = await db
+            .collection("users")
+            .where("role", "==", "tenant")
+            .get();
 
-          await db.collection("users").doc(user.uid).set({
-            email,
-            role: "tenant",
-            unitNumbers,
-            mustChangePassword: true,
-            createdAt:
-              firebase.firestore.FieldValue.serverTimestamp(),
-          });
-
-          // Build detailed unit numbers with building and floor info for email
-          const unitsWithDetails = unitNumbers.map(unitStr => {
-            const numPart = parseInt(unitStr.split("-")[1], 10);
-            const unitInfo = units.find(u => u.num === numPart);
-
-            if (unitInfo) {
-              return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
-            } else {
-              return unitStr;
+          const occupiedUnits = [];
+          usersSnapshot.forEach((docSnap) => {
+            const userData = docSnap.data();
+            if (userData.unitNumbers && Array.isArray(userData.unitNumbers)) {
+              occupiedUnits.push(...userData.unitNumbers);
             }
           });
+          console.log("Occupied units fetched:", occupiedUnits);
+          return occupiedUnits;
+        } catch (error) {
+          console.error("Error fetching occupied units:", error);
+          return [];
+        }
+      }
 
-          // ⭐ SEND EMAIL AFTER ACCOUNT CREATION
-          await sendAccountEmail(email, email, password, unitsWithDetails);
+      // Load and display list of created unit owners
+      async function loadAndDisplayUnitOwners() {
+        const ul = document.getElementById("unitOwnersUl");
+        ul.innerHTML = "<li>Loading...</li>";
+        try {
+          const snapshot = await db.collection("users").where("role", "==", "tenant").get();
+          if (snapshot.empty) {
+            ul.innerHTML = "<li>No unit owners found.</li>";
+            return;
+          }
 
-          occupiedUnits.push(...unitNumbers);
+          ul.innerHTML = ""; // clear loading
 
-          await auth.signInWithEmailAndPassword(
-            adminEmail,
-            adminPassword
-          );
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const li = document.createElement("li");
+            li.style.padding = "6px 0";
+            li.style.borderBottom = "1px solid #eee";
 
-          showPopup(
-            "Unit Owner created successfully! Temporary password: " +
-            password
-          );
+            const unitsText = data.unitNumbers ? data.unitNumbers.map(unitStr => {
+              const numPart = parseInt(unitStr.split("-")[1], 10);
+              const unitInfo = units.find(u => u.num === numPart);
 
-          form.reset();
-          passwordInput.value = "";
-          passwordInput.style.background = "#222";
-          passwordInput.style.border =
-            "1px solid rgba(255,255,255,0.18)";
+              if (unitInfo) {
+                return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
+              } else {
+                return unitStr;
+              }
+            }).join(", ") : "No units assigned";
 
-          unitContainer.innerHTML = `
-            <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-              <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-                <option value="">-- Select Type --</option>
-                <option value="1B">1B (1 Bedroom)</option>
-                <option value="2B">2B (2 Bedroom)</option>
-              </select>
-              <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-                <option value="">-- Select Unit Number --</option>
-              </select>
-              <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-            </div>
+            li.textContent = `${data.email} — Units: ${unitsText}`;
+
+            ul.appendChild(li);
+          });
+
+        } catch (error) {
+          console.error("Error loading unit owners:", error);
+          ul.innerHTML = `<li style="color:red;">Error loading unit owners.</li>`;
+        }
+      }
+
+      (async () => {
+        let occupiedUnits = await getOccupiedUnits();
+
+        const passwordInput = document.getElementById("tenantPassword");
+        const generateBtn = document.getElementById("generatePasswordBtn");
+        const form = document.getElementById("createTenantForm");
+        const unitContainer = document.getElementById("unitContainer");
+        const addUnitBtn = document.getElementById("addUnitBtn");
+
+        generateBtn.addEventListener("click", () => {
+          const newPassword = generatePassword();
+          passwordInput.value = newPassword;
+          passwordInput.style.background = "#e8f5e8";
+          passwordInput.style.border = "1px solid #4CAF50";
+          setTimeout(() => {
+            passwordInput.style.background = "#222";
+            passwordInput.style.border = "1px solid rgba(255,255,255,0.18)";
+          }, 3000);
+        });
+
+        const firstType = document.querySelector(".unitType");
+        const firstNumber = document.querySelector(".unitNumber");
+        firstType.addEventListener("change", () =>
+          populateUnitNumbers(firstType, firstNumber, occupiedUnits)
+        );
+
+        addUnitBtn.addEventListener("click", () => {
+          const row = document.createElement("div");
+          row.classList.add("unit-row");
+          row.style = "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
+          row.innerHTML = `
+            <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+              <option value="">-- Select Type --</option>
+              <option value="1B">1B (1 Bedroom)</option>
+              <option value="2B">2B (2 Bedroom)</option>
+            </select>
+            <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+              <option value="">-- Select Unit Number --</option>
+            </select>
+            <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
           `;
+          unitContainer.appendChild(row);
 
-          const newFirstType = document.querySelector(".unitType");
-          const newFirstNumber = document.querySelector(".unitNumber");
-          newFirstType.addEventListener("change", () =>
-            populateUnitNumbers(
-              newFirstType,
-              newFirstNumber,
-              occupiedUnits
-            )
+          const tSelect = row.querySelector(".unitType");
+          const nSelect = row.querySelector(".unitNumber");
+          tSelect.addEventListener("change", () =>
+            populateUnitNumbers(tSelect, nSelect, occupiedUnits)
           );
 
-          document
-            .querySelector(".removeUnitBtn")
-            .addEventListener("click", function () {
-              if (
-                document.querySelectorAll(".unit-row").length > 1
-              ) {
-                this.parentElement.remove();
+          row.querySelector(".removeUnitBtn").addEventListener("click", function () {
+            if (document.querySelectorAll(".unit-row").length > 1) {
+              row.remove();
+            }
+          });
+        });
+
+        // Initial remove button event for first unit row
+        document.querySelector(".removeUnitBtn").addEventListener("click", function () {
+          if (document.querySelectorAll(".unit-row").length > 1) {
+            this.parentElement.remove();
+          }
+        });
+
+        // Load and display existing unit owners at startup
+        await loadAndDisplayUnitOwners();
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const email = document.getElementById("tenantEmail").value;
+          const password = passwordInput.value;
+          const unitNumbers = Array.from(document.querySelectorAll(".unitNumber"))
+            .map((i) => i.value)
+            .filter((v) => v !== "");
+
+          const occupiedSet = new Set(occupiedUnits);
+          const occupiedSelections = unitNumbers.filter((u) => occupiedSet.has(u));
+          if (occupiedSelections.length > 0) {
+            showPopup(
+              `Error: The following units are already occupied: ${occupiedSelections.join(
+                ", "
+              )}. Please select different units.`
+            );
+            return;
+          }
+
+          try {
+            const userCredential =
+              await auth.createUserWithEmailAndPassword(
+                email,
+                password
+              );
+            const user = userCredential.user;
+
+            await db.collection("users").doc(user.uid).set({
+              email,
+              role: "tenant",
+              unitNumbers,
+              mustChangePassword: true,
+              createdAt:
+                firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Build detailed unit numbers with building and floor info for email
+            const unitsWithDetails = unitNumbers.map(unitStr => {
+              const numPart = parseInt(unitStr.split("-")[1], 10);
+              const unitInfo = units.find(u => u.num === numPart);
+
+              if (unitInfo) {
+                return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
+              } else {
+                return unitStr;
               }
             });
 
-          // Update the unit owners list display after adding a new user
-          await loadAndDisplayUnitOwners();
+            // ⭐ SEND EMAIL AFTER ACCOUNT CREATION
+            await sendAccountEmail(email, email, password, unitsWithDetails);
 
-        } catch (error) {
-          showPopup("Error: " + error.message);
-        }
-      });
-    })();
-  }
+            occupiedUnits.push(...unitNumbers);
+
+            await auth.signInWithEmailAndPassword(
+              adminEmail,
+              adminPassword
+            );
+
+            showPopup(
+              "Unit Owner created successfully! Temporary password: " +
+              password
+            );
+
+            form.reset();
+            passwordInput.value = "";
+            passwordInput.style.background = "#222";
+            passwordInput.style.border =
+              "1px solid rgba(255,255,255,0.18)";
+
+            unitContainer.innerHTML = `
+              <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                  <option value="">-- Select Type --</option>
+                  <option value="1B">1B (1 Bedroom)</option>
+                  <option value="2B">2B (2 Bedroom)</option>
+                </select>
+                <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                  <option value="">-- Select Unit Number --</option>
+                </select>
+                <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+              </div>
+            `;
+
+            const newFirstType = document.querySelector(".unitType");
+            const newFirstNumber = document.querySelector(".unitNumber");
+            newFirstType.addEventListener("change", () =>
+              populateUnitNumbers(
+                newFirstType,
+                newFirstNumber,
+                occupiedUnits
+              )
+            );
+
+            document
+              .querySelector(".removeUnitBtn")
+              .addEventListener("click", function () {
+                if (
+                  document.querySelectorAll(".unit-row").length > 1
+                ) {
+                  this.parentElement.remove();
+                }
+              });
+
+            // Update the unit owners list display after adding a new user
+            await loadAndDisplayUnitOwners();
+
+          } catch (error) {
+            showPopup("Error: " + error.message);
+          }
+        });
+      })();
+    }
 
     // ======================== FEEDBACK RECEIVED LOGIC ========================
     function initFeedbackReceived() {
@@ -2243,4 +2385,3 @@
   </div>
 </body>
 </html>
-
