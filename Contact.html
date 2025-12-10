@@ -280,7 +280,7 @@
         const linkMatch = content.match(/https:\/\/[^\s]+/);
         if (linkMatch) {
           const link = linkMatch[0];
-          const linkHtml = `<a href="${link}" target="_blank" class="calculator-link">Open Mortgage Calculator</a>`;
+          const linkHtml = `<a href="${link}" target="_blank" class="MORTGAGE_CALCULATOR_LINK">Open Mortgage Calculator</a>`;
           content = content.replace(link, '') + '\n\n' + linkHtml;
         }
         
