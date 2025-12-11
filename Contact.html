@@ -274,24 +274,16 @@
 
     // Function to format message content with proper formatting
     function formatMessageContent(content) {
-      // Check if it's a price list message
-      if (content.includes('🏠') || content.includes('Calculate your personalized payments')) {
-        // Replace the calculator link with a clickable one
-        const linkMatch = content.match(/https:\/\/[^\s]+/);
-        if (linkMatch) {
-          const link = linkMatch[0];
-          const linkHtml = `<a href="${link}" target="_blank" class="MORTGAGE_CALCULATOR_LINK">Open Mortgage Calculator</a>`;
-          content = content.replace(link, '') + '\n\n' + linkHtml;
-        }
-        
-        // Wrap in a div with monospace font for formatting
-        return `<div class="message-content">${content.replace(/\n/g, '<br>')}</div>`;
-      }
-      
-      // Regular message
-      return content.replace(/\n/g, '<br>');
-    }
+    // Universal URL detection — make ALL links clickable
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
 
+    content = content.replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank">${url}</a>`;
+    });
+
+    // Convert new lines
+    return content.replace(/\n/g, '<br>');
+  }
     async function startListeningToMessages() {
       const anonId = getGuestId();
 
@@ -473,4 +465,3 @@
   </script>
 </body>
 </html>
-
