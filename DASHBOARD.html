@@ -4,105 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Property Owner Dashboard – Solano Hills</title>
-  <style>
-    /* ==================== SIMPLE LOADING INDICATORS ==================== */
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .loading-spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #8d6c39;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-
-    .loading-spinner-small {
-        width: 20px;
-        height: 20px;
-        border: 2px solid #f3f3f3;
-        border-top: 2px solid #8d6c39;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        display: inline-block;
-        margin-right: 8px;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    /* Button loading state */
-    .button-loading {
-        position: relative;
-        color: transparent !important;
-    }
-
-    .button-loading::after {
-        content: '';
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 20px;
-        height: 20px;
-        margin: -10px 0 0 -10px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top: 2px solid white;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-
-    /* Hidden class */
-    .hidden {
-        display: none !important;
-    }
-
-    /* Popup styles */
-    .popup {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 10000;
-    }
-    
-    .popup-content {
-        background: white;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        text-align: center;
-        max-width: 400px;
-        width: 90%;
-    }
-    
-    .popup-content button {
-        margin-top: 1rem;
-        padding: 8px 20px;
-        background: #8d6c39;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-  </style>
   <link rel="stylesheet" href="Dashboard.css" />
 </head>
 <body>
@@ -138,7 +39,7 @@
   </div>
 
   <!-- ======================== THIRD‑PARTY SCRIPTS ======================== -->
-  <script src="https://www.paypal.com/sdk/js?client-id=ASDYl8DDDQKLSnsL75To3794uumVSxwIKExnbGsTeuNsmrdqIMJTf9FKF3BWjULxHoQOvA5oNflYDSgh&currency=PHP"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=ASbUIe1_A3shQqfiUe1_TnYnp7jGyD-_pClj10rYjAG7Fmbu_sPi6s8LoJD2bRv6bT2XkJBo-FpPO5t4&currency=PHP"></script>
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <script>
     (function () {
@@ -227,6 +128,9 @@
 
     /* ======================== MAIN ROUTER ======================== */
     window.loadContent = function (event, section) {
+      // Save the active tab to localStorage
+      localStorage.setItem('activeTab', section);
+      
       // Show loading when switching sections
       showLoading();
       
@@ -2467,8 +2371,36 @@
       document.getElementById("customPopup").classList.add("hidden");
     };
 
+    /* ======================== TAB PERSISTENCE ======================== */
+    function setActiveTabOnLoad() {
+      const savedTab = localStorage.getItem('activeTab');
+      if (savedTab) {
+        // Remove active class from all links first
+        document.querySelectorAll(".sidebar nav ul li a").forEach(link => {
+          link.classList.remove("active");
+        });
+        
+        // Add active class to the saved tab link
+        const savedTabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${savedTab}"]`);
+        if (savedTabLink) {
+          savedTabLink.classList.add("active");
+        }
+      }
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
-      loadContent(null, "dashboard");
+      setActiveTabOnLoad();
+      
+      // Check if there's a saved tab in localStorage
+      const savedTab = localStorage.getItem('activeTab');
+      
+      // Load the saved tab if it exists, otherwise load dashboard
+      if (savedTab && 
+          ['dashboard', 'maintenance', 'billing', 'feedback'].includes(savedTab)) {
+        loadContent(null, savedTab);
+      } else {
+        loadContent(null, "dashboard");
+      }
     });
   </script>
 
