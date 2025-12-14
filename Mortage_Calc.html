@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Personalized Mortgage Calculator | PHINMA Properties</title>
-    <link rel="stylesheet" href="Mortage_Calc.css" />
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Personalized Mortgage Calculator | PHINMA Properties</title>
+<link rel="stylesheet" href="Mortage_Calc.css" />
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 </head>
+
 <body>
+
     <div class="email-container">
         <div class="header">
             <div class="logo">PHINMA PROPERTIES</div>
@@ -26,98 +32,35 @@
             
             <div class="calculator-section">
                 <h3 class="section-title">Customize Your Investment</h3>
-
-                <div class="input-row">
-  <div class="input-label">Unit Type</div>
-  <div class="input-controls">
-    <select id="unitType" class="number-input" style="width:auto; text-align:left;">
-      <option value="1br" selected>1 Bedroom</option>
-      <option value="2br">2 Bedroom</option>
-    </select>
-  </div>
-</div>
-
                 
-             <div class="input-row">
-    <div class="input-label">Property Price</div>
-    <div class="input-controls">
-        <span style="font-weight: 600; color: #cfa85b;">₱</span>
-        
-        <input
-            type="number"
-            id="propertyPrice"
-            class="number-input"
-            value="386900"
-            readonly
-        >
-        
-        <input
-            type="range"
-            id="propertyPriceSlider"
-            class="slider"
-            min="386900"
-            max="773800"
-            step="386900"
-            value="386900"
-            disabled
-        >
-    </div>
-</div>
-
+                <div class="input-group">
+                    <div class="input-row">
+                        <div class="input-label">Property Price</div>
+                        <div class="input-controls">
+                            <span style="font-weight: 600; color: #cfa85b;">₱</span>
+                            <input type="number" id="propertyPrice" class="number-input" value="3868900" min="1000000" max="10000000" step="10000">
+                            <input type="range" id="propertyPriceSlider" class="slider" min="1000000" max="10000000" step="10000" value="3868900">
+                        </div>
+                    </div>
                     
                     <div class="input-row">
-    <div class="input-label">Your Downpayment</div>
-    <div class="input-controls">
-        <input
-            type="number"
-            id="downpaymentPercent"
-            class="number-input"
-            value="10"
-            min="10"
-            max="100"
-            step="1"
-        >
-        <span style="font-weight: 600; color: #cfa85b;">%</span>
-        <input
-            type="range"
-            id="downpaymentSlider"
-            class="slider"
-            min="10"
-            max="100"
-            step="1"
-            value="10"
-        >
-        <!-- live peso amount -->
-        <span id="downpaymentAmountLabel" class="inline-amount">₱ 0</span>
-    </div>
-</div>
-
+                        <div class="input-label">Your Downpayment</div>
+                        <div class="input-controls">
+                            <input type="number" id="downpaymentPercent" class="number-input" value="10" min="0" max="100" step="1">
+                            <span style="font-weight: 600; color: #cfa85b;">%</span>
+                            <input type="range" id="downpaymentSlider" class="slider" min="0" max="100" step="1" value="10">
+                        </div>
+                    </div>
                     
                     <div class="input-row">
-    <div class="input-label">Loan Term</div>
-    <div class="input-controls">
-        <input
-            type="number"
-            id="loanTerm"
-            class="number-input"
-            value="25"
-            min="5"
-            max="30"
-            step="1"
-        >
-        <span style="font-weight: 600; color: #cfa85b;">years</span>
-        <input
-            type="range"
-            id="loanTermSlider"
-            class="slider"
-            min="5"
-            max="30"
-            step="1"
-            value="25"
-        >
-    </div>
-</div>
-
+                        <div class="input-label">Loan Term</div>
+                        <div class="input-controls">
+                            <input type="number" id="loanTerm" class="number-input" value="25" min="5" max="30" step="1">
+                            <span style="font-weight: 600; color: #cfa85b;">years</span>
+                            <input type="range" id="loanTermSlider" class="slider" min="5" max="30" step="1" value="25">
+                        </div>
+                    </div>
+                    
                     <div class="input-row">
                         <div class="input-label">Interest Rate</div>
                         <div class="input-controls">
@@ -206,372 +149,222 @@
         </div>
     </div>
 
-   <script>
-    // Firebase Configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
-        authDomain: "solanodb-a4f65.firebaseapp.com",
-        projectId: "solanodb-a4f65",
-        storageBucket: "solanodb-a4f65.firebasestorage.app",
-        messagingSenderId: "98081894649",
-        appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    // ======= CONSTANTS =======
-    const ONE_BEDROOM_PRICE = 386900;
-    const TWO_BEDROOM_PRICE = ONE_BEDROOM_PRICE * 2; // 773,800
-    const MIN_DOWNPAYMENT_PERCENT = 10;
-    const ALLOWED_TERMS = [5, 10, 15, 20, 25, 30];
-
-    // ======= DOM Elements =======
-    const unitTypeSelect = document.getElementById('unitType');
-
-    const propertyPriceInput   = document.getElementById('propertyPrice');
-    const propertyPriceSlider  = document.getElementById('propertyPriceSlider');
-    const downpaymentPercentInput = document.getElementById('downpaymentPercent');
-    const downpaymentSlider    = document.getElementById('downpaymentSlider');
-    const loanTermInput        = document.getElementById('loanTerm');
-    const loanTermSlider       = document.getElementById('loanTermSlider');
-    const interestRateInput    = document.getElementById('interestRate');
-    const interestRateSlider   = document.getElementById('interestRateSlider');
-
-    // Result elements
-    const monthlyPaymentEl         = document.getElementById('monthlyPayment');
-    const termYearsEl              = document.getElementById('termYears');
-    const breakdownPriceEl         = document.getElementById('breakdownPrice');
-    const breakdownDownpaymentEl   = document.getElementById('breakdownDownpayment');
-    const breakdownLoanEl          = document.getElementById('breakdownLoan');
-    const breakdownInterestEl      = document.getElementById('breakdownInterest');
-    const previewBody              = document.getElementById('previewBody');
-    const downpaymentAmountLabel   = document.getElementById('downpaymentAmountLabel');
-
-    // Email button
-    const sendScheduleBtn = document.getElementById('sendScheduleBtn');
-
-    // ======= HELPERS =======
-
-    function formatCurrency(amount) {
-        return '₱ ' + amount.toLocaleString('en-PH', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        });
-    }
-
-    function formatCurrencyDecimal(amount) {
-        return '₱ ' + amount.toLocaleString('en-PH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    // generic sync (for simple pairs)
-    function setupInputSync(input, slider) {
-        input.addEventListener('input', function () {
-            slider.value = this.value;
-            calculate();
-        });
-
-        slider.addEventListener('input', function () {
-            input.value = this.value;
-            calculate();
-        });
-    }
-
-    // Only use generic sync for interest rate
-    setupInputSync(interestRateInput, interestRateSlider);
-
-    // ======= SPECIAL HANDLING =======
-
-    // Unit type → fixed property price
-    function updatePropertyPriceForUnit() {
-        const price = unitTypeSelect.value === '2br'
-            ? TWO_BEDROOM_PRICE
-            : ONE_BEDROOM_PRICE;
-
-        propertyPriceInput.value = price;
-        propertyPriceSlider.value = price;
-        calculate();
-    }
-
-    unitTypeSelect.addEventListener('change', updatePropertyPriceForUnit);
-
-    // Downpayment (min 10%)
-    downpaymentSlider.min = MIN_DOWNPAYMENT_PERCENT;
-
-    downpaymentPercentInput.addEventListener('input', function () {
-        let val = parseFloat(this.value) || 0;
-        if (val < MIN_DOWNPAYMENT_PERCENT) val = MIN_DOWNPAYMENT_PERCENT;
-        if (val > 100) val = 100;
-        this.value = val;
-        downpaymentSlider.value = val;
-        calculate();
-    });
-
-    downpaymentSlider.addEventListener('input', function () {
-        let val = parseFloat(this.value) || MIN_DOWNPAYMENT_PERCENT;
-        if (val < MIN_DOWNPAYMENT_PERCENT) val = MIN_DOWNPAYMENT_PERCENT;
-        downpaymentPercentInput.value = val;
-        calculate();
-    });
-
-    // Loan term snapped to allowed values
-    function snapToAllowedTerm(value) {
-        let closest = ALLOWED_TERMS[0];
-        let minDiff = Math.abs(value - closest);
-        for (const t of ALLOWED_TERMS) {
-            const diff = Math.abs(value - t);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closest = t;
-            }
-        }
-        return closest;
-    }
-
-    loanTermInput.addEventListener('input', function () {
-        let val = parseFloat(this.value) || ALLOWED_TERMS[0];
-        val = snapToAllowedTerm(val);
-        this.value = val;
-        loanTermSlider.value = val;
-        calculate();
-    });
-
-    loanTermSlider.addEventListener('input', function () {
-        let val = parseFloat(this.value) || ALLOWED_TERMS[0];
-        val = snapToAllowedTerm(val);
-        this.value = val;
-        loanTermInput.value = val;
-        calculate();
-    });
-
-    // ======= CORE CALCULATION =======
-
-    function calculate() {
-        // Use fixed property price from input
-        const propertyPrice = parseFloat(propertyPriceInput.value) || ONE_BEDROOM_PRICE;
-
-        // Downpayment (enforce min 10%)
-        let downpaymentPercent = parseFloat(downpaymentPercentInput.value);
-        if (isNaN(downpaymentPercent) || downpaymentPercent < MIN_DOWNPAYMENT_PERCENT) {
-            downpaymentPercent = MIN_DOWNPAYMENT_PERCENT;
-            downpaymentPercentInput.value = downpaymentPercent;
-            downpaymentSlider.value = downpaymentPercent;
-        }
-
-        // Loan term (snap to allowed)
-        let loanTermYears = parseFloat(loanTermInput.value);
-        if (isNaN(loanTermYears)) {
-            loanTermYears = ALLOWED_TERMS[0];
-        }
-        loanTermYears = snapToAllowedTerm(loanTermYears);
-        loanTermInput.value = loanTermYears;
-        loanTermSlider.value = loanTermYears;
-
-        const interestRate = parseFloat(interestRateInput.value) / 100 || 0;
-
-        termYearsEl.textContent = loanTermYears;
-
-        const downpaymentAmount = propertyPrice * (downpaymentPercent / 100);
-        const loanAmount = propertyPrice - downpaymentAmount;
-
-        const monthlyInterestRate = interestRate / 12;
-        const loanTermMonths = loanTermYears * 12;
-
-        let monthlyPayment;
-        if (interestRate === 0) {
-            monthlyPayment = loanAmount / loanTermMonths;
-        } else {
-            monthlyPayment =
-                loanAmount *
-                (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) /
-                (Math.pow(1 + monthlyInterestRate, loanTermMonths) - 1);
-        }
-
-        const totalPayment = monthlyPayment * loanTermMonths;
-        const totalInterest = totalPayment - loanAmount;
-
-        // Update UI
-        monthlyPaymentEl.textContent       = formatCurrencyDecimal(monthlyPayment);
-        breakdownPriceEl.textContent       = formatCurrency(propertyPrice);
-        breakdownDownpaymentEl.textContent = formatCurrency(downpaymentAmount);
-        breakdownLoanEl.textContent        = formatCurrency(loanAmount);
-        breakdownInterestEl.textContent    = formatCurrency(totalInterest);
-        if (downpaymentAmountLabel) {
-            downpaymentAmountLabel.textContent = formatCurrency(downpaymentAmount);
-        }
-
-        // First-year preview
-        const monthlyRate = monthlyInterestRate; // for clarity
-        generateFirstYearPreview(loanAmount, monthlyRate, monthlyPayment);
-    }
-
-    function generateFirstYearPreview(loanAmount, monthlyInterestRate, monthlyPayment) {
-        previewBody.innerHTML = '';
-        let balance = loanAmount;
-
-        for (let month = 1; month <= 12; month++) {
-            const interestPayment = balance * monthlyInterestRate;
-            const principalPayment = monthlyPayment - interestPayment;
-            balance -= principalPayment;
-
-            const row = document.createElement('tr');
-
-            // subtle highlight first & last month
-            if (month === 1 || month === 12) {
-                row.style.backgroundColor = 'rgba(207, 168, 91, 0.12)';
-            }
-
-            row.innerHTML = `
-                <td>Month ${month}</td>
-                <td>${formatCurrencyDecimal(principalPayment)}</td>
-                <td>${formatCurrencyDecimal(interestPayment)}</td>
-                <td>${formatCurrency(balance)}</td>
-            `;
-
-            previewBody.appendChild(row);
-        }
-    }
-
-    // ======= FIREBASE SAVE LOGIC (unchanged except using new values) =======
-
-    async function saveMortgageCalculation(data) {
-        try {
-            const docRef = await db.collection('mortgage_calculations').add({
-                ...data,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                source: 'mortgage_calculator',
-                status: 'new'
-            });
-            console.log('Mortgage calculation saved with ID:', docRef.id);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error saving mortgage calculation:', error);
-            throw error;
-        }
-    }
-
-    async function checkExistingInquiry(email) {
-        try {
-            const querySnapshot = await db.collection('inquiries')
-                .where('email', '==', email)
-                .limit(1)
-                .get();
-
-            return !querySnapshot.empty;
-        } catch (error) {
-            console.error('Error checking existing inquiry:', error);
-            return false;
-        }
-    }
-
-    // ======= SUBMIT HANDLER =======
-
-    sendScheduleBtn.addEventListener('click', async function () {
-        const clientEmail = document.getElementById('clientEmail').value.trim();
-        const clientName = document.getElementById('clientName').value.trim();
-        const clientPhone = document.getElementById('clientPhone').value.trim();
-
-        if (!clientEmail || !clientEmail.includes('@') || !clientEmail.includes('.')) {
-            alert('Please enter a valid email address.');
-            return;
-        }
-
-        const propertyPrice   = parseFloat(propertyPriceInput.value) || ONE_BEDROOM_PRICE;
-        const downpaymentPercent = parseFloat(downpaymentPercentInput.value) || MIN_DOWNPAYMENT_PERCENT;
-        const loanTermYears   = parseFloat(loanTermInput.value) || ALLOWED_TERMS[0];
-        const interestRate    = parseFloat(interestRateInput.value) || 0;
-
-        const snappedLoanTerm = snapToAllowedTerm(loanTermYears);
-        const finalLoanTermYears = snappedLoanTerm;
-
-        const downpaymentAmount = propertyPrice * (downpaymentPercent / 100);
-        const loanAmount        = propertyPrice - downpaymentAmount;
-        const monthlyInterestRate = interestRate / 100 / 12;
-        const loanTermMonths    = finalLoanTermYears * 12;
-
-        let monthlyPayment;
-        if (interestRate === 0) {
-            monthlyPayment = loanAmount / loanTermMonths;
-        } else {
-            monthlyPayment =
-                loanAmount *
-                (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) /
-                (Math.pow(1 + monthlyInterestRate, loanTermMonths) - 1);
-        }
-
-        const totalInterest = monthlyPayment * loanTermMonths - loanAmount;
-        const totalPayment  = monthlyPayment * loanTermMonths;
-
-        const isExistingClient = await checkExistingInquiry(clientEmail);
-
-        const calculationData = {
-            email: clientEmail,
-            name: clientName || 'Not provided',
-            phone: clientPhone || 'Not provided',
-            propertyPrice: propertyPrice,
-            downpaymentPercent: downpaymentPercent,
-            downpaymentAmount: downpaymentAmount,
-            loanAmount: loanAmount,
-            loanTermYears: finalLoanTermYears,
-            interestRate: interestRate,
-            monthlyPayment: monthlyPayment,
-            totalInterest: totalInterest,
-            totalPayment: totalPayment,
-            calculationDate: new Date().toISOString(),
-            isExistingClient: isExistingClient,
-            calculationSummary: {
-                monthlyPayment: formatCurrencyDecimal(monthlyPayment),
-                downpayment: formatCurrency(downpaymentAmount),
-                loanAmount: formatCurrency(loanAmount),
-                totalInterest: formatCurrency(totalInterest),
-                term: `${finalLoanTermYears} years`
-            }
-        };
-
-        try {
-            await saveMortgageCalculation(calculationData);
-
-            let successMessage = `Thank you ${clientName || ''}! Your mortgage calculation has been saved.`;
-
-            if (isExistingClient) {
-                successMessage += '\n\nWe found your previous inquiry. Our project manager will review your new calculation alongside your previous inquiry.';
-            } else {
-                successMessage += '\n\nA detailed schedule has been sent to your email. Our property specialist will contact you within 24 hours.';
-            }
-
-            alert(successMessage);
-
-            document.getElementById('clientEmail').value = '';
-            document.getElementById('clientName').value = '';
-            document.getElementById('clientPhone').value = '';
-
-            sendScheduleBtn.textContent = 'Calculation Saved!';
-            sendScheduleBtn.style.backgroundColor = '#28a745';
-
-            setTimeout(() => {
-                sendScheduleBtn.textContent = 'Submit Computation';
-                sendScheduleBtn.style.backgroundColor = '#cfa85b';
-            }, 3000);
-
-        } catch (error) {
-            alert('There was an error saving your calculation. Please try again or contact us directly.');
-            console.error('Error:', error);
-        }
-    });
-
-    // Recalculate when any numeric/slider input changes
-    const allInputs = document.querySelectorAll('.number-input, .slider');
-    allInputs.forEach(input => {
-        input.addEventListener('input', calculate);
-    });
-
-    // Initial setup
-    updatePropertyPriceForUnit();
+<script>
+/* ================= FIREBASE ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+  authDomain: "solanodb-a4f65.firebaseapp.com",
+  projectId: "solanodb-a4f65",
+  storageBucket: "solanodb-a4f65.firebasestorage.app",
+  messagingSenderId: "98081894649",
+  appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ================= EMAILJS INIT ================= */
+(function () {
+  emailjs.init("JOQqxoCLq72v5huex");
+})();
+
+/* ================= DOM ================= */
+const propertyPriceInput = document.getElementById('propertyPrice');
+const propertyPriceSlider = document.getElementById('propertyPriceSlider');
+const downpaymentPercentInput = document.getElementById('downpaymentPercent');
+const downpaymentSlider = document.getElementById('downpaymentSlider');
+const loanTermInput = document.getElementById('loanTerm');
+const loanTermSlider = document.getElementById('loanTermSlider');
+const interestRateInput = document.getElementById('interestRate');
+const interestRateSlider = document.getElementById('interestRateSlider');
+
+const monthlyPaymentEl = document.getElementById('monthlyPayment');
+const termYearsEl = document.getElementById('termYears');
+const breakdownPriceEl = document.getElementById('breakdownPrice');
+const breakdownDownpaymentEl = document.getElementById('breakdownDownpayment');
+const breakdownLoanEl = document.getElementById('breakdownLoan');
+const breakdownInterestEl = document.getElementById('breakdownInterest');
+const previewBody = document.getElementById('previewBody');
+
+const sendScheduleBtn = document.getElementById('sendScheduleBtn');
+
+/* ================= HELPERS ================= */
+function formatCurrency(n) {
+  return '₱ ' + n.toLocaleString('en-PH');
+}
+
+function formatCurrencyDecimal(n) {
+  return '₱ ' + n.toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+/* ================= SYNC INPUTS ================= */
+function setupInputSync(input, slider) {
+  input.addEventListener('input', () => {
+    slider.value = input.value;
     calculate();
+  });
+
+  slider.addEventListener('input', () => {
+    input.value = slider.value;
+    calculate();
+  });
+}
+
+setupInputSync(propertyPriceInput, propertyPriceSlider);
+setupInputSync(downpaymentPercentInput, downpaymentSlider);
+setupInputSync(loanTermInput, loanTermSlider);
+setupInputSync(interestRateInput, interestRateSlider);
+
+/* ================= CALCULATE ================= */
+function calculate() {
+  const propertyPrice = +propertyPriceInput.value;
+  const dpPercent = +downpaymentPercentInput.value / 100;
+  const years = +loanTermInput.value;
+  const rate = +interestRateInput.value / 100;
+
+  termYearsEl.textContent = years;
+
+  const downpayment = propertyPrice * dpPercent;
+  const loanAmount = propertyPrice - downpayment;
+
+  const r = rate / 12;
+  const months = years * 12;
+
+  const monthly = rate === 0
+    ? loanAmount / months
+    : loanAmount * (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
+
+  const totalPayment = monthly * months;
+  const totalInterest = totalPayment - loanAmount;
+
+  monthlyPaymentEl.textContent = formatCurrencyDecimal(monthly);
+  breakdownPriceEl.textContent = formatCurrency(propertyPrice);
+  breakdownDownpaymentEl.textContent = formatCurrency(downpayment);
+  breakdownLoanEl.textContent = formatCurrency(loanAmount);
+  breakdownInterestEl.textContent = formatCurrency(totalInterest);
+
+  generateFirstYearPreview(loanAmount, r, monthly);
+}
+
+/* ================= AMORT PREVIEW ================= */
+function generateFirstYearPreview(balance, rate, monthly) {
+  previewBody.innerHTML = '';
+
+  for (let m = 1; m <= 12; m++) {
+    const interest = balance * rate;
+    const principal = monthly - interest;
+    balance -= principal;
+
+    previewBody.innerHTML += `
+      <tr>
+        <td>Month ${m}</td>
+        <td>${formatCurrencyDecimal(principal)}</td>
+        <td>${formatCurrencyDecimal(interest)}</td>
+        <td>${formatCurrency(balance)}</td>
+      </tr>
+    `;
+  }
+}
+
+/* ================= FIREBASE SAVE ================= */
+async function saveMortgageCalculation(data) {
+  return db.collection('mortgage_calculations').add({
+    ...data,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    source: 'mortgage_calculator',
+    status: 'new'
+  });
+}
+
+/* ================= CHECK EXISTING ================= */
+async function checkExistingInquiry(email) {
+  const snap = await db.collection('inquiries')
+    .where('email', '==', email)
+    .limit(1)
+    .get();
+
+  return !snap.empty;
+}
+
+/* ================= EMAIL SEND ================= */
+function sendCalculationEmail_EmailJS(email, name, data) {
+  const message = `
+Hello ${name || "Client"},
+
+PROPERTY PRICE: ${formatCurrency(data.propertyPrice)}
+DOWNPAYMENT (${data.downpaymentPercent}%): ${formatCurrency(data.downpaymentAmount)}
+LOAN AMOUNT: ${formatCurrency(data.loanAmount)}
+
+LOAN TERM: ${data.loanTermYears} years
+INTEREST RATE: ${data.interestRate}%
+
+MONTHLY PAYMENT: ${formatCurrencyDecimal(data.monthlyPayment)}
+TOTAL INTEREST: ${formatCurrency(data.totalInterest)}
+TOTAL PAYMENT: ${formatCurrency(data.totalPayment)}
+
+PHINMA Properties
+Solano Hillside Residences
+`;
+
+  return emailjs.send("service_hehhqyt", "template_dc67lup", {
+    to_email: email,
+    client_name: name || "Client",
+    message
+  });
+}
+
+/* ================= SUBMIT ================= */
+sendScheduleBtn.addEventListener('click', async () => {
+  const email = clientEmail.value.trim();
+  const name = clientName.value.trim();
+  const phone = clientPhone.value.trim();
+
+  if (!email || !email.includes('@')) {
+    alert('Enter a valid email');
+    return;
+  }
+
+  calculate();
+
+  const price = +propertyPriceInput.value;
+  const dpPercent = +downpaymentPercentInput.value;
+  const downpayment = price * (dpPercent / 100);
+  const loanAmount = price - downpayment;
+  const monthly = +monthlyPaymentEl.textContent.replace(/[₱,]/g, '');
+  const years = +loanTermInput.value;
+  const months = years * 12;
+  const totalPayment = monthly * months;
+  const totalInterest = totalPayment - loanAmount;
+
+  const isExisting = await checkExistingInquiry(email);
+
+  const data = {
+    email,
+    name: name || 'Not provided',
+    phone: phone || 'Not provided',
+    propertyPrice: price,
+    downpaymentPercent: dpPercent,
+    downpaymentAmount: downpayment,
+    loanAmount,
+    loanTermYears: years,
+    interestRate: +interestRateInput.value,
+    monthlyPayment: monthly,
+    totalInterest,
+    totalPayment,
+    isExistingClient: isExisting
+  };
+
+  await saveMortgageCalculation(data);
+  await sendCalculationEmail_EmailJS(email, name, data);
+
+  alert('Calculation sent to Project manager and emailed to you successfully!');
+});
+
+/* ================= INIT ================= */
+calculate();
 </script>
 </body>
 </html>
