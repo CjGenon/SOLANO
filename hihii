@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Project Manager Dashboard – Solano Hills</title>
+
   <link rel="stylesheet" href="PM-dasboard.css" />
 
   <!-- Chart.js for dashboard charts -->
