@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Project Manager Dashboard – Solano Hills</title>
+  <link rel="stylesheet" href="PM-dasboard.css" />
+
+  <!-- Chart.js for dashboard charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script>
+    (function () {
+      emailjs.init("avvdJIIs04H8nGyu_");
+    })();
+  </script>
+</head>
+<body>
+  <!-- ======================== SIDEBAR ======================== -->
+  <div class="sidebar">
+    <div class="logo">
+      <img src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
+        <li><a href="#" onclick="loadContent(event, 'inquiries')">Inquiries</a></li>
+        <li><a href="#" onclick="loadContent(event, 'document')">Document</a></li>
+        <li><a href="LogIn.html">Logout</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- ======================== MAIN CONTENT ======================== -->
+  <main class="main-content">
+    <div id="mainContent">
+      <h1 class="pm-dashboard-title">Project Manager Dashboard</h1>
+      <p class="pm-dashboard-subtitle">High-level overview of inquiries, mortgage calculations, and client documents.</p>
+    </div>
+  </main>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- ======================== APP SCRIPT ======================== -->
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      getDocs,
+      addDoc,
+      serverTimestamp,
+      updateDoc,
+      doc,
+      getDoc,
+      deleteDoc
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+    // ================= FIREBASE CONFIG =================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+      authDomain: "solanodb-a4f65.firebaseapp.com",
+      projectId: "solanodb-a4f65",
+      storageBucket: "solanodb-a4f65.firebasestorage.app",
+      messagingSenderId: "98081894649",
+      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    /* ==================== LOADING FUNCTIONS ==================== */
+    window.showLoading = function() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.remove('hidden');
+      }
+    };
+
+    window.hideLoading = function() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+    };
+
+    window.setButtonLoading = function(button, isLoading) {
+      if (!button) return;
+      
+      if (isLoading) {
+        button.disabled = true;
+        button.classList.add('button-loading');
+        const originalText = button.textContent;
+        button.setAttribute('data-original-text', originalText);
+        button.textContent = 'Loading...';
+      } else {
+        button.disabled = false;
+        button.classList.remove('button-loading');
+        const originalText = button.getAttribute('data-original-text');
+        if (originalText) {
+          button.textContent = originalText;
+        }
+      }
+    };
+
+    const mainContent = document.getElementById("mainContent");
+
+    // Used for drill-down from dashboard KPIs
+    window.__initialInquiryView = "all";
+
+    // ------------- Small helpers -------------
+    const Toast = {
+      show(message, type = "info", duration = 2500) {
+        const div = document.createElement("div");
+        div.className = `toast toast-${type}`;
+        div.textContent = message;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), duration);
+      }
+    };
+
+    const formatCurrency = (amount) => {
+      if (amount === undefined || amount === null) return "₱0";
+      return "₱" + Number(amount).toLocaleString("en-PH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    };
+    const formatCurrencyDecimal = (amount) => {
+      if (amount === undefined || amount === null) return "₱0.00";
+      return "₱" + Number(amount).toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    };
+    
+
+    // ----------------- NAV / ROUTER -----------------
+    window.loadContent = function (event, section) {
+      // Save active tab to localStorage
+      localStorage.setItem('pmActiveTab', section);
+      
+      // Show loading
+      showLoading();
+      
+      if (event) event.preventDefault();
+
+      // Active state on sidebar
+      document.querySelectorAll(".sidebar nav ul li a").forEach((link) =>
+        link.classList.remove("active")
+      );
+      if (event?.target?.tagName === "A") {
+        event.target.classList.add("active");
+      } else {
+        // Add active class to the tab link
+        const tabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${section}"]`);
+        if (tabLink) tabLink.classList.add("active");
+      }
+
+      mainContent.innerHTML = "";
+
+      switch (section) {
+        case "dashboard":
+          renderDashboard();
+          break;
+        case "inquiries":
+          renderInquiries();
+          break;
+        case "document":
+          renderDocuments();
+          break;
+        default:
+          renderDashboard();
+      }
+    };
+
+    // Function to set active tab on page load
+    function setActiveTabOnLoad() {
+      const savedTab = localStorage.getItem('pmActiveTab');
+      if (savedTab) {
+        // Remove active class from all links first
+        document.querySelectorAll(".sidebar nav ul li a").forEach(link => {
+          link.classList.remove("active");
+        });
+        
+        // Add active class to the saved tab link
+        const savedTabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${savedTab}"]`);
+        if (savedTabLink) {
+          savedTabLink.classList.add("active");
+        }
+      }
+    }
+
+    // ============================================================
+    // DASHBOARD RENDER + LOGIC
+    // ============================================================
+
+    let inquiriesChartInstance = null;
+    let clientTypesChartInstance = null;
+
+    function renderDashboard() {
+      mainContent.innerHTML = `
+        <h1 class="pm-dashboard-title">Project Manager Dashboard</h1>
+        <p class="pm-dashboard-subtitle">
+          High-level overview of inquiries, mortgage calculations, and client documents.
+        </p>
+
+        <div class="kpi-row">
+          <div class="card kpi-card" id="kpi-inquiries">
+            <div class="kpi-label">INQUIRIES</div>
+            <div class="kpi-value" id="kpiInquiriesCount">0</div>
+            <div class="kpi-meta" id="kpiInquiriesMeta">–</div>
+            <button class="kpi-cta" type="button">CLICK TO VIEW INBOX</button>
+          </div>
+
+          <div class="card kpi-card" id="kpi-calculations">
+            <div class="kpi-label">MORTGAGE CALCULATIONS</div>
+            <div class="kpi-value" id="kpiCalculationsCount">0</div>
+            <div class="kpi-meta" id="kpiCalculationsMeta">–</div>
+            <button class="kpi-cta" type="button">CLICK TO VIEW CALCULATIONS</button>
+          </div>
+
+          <div class="card kpi-card" id="kpi-documents">
+            <div class="kpi-label">CLIENT DOCUMENTS</div>
+            <div class="kpi-value" id="kpiDocumentsCount">0</div>
+            <div class="kpi-meta" id="kpiDocumentsMeta">–</div>
+            <button class="kpi-cta" type="button">CLICK TO VIEW DOCUMENTS</button>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="chart-column">
+            <div class="card chart-card">
+              <div class="chart-title-row">
+                <div class="chart-title">Inquiries – last 6 months</div>
+                <div class="chart-subtitle">Created date from inquiry form</div>
+              </div>
+              <canvas id="inquiriesChart"></canvas>
+            </div>
+
+            <div class="card chart-card chart-card--small">
+              <div class="chart-title-row">
+                <div class="chart-title">Client types from document uploads</div>
+                <div class="chart-subtitle">Employed vs Self-Employed vs Business Owner</div>
+              </div>
+              <canvas id="clientTypesChart"></canvas>
+            </div>
+          </div>
+
+          <div class="right-column">
+            <div class="card calendar-card">
+              <div class="calendar-header">
+                <div class="calendar-icon">📅</div>
+                <div class="calendar-title">Calendar</div>
+              </div>
+              <div id="calendar"></div>
+            </div>
+
+            <div class="card activity-card">
+              <div class="activity-header">
+                <div class="activity-title">Recent activity</div>
+                <div class="activity-subtitle">Latest inquiries &amp; calculations</div>
+              </div>
+              <div class="activity-list" id="activityList"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      hookDashboardDrilldown();
+      buildCalendar();
+      loadDashboardData();
+      
+      // Hide loading after content is rendered
+      setTimeout(() => hideLoading(), 300);
+    }
+
+    function hookDashboardDrilldown() {
+      const inqCard = document.getElementById("kpi-inquiries");
+      const calcCard = document.getElementById("kpi-calculations");
+      const docCard = document.getElementById("kpi-documents");
+
+      inqCard
+        .querySelector(".kpi-cta")
+        .addEventListener("click", () => {
+          window.__initialInquiryView = "inquiries";
+          loadContent(null, "inquiries");
+        });
+
+      calcCard
+        .querySelector(".kpi-cta")
+        .addEventListener("click", () => {
+          window.__initialInquiryView = "calculations";
+          loadContent(null, "inquiries");
+        });
+
+      docCard
+        .querySelector(".kpi-cta")
+        .addEventListener("click", () => {
+          loadContent(null, "document");
+        });
+    }
+
+    function buildCalendar() {
+      const calendar = document.getElementById("calendar");
+      if (!calendar) return;
+
+      const today = new Date();
+      const monthName = today.toLocaleString("default", { month: "long" });
+      const year = today.getFullYear();
+      const firstDay = new Date(year, today.getMonth(), 1);
+      const lastDay = new Date(year, today.getMonth() + 1, 0);
+      const startDay = firstDay.getDay();
+
+      let html = "<table class='cal-table'>";
+      html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+      html +=
+        "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+      for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const isToday = day === today.getDate();
+        html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+        if ((day + startDay) % 7 === 0 && day !== lastDay.getDate())
+          html += "</tr><tr>";
+      }
+      html += "</tr></table>";
+      calendar.innerHTML = html;
+    }
+
+    async function loadDashboardData() {
+      try {
+        const [inqSnap, calcSnap] = await Promise.all([
+          getDocs(collection(db, "inquiries")),
+          getDocs(collection(db, "mortgage_calculations"))
+        ]);
+
+        let inquiries = inqSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        let calcs = calcSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        const getTime = (obj) => {
+          const t = obj.createdAt?.toDate ? obj.createdAt.toDate() : null;
+          return t ? t.getTime() : 0;
+        };
+
+        inquiries.sort((a, b) => getTime(b) - getTime(a));
+        calcs.sort((a, b) => getTime(b) - getTime(a));
+
+        const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const inqLast7 = inquiries.filter((i) => {
+          const t = i.createdAt?.toDate ? i.createdAt.toDate() : null;
+          return t && t >= sevenDaysAgo;
+        }).length;
+
+        const calcLast30 = calcs.filter((c) => {
+          const t = c.createdAt?.toDate ? c.createdAt.toDate() : null;
+          return t && t >= thirtyDaysAgo;
+        }).length;
+
+        const employedCount = history.filter(
+          (h) => h.clientType === "employed"
+        ).length;
+        const selfCount = history.filter(
+          (h) => h.clientType === "self_employed"
+        ).length;
+        const businessCount = history.filter(
+          (h) => h.clientType === "business_owner"
+        ).length;
+
+        document.getElementById("kpiInquiriesCount").textContent =
+          inquiries.length;
+        document.getElementById(
+          "kpiInquiriesMeta"
+        ).textContent = `${inqLast7} in the last 7 days`;
+
+        document.getElementById("kpiCalculationsCount").textContent =
+          calcs.length;
+        document.getElementById(
+          "kpiCalculationsMeta"
+        ).textContent = `${calcLast30} in the last 30 days`;
+
+        const totalDocs = history.length;
+        document.getElementById("kpiDocumentsCount").textContent = totalDocs;
+        document.getElementById(
+          "kpiDocumentsMeta"
+        ).textContent = `Employed: ${employedCount} · Self-Employed: ${selfCount} · Business: ${businessCount}`;
+
+        // ---- Inquiries line chart (last 6 months) ----
+        const labels = [];
+        const counts = [];
+        const sixMonths = [];
+
+        for (let i = 5; i >= 0; i--) {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${date.getFullYear()}-${date.getMonth()}`;
+          sixMonths.push(key);
+          labels.push(
+            date.toLocaleString("default", { month: "short" })
+          );
+          counts.push(0);
+        }
+
+        inquiries.forEach((inq) => {
+          const t = inq.createdAt?.toDate ? inq.createdAt.toDate() : null;
+          if (!t) return;
+          const key = `${t.getFullYear()}-${t.getMonth()}`;
+          const idx = sixMonths.indexOf(key);
+          if (idx !== -1) counts[idx] += 1;
+        });
+
+        const ctx1 = document.getElementById("inquiriesChart").getContext("2d");
+        if (inquiriesChartInstance) inquiriesChartInstance.destroy();
+        inquiriesChartInstance = new Chart(ctx1, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Inquiries",
+                data: counts,
+                tension: 0.35,
+                fill: true,
+                backgroundColor: "rgba(207, 168, 91, 0.18)",
+                borderColor: "#cfa85b",
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: "#f3efe9"
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            animation: {
+              duration: 900,
+              easing: "easeOutQuart"
+            },
+            scales: {
+              x: {
+                ticks: { color: "#c9c1b2", font: { size: 11 } },
+                grid: { display: false }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#c9c1b2", stepSize: 1, font: { size: 11 } },
+                grid: { color: "rgba(255,255,255,0.05)" }
+              }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+
+        // ---- Client types bar chart ----
+        const ctx2 = document
+          .getElementById("clientTypesChart")
+          .getContext("2d");
+        if (clientTypesChartInstance) clientTypesChartInstance.destroy();
+        clientTypesChartInstance = new Chart(ctx2, {
+          type: "bar",
+          data: {
+            labels: ["Employed", "Self-Employed", "Business Owner"],
+            datasets: [
+              {
+                label: "Document sets",
+                data: [employedCount, selfCount, businessCount],
+                backgroundColor: ["#cfa85b", "#7cb342", "#42a5f5"],
+                borderRadius: 8,
+                maxBarThickness: 26
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: {
+                ticks: { color: "#d6cec0", font: { size: 11 } },
+                grid: { display: false }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#d6cec0", stepSize: 1, font: { size: 11 } },
+                grid: { color: "rgba(255,255,255,0.04)" }
+              }
+            },
+            animation: {
+              duration: 800,
+              easing: "easeOutQuart"
+            }
+          }
+        });
+
+        // ---- Recent activity list ----
+        const activityList = document.getElementById("activityList");
+        activityList.innerHTML = "";
+
+        const activities = [];
+
+        inquiries.forEach((inq) => {
+          const t = inq.createdAt?.toDate ? inq.createdAt.toDate() : null;
+          if (!t) return;
+          activities.push({
+            type: "inquiry",
+            label: inq.name || "New inquiry",
+            meta:
+              (inq.inquiry_topic || "").replace(/_/g, " ") ||
+              "Inquiry submitted",
+            time: t
+          });
+        });
+
+        calcs.forEach((c) => {
+          const t = c.createdAt?.toDate ? c.createdAt.toDate() : null;
+          if (!t) return;
+          activities.push({
+            type: "calc",
+            label: c.name || "Mortgage calculation",
+            meta: `Monthly: ${formatCurrency(c.monthlyPayment)}`,
+            time: t
+          });
+        });
+
+        history.forEach((h) => {
+          const t = h.time ? new Date(h.time) : null;
+          if (!t) return;
+          activities.push({
+            type: "document",
+            label: h.name || "Document upload",
+            meta: `Client type: ${
+              h.clientTypeLabel || "N/A"
+            } – ${h.files.length} file(s)`,
+            time: t
+          });
+        });
+
+        activities
+          .sort((a, b) => b.time - a.time)
+          .slice(0, 10)
+          .forEach((act) => {
+            const div = document.createElement("div");
+            div.className = "activity-item";
+            const badgeClass =
+              act.type === "inquiry"
+                ? "inquiry"
+                : act.type === "calc"
+                ? "calc"
+                : "document";
+            const typeLabel =
+              act.type === "inquiry"
+                ? "INQUIRY"
+                : act.type === "calc"
+                ? "CALC"
+                : "DOCS";
+
+            div.innerHTML = `
+              <div class="activity-main">
+                <div class="activity-label">${act.label}</div>
+                <div class="activity-meta">${act.meta}</div>
+              </div>
+              <div>
+                <div class="activity-meta">
+                  ${act.time.toLocaleDateString()} ${act.time.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}
+                </div>
+                <div class="activity-badge ${badgeClass}">${typeLabel}</div>
+              </div>
+            `;
+            activityList.appendChild(div);
+          });
+      } catch (error) {
+        console.error(error);
+        Toast.show("Failed to load dashboard data", "error");
+      }
+    }
+
+    // ============================================================
+    // INQUIRIES & MORTGAGE
+    // ============================================================
+
+    function renderInquiries() {
+      mainContent.innerHTML = `
+        <div class="inquiries-header">
+          <div>
+            <h1 class="inquiries-title">Inquiries & Mortgage Calculations</h1>
+          </div>
+          <div class="filter-bar">
+            <span class="filter-label">View</span>
+            <div class="filter-pill-group">
+              <button id="toggleViewBtn" class="filter-pill">All</button>
+              <button id="showInquiriesBtn" class="filter-pill">Inquiries</button>
+              <button id="showCalculationsBtn" class="filter-pill">Calculations</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="dataContainer"></div>
+
+        <!-- Messages Popup Panel -->
+        <div id="messagesPopupPanel" class="messages-popup-panel">
+          <div class="messages-popup-content">
+            <div class="messages-popup-header">
+              <h3 id="messagesPanelTitle" class="messages-popup-title">Messages</h3>
+              <button id="closeMessagesPanelBtn" class="messages-popup-close">×</button>
+            </div>
+            <div class="messages-popup-body">
+              <div id="messagesContainer"></div>
+              <div class="reply-section">
+                <h4 style="margin-top:0;">Send Reply</h4>
+                <textarea id="replyMessage" class="reply-textarea" placeholder="Type your reply here..."></textarea>
+
+                <div class="quick-replies">
+                  <p class="quick-replies-label">Quick replies:</p>
+                  <div class="quick-reply-buttons">
+                    <button class="quickReplyBtn" data-template="thankyou">Thank you</button>
+                    <button class="quickReplyBtn" data-template="followup">Follow-up</button>
+                    <button class="quickReplyBtn" data-template="pricelist_1bed">Send 1-BR pricelist</button>
+                    <button class="quickReplyBtn" data-template="pricelist_2bed">Send 2-BR pricelist</button>
+                    <button class="quickReplyBtn" data-template="appointment">Schedule appointment</button>
+                  </div>
+                </div>
+
+                <div class="reply-buttons">
+                  <button id="sendReplyBtn" class="send">Send reply</button>
+                  <button id="cancelReplyBtn" class="cancel">Clear</button>
+                </div>
+                <div id="replyStatus" style="margin-top:8px;font-size:12px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      setupInquiriesLogic();
+      // Hide loading after content is rendered
+      setTimeout(() => hideLoading(), 300);
+    }
+
+    function setupInquiriesLogic() {
+      const dataContainer = document.getElementById("dataContainer");
+      let currentView =
+        window.__initialInquiryView === "inquiries"
+          ? "inquiries"
+          : window.__initialInquiryView === "calculations"
+          ? "calculations"
+          : "all";
+
+      // Reset after using
+      window.__initialInquiryView = "all";
+
+      const MORTGAGE_CALCULATOR_LINK =
+        "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
+
+      const inquiryTopicMap = {
+        payment: "Payment / Price",
+        interested_1b: "Interested in 1 Bedroom unit",
+        interested_2b: "Interested in 2 Bedroom unit",
+        interested_both: "Interested in both bedroom units",
+        other: "Other (explained in message)"
+      };
+
+      const paymentInfoMap = {
+        downpayment: "Downpayment",
+        monthly_amortization: "Monthly amortization",
+        total_price: "Total price",
+        payment_terms: "Payment terms",
+        other_payment: "Other payment info"
+      };
+
+      // Filter pill interactions
+      const allBtn = document.getElementById("toggleViewBtn");
+      const inqBtn = document.getElementById("showInquiriesBtn");
+      const calcBtn = document.getElementById("showCalculationsBtn");
+
+      function updateFilterPills() {
+        [allBtn, inqBtn, calcBtn].forEach((b) => b.classList.remove("active"));
+        if (currentView === "all") allBtn.classList.add("active");
+        else if (currentView === "inquiries") inqBtn.classList.add("active");
+        else calcBtn.classList.add("active");
+      }
+
+      allBtn.addEventListener("click", () => {
+        currentView = "all";
+        updateFilterPills();
+        loadData();
+      });
+      inqBtn.addEventListener("click", () => {
+        currentView = "inquiries";
+        updateFilterPills();
+        loadData();
+      });
+      calcBtn.addEventListener("click", () => {
+        currentView = "calculations";
+        updateFilterPills();
+        loadData();
+      });
+
+      updateFilterPills();
+
+      // MESSAGES PANEL SETUP
+      const messagesPanel = document.getElementById("messagesPopupPanel");
+      const closeMessagesPanelBtn = document.getElementById(
+        "closeMessagesPanelBtn"
+      );
+      const sendReplyBtn = document.getElementById("sendReplyBtn");
+      const cancelReplyBtn = document.getElementById("cancelReplyBtn");
+      const quickReplyBtns = document.querySelectorAll(".quickReplyBtn");
+
+      function closeMessages() {
+        messagesPanel.style.display = "none";
+      }
+
+      closeMessagesPanelBtn.addEventListener("click", closeMessages);
+      messagesPanel.addEventListener("click", (e) => {
+        if (e.target === messagesPanel) closeMessages();
+      });
+
+      cancelReplyBtn.addEventListener("click", () => {
+        document.getElementById("replyMessage").value = "";
+        document.getElementById("replyStatus").textContent = "";
+      });
+
+      const MORT_LINK = MORTGAGE_CALCULATOR_LINK;
+
+      quickReplyBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const template = btn.dataset.template;
+          let message = "";
+          switch (template) {
+            case "thankyou":
+              message =
+                "Thank you for your inquiry about Solano Hillside Residences. We appreciate your interest and would be happy to assist you further with any questions you may have.";
+              break;
+            case "followup":
+              message =
+                "I'm following up on your recent inquiry about our units. Are you still interested, or would you like to schedule a site viewing so we can walk you through the options?";
+              break;
+            case "pricelist_1bed":
+              message = `Here are the details for our 1-Bedroom units:\n\n• Floor area: 24–28 sqm\n• Price range: ₱2.8M–₱3.2M\n• Typical downpayment: ₱150,000\n• Sample monthly amortization available upon request.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+              break;
+            case "pricelist_2bed":
+              message = `Here are the details for our 2-Bedroom units:\n\n• Floor area: 36–42 sqm\n• Price range: ₱3.8M–₱4.2M\n• Flexible payment terms available.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+              break;
+            case "appointment":
+              message =
+                "We’d be glad to schedule a site viewing for you. Please let us know your preferred date and time (weekday or weekend), and we’ll coordinate the visit for you.";
+              break;
+          }
+          const textarea = document.getElementById("replyMessage");
+          textarea.value = message;
+          textarea.focus();
+        });
+      });
+
+      sendReplyBtn.addEventListener("click", async () => {
+        const replyMessage = document
+          .getElementById("replyMessage")
+          .value.trim();
+        const currentInquiryId = messagesPanel.dataset.inquiryId;
+        const replyStatus = document.getElementById("replyStatus");
+
+        if (!replyMessage) {
+          Toast.show("Please enter a reply message", "error");
+          return;
+        }
+
+        // Show loading on button
+        setButtonLoading(sendReplyBtn, true);
+
+        try {
+          await addDoc(
+            collection(db, "inquiries", currentInquiryId, "messages"),
+            {
+              sender: "admin",
+              senderName: "Project Manager",
+              senderId: "admin_pm",
+              content: replyMessage,
+              timestamp: serverTimestamp(),
+              readByPM: true,
+              readByUser: false
+            }
+          );
+
+          await updateDoc(doc(db, "inquiries", currentInquiryId), {
+            status: "responded"
+          });
+
+          document.getElementById("replyMessage").value = "";
+          await loadInquiryMessages(currentInquiryId);
+
+          Toast.show("Reply sent successfully", "success");
+          replyStatus.textContent = "✓ Reply sent successfully.";
+          replyStatus.style.color = "#4caf50";
+        } catch (error) {
+          console.error(error);
+          Toast.show("Failed to send reply", "error");
+          replyStatus.textContent = "✗ Failed to send reply.";
+          replyStatus.style.color = "#f44336";
+        } finally {
+          setButtonLoading(sendReplyBtn, false);
+        }
+      });
+
+      // View messages
+      window.viewInquiryMessages = async function (inquiryId) {
+        try {
+          const messagesContainer =
+            document.getElementById("messagesContainer");
+          const panelTitle = document.getElementById("messagesPanelTitle");
+          messagesContainer.innerHTML =
+            "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading messages…</div>";
+
+          const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+          if (!inquiryDoc.exists()) {
+            Toast.show("Inquiry not found", "error");
+            return;
+          }
+          const data = inquiryDoc.data();
+          panelTitle.textContent = `Conversation with ${
+            data.name || "Client"
+          }`;
+          messagesPanel.dataset.inquiryId = inquiryId;
+          messagesPanel.style.display = "flex";
+
+          await loadInquiryMessages(inquiryId);
+        } catch (error) {
+          console.error(error);
+          Toast.show("Failed to load messages", "error");
+        }
+      };
+
+      async function loadInquiryMessages(inquiryId) {
+        const messagesContainer = document.getElementById("messagesContainer");
+        messagesContainer.innerHTML = "";
+
+        const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+        const data = inquiryDoc.data();
+
+        const topicText =
+          inquiryTopicMap[data.inquiry_topic] || "No topic selected";
+        const paymentText = paymentInfoMap[data.payment_info] || "";
+        const created = data.createdAt?.toDate
+          ? data.createdAt.toDate().toLocaleString()
+          : "N/A";
+
+        const header = document.createElement("div");
+        header.className = "message-bubble client";
+        header.innerHTML = `
+          <div class="message-header">
+            <div class="message-sender">${data.name || "Client"}</div>
+            <div class="message-time">${created}</div>
+          </div>
+          <div style="font-size:13px;">
+            <strong>Inquiry topic:</strong> ${topicText}<br/>
+            ${
+              paymentText
+                ? `<strong>Payment info:</strong> ${paymentText}<br/>`
+                : ""
+            }
+            <strong>Email:</strong> ${data.email}<br/>
+            <strong>Phone:</strong> ${data.number || "N/A"}<br/>
+          </div>
+        `;
+        messagesContainer.appendChild(header);
+
+        const messagesSnap = await getDocs(
+          query(
+            collection(db, "inquiries", inquiryId, "messages"),
+            orderBy("timestamp", "asc")
+          )
+        );
+
+        if (messagesSnap.empty) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
+          empty.textContent =
+            "No chat history yet. Use the reply form below to send the first message.";
+          messagesContainer.appendChild(empty);
+        } else {
+          messagesSnap.forEach((m) => {
+            const msg = m.data();
+            const isAdmin = msg.sender === "admin";
+            const div = document.createElement("div");
+            div.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
+            const t = msg.timestamp?.toDate
+              ? msg.timestamp.toDate().toLocaleString()
+              : "N/A";
+            div.innerHTML = `
+              <div class="message-header">
+                <div class="message-sender">${
+                  isAdmin ? "You (Admin)" : data.name || "Client"
+                }</div>
+                <div class="message-time">${t}</div>
+              </div>
+              <div class="message-content" style="white-space:pre-wrap;">${
+                msg.content
+              }</div>
+            `;
+            messagesContainer.appendChild(div);
+          });
+        }
+
+        setTimeout(
+          () => (messagesContainer.scrollTop = messagesContainer.scrollHeight),
+          100
+        );
+      }
+
+      // Delete calculation
+      window.deleteCalculation = async function (calcId) {
+        if (
+          !confirm("Delete this mortgage calculation? This action is permanent.")
+        )
+          return;
+        try {
+          await deleteDoc(doc(db, "mortgage_calculations", calcId));
+          Toast.show("Calculation deleted", "success");
+          loadData();
+        } catch (error) {
+          console.error(error);
+          Toast.show("Delete failed", "error");
+        }
+      };
+
+      // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
+      async function loadData() {
+        try {
+          // Show loading indicator
+          dataContainer.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #b9ae9d;">
+              <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #2b2520; border-top: 3px solid #cfa85b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <p style="margin-top: 10px;">Loading data...</p>
+            </div>
+            <style>
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+          `;
+
+          const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
+            getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
+          ]);
+
+          const inquiriesData = inquiriesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            type: "inquiry",
+            data: doc.data()
+          }));
+
+          const calculationsData = calculationsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            type: "calculation",
+            data: doc.data()
+          }));
+
+          let filteredData;
+          if (currentView === "inquiries") {
+            filteredData = inquiriesData;
+          } else if (currentView === "calculations") {
+            filteredData = calculationsData;
+          } else {
+            filteredData = [...inquiriesData, ...calculationsData];
+          }
+
+          filteredData.sort((a, b) => {
+            const dateA =
+              a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
+            const dateB =
+              b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
+            return dateB - dateA;
+          });
+
+          if (filteredData.length === 0) {
+            dataContainer.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: #b9ae9d;">
+                <p style="font-size: 16px; margin-bottom: 10px;">
+                  No ${currentView === "all" ? "data" : currentView} yet.
+                </p>
+                <p style="font-size: 14px; color: #8e8272;">
+                  Check back later for new inquiries and calculations.
+                </p>
+              </div>
+            `;
+            return;
+          }
+
+          // Group items by email
+          const emailGroups = new Map();
+
+          filteredData.forEach(item => {
+            const email = item.data.email || "No email provided";
+            if (!emailGroups.has(email)) {
+              emailGroups.set(email, {
+                email,
+                name: item.data.name || "Client",
+                inquiries: [],
+                calculations: []
+              });
+            }
+
+            const group = emailGroups.get(email);
+            if (item.type === "inquiry") {
+              group.inquiries.push(item);
+            } else if (item.type === "calculation") {
+              group.calculations.push(item);
+            }
+          });
+
+          const fragment = document.createDocumentFragment();
+
+          for (const [, group] of emailGroups) {
+            const groupDiv = document.createElement("div");
+            groupDiv.className = "email-group";
+            groupDiv.style.cssText =
+              "border: 1px solid #3a3329; padding: 16px 18px; margin-bottom: 18px; border-radius: 12px; background-color: #1c1813; box-shadow: 0 10px 24px rgba(0,0,0,0.4);";
+
+            let groupHTML = `
+              <div class="email-group-header">
+                <div>
+                  <div class="email-group-name">${group.name}</div>
+                  <div style="font-size:13px;color:#d6cec0;">
+                    Email: <span>${group.email}</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="badge inquiry">
+                    ${group.inquiries.length} Inquiry${group.inquiries.length !== 1 ? "ies" : ""}
+                  </span>
+                  <span class="badge calculation">
+                    ${group.calculations.length} Calculation${group.calculations.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+            `;
+
+            // ----- Inquiries -----
+            if (group.inquiries.length > 0) {
+              groupHTML += `
+                <h4 style="color:#ead39e;margin:4px 0 6px;font-size:13px;">Inquiries</h4>
+              `;
+
+              group.inquiries.forEach(inquiry => {
+                const d = inquiry.data;
+                const inquiryTopicText =
+                  inquiryTopicMap[d.inquiry_topic] || "No topic selected";
+                const paymentInfoText =
+                  paymentInfoMap[d.payment_info] || "";
+                const inquiryDate = d.createdAt?.toDate
+                  ? d.createdAt.toDate().toLocaleString()
+                  : "Not available";
+
+                const statusColor =
+                  d.status === "responded"
+                    ? "#4CAF50"
+                    : d.status === "pending"
+                    ? "#ffb74d"
+                    : "#f44336";
+
+                groupHTML += `
+                  <div class="inquiry-item">
+                    <div class="item-content">
+                      <div class="item-details">
+                        <div><strong>Inquiry Topic:</strong> ${inquiryTopicText}</div>
+                        ${paymentInfoText ? `<div><strong>Payment Info:</strong> ${paymentInfoText}</div>` : ""}
+                        <div><strong>Date:</strong> ${inquiryDate}</div>
+                        <div><strong>Status:</strong>
+                          <span style="color:${statusColor};font-weight:600;">
+                            ${d.status || "new"}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="item-actions">
+                        <button class="item-action-btn view"
+                                onclick="viewInquiryMessages('${inquiry.id}')">
+                          View Chat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              });
+            }
+
+            // ----- Mortgage calculations -----
+            if (group.calculations.length > 0) {
+              groupHTML += `
+                <h4 style="color:#c8f7d5;margin:8px 0 4px;font-size:13px;">Mortgage Calculations</h4>
+              `;
+
+              group.calculations.forEach(calc => {
+                const d = calc.data;
+                const calcSummary = d.formatted || {};
+
+                groupHTML += `
+                  <div class="calculation-item">
+                    <div class="item-content">
+                      <div class="item-details">
+                        <div><strong>Property Price:</strong>
+                          ${calcSummary.propertyPrice || formatCurrency(d.propertyPrice)}</div>
+                        <div><strong>Downpayment:</strong>
+                          ${d.downpaymentPercent}% (${calcSummary.downpayment || formatCurrency(d.downpaymentAmount)})</div>
+                        <div><strong>Loan Amount:</strong>
+                          ${calcSummary.loanAmount || formatCurrency(d.loanAmount)}</div>
+                        <div><strong>Monthly Payment:</strong>
+                          ${
+                            calcSummary.monthlyPayment ||
+                            formatCurrencyDecimal(d.monthlyPayment)
+                          }</div>
+                        <div><strong>Term:</strong>
+                          ${d.loanTermYears} years @ ${d.interestRate}%</div>
+                      </div>
+                      <div class="item-actions">
+                        <button class="item-action-btn delete"
+                                onclick="deleteCalculation('${calc.id}')">
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              });
+            }
+
+            groupDiv.innerHTML = groupHTML;
+            fragment.appendChild(groupDiv);
+          }
+
+          dataContainer.innerHTML = "";
+          dataContainer.appendChild(fragment);
+
+          Toast.show(`Loaded ${filteredData.length} items`, "info", 1500);
+        } catch (error) {
+          console.error(error);
+          Toast.show(`Failed to load data: ${error.message}`, "error");
+          dataContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #f44336;">
+              <p style="font-size: 16px; margin-bottom: 10px;">Failed to load data</p>
+              <p style="font-size: 14px; color: #999; margin-bottom: 20px;">
+                ${error.message}
+              </p>
+            </div>
+          `;
+        }
+      }
+      loadData();
+    }
+
+    // ============================================================
+    // DOCUMENTS – CLIENT DOCUMENT SETS
+    // ============================================================
+
+    function renderDocuments() {
+      mainContent.innerHTML = `
+        <h1 class="doc-title">Client Documents</h1>
+        <p class="pm-dashboard-subtitle">
+          Upload and track document sets, categorized by client type.
+        </p>
+
+        <div class="doc-layout">
+          <section class="card doc-form-card">
+            <h3>Upload document set</h3>
+            <p class="subtle">Fill in client details, select client type, then attach all required documents.</p>
+
+            <form id="uploadForm">
+              <div class="form-grid">
+                <div class="form-field full">
+                  <label class="field-label" for="clientName">Client name</label>
+                  <input id="clientName" class="input" type="text" placeholder="Full name" required />
+                </div>
+
+                <div class="form-field full">
+                  <label class="field-label" for="clientTypeSelect">Client type</label>
+                  <select id="clientTypeSelect" class="doc-select" required>
+                    <option value="" disabled selected>– Select client type –</option>
+                    <option value="employed">Employed</option>
+                    <option value="self_employed">Self-Employed / Freelancer</option>
+                    <option value="business_owner">Business Owner</option>
+                  </select>
+                </div>
+
+                <div class="form-field">
+                  <label class="field-label" for="num1Bedroom"># of 1BR units</label>
+                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                </div>
+
+                <div class="form-field">
+                  <label class="field-label" for="num2Bedroom"># of 2BR units</label>
+                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                </div>
+
+                <div class="form-field full">
+                  <label class="field-label" for="paymentTerms">Payment terms</label>
+                  <select id="paymentTerms" class="doc-select" required>
+                    <option value="" disabled selected>– Select payment terms –</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+                </div>
+
+                <div class="form-field full">
+                  <label class="field-label">Required documents</label>
+                  <div class="requirements-wrapper">
+                    <p class="requirements-hint">
+                      Select a client type to see the exact list of required documents for upload.
+                      All fields are required.
+                    </p>
+                    <div id="requirementsList"></div>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="doc-submit-btn">Upload &amp; send to admin</button>
+            </form>
+          </section>
+
+          <aside class="card doc-requirements-card">
+            <h3>Requirements per client type</h3>
+            <p class="subtle">
+              General requirements apply to all buyers. Specific requirements depend on the chosen client type.
+            </p>
+
+            <div style="margin-top:10px;">
+              <div class="req-section-title">General requirements (all buyers)</div>
+              <ul class="req-list">
+                <li>Photocopy of at least two valid government-issued IDs.</li>
+                <li>Tax Identification Number (TIN) and BIR verification slip (if applicable).</li>
+                <li>Proof of billing (electricity, water, phone, or credit card bill).</li>
+                <li>Marriage certificate (if married).</li>
+                <li>Community Tax Certificate (Cedula), if required.</li>
+                <li>Reservation agreement and payment of reservation fee (for pre-selling units).</li>
+                <li>Passport or ACR – for foreign nationals residing in the Philippines.</li>
+              </ul>
+
+              <div class="req-block-title">Employed</div>
+              <ul class="req-list">
+                <li>Certificate of Employment and Compensation (COEC).</li>
+                <li>Latest payslips (typically last 3 months).</li>
+                <li>OFW employment contract (for overseas workers).</li>
+              </ul>
+
+              <div class="req-block-title">Self-Employed / Freelancers / Commission-Based</div>
+              <ul class="req-list">
+                <li>Certificate of Engagement from business owner or client.</li>
+                <li>Commission vouchers for the last 12 months.</li>
+                <li>Bank statements (3–12 months) showing consistent income.</li>
+                <li>Lease contract &amp; tax declaration (if income is from rentals).</li>
+                <li>Certified true copy of transport franchise (for PUV operators).</li>
+              </ul>
+
+              <div class="req-block-title">Business Owners</div>
+              <ul class="req-list">
+                <li>DTI Registration (for sole proprietors).</li>
+                <li>SEC Registration with Articles of Incorporation and By-laws (for corporations/partnerships).</li>
+                <li>Business / Mayor's Permit.</li>
+                <li>Income Tax Returns (BIR Form 1701 / 1702) with Audited Financial Statements.</li>
+                <li>Audited Financial Statements for the last 2–3 years.</li>
+                <li>Bank statements or passbook (3–12 months).</li>
+                <li>Trade references (list of key suppliers &amp; customers with contact details).</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <section class="card upload-history-card">
+          <h3 class="upload-history-title">Upload history</h3>
+          <p class="upload-history-sub">
+            Local summary of recent document sets (stored in this browser).
+          </p>
+          <div id="uploadHistory" class="upload-history-list"></div>
+        </section>
+      `;
+
+      setupDocumentLogic();
+      // Hide loading after content is rendered
+      setTimeout(() => hideLoading(), 300);
+    }
+
+    function setupDocumentLogic() {
+      const REQUIREMENTS_BASE = [
+        "Two valid government-issued IDs",
+        "TIN and BIR verification slip",
+        "Proof of billing",
+        "Marriage certificate (if married)",
+        "Community Tax Certificate (Cedula), if required",
+        "Reservation agreement",
+        "Proof of reservation fee payment",
+        "Passport or ACR (if foreign national)"
+      ];
+
+      const REQUIREMENTS_TYPES = {
+        employed: [
+          "Certificate of Employment and Compensation (COEC)",
+          "Latest payslips (last 3 months)",
+          "OFW employment contract (if applicable)"
+        ],
+        self_employed: [
+          "Certificate of Engagement",
+          "Commission vouchers (last 12 months)",
+          "Bank statements (3–12 months)",
+          "Lease contract & tax declaration (if from rentals)",
+          "Certified true copy of transport franchise (if PUV operator)"
+        ],
+        business_owner: [
+          "DTI Registration (for sole proprietors)",
+          "SEC Registration with Articles & By-laws (for corporations/partnerships)",
+          "Business / Mayor's Permit",
+          "Income Tax Returns with Audited Financial Statements",
+          "Audited Financial Statements (last 2–3 years)",
+          "Bank statements or passbook (3–12 months)",
+          "Trade references (suppliers & customers list)"
+        ]
+      };
+
+      const clientTypeLabels = {
+        employed: "Employed",
+        self_employed: "Self-Employed",
+        business_owner: "Business Owner"
+      };
+
+      const uploadForm = document.getElementById("uploadForm");
+      const clientTypeSelect = document.getElementById("clientTypeSelect");
+      const requirementsList = document.getElementById("requirementsList");
+      const uploadHistoryEl = document.getElementById("uploadHistory");
+
+      const nameInput = document.getElementById("clientName");
+      const paymentTermsSelect = document.getElementById("paymentTerms");
+      const num1BedroomInput = document.getElementById("num1Bedroom");
+      const num2BedroomInput = document.getElementById("num2Bedroom");
+
+      const circumference = 2 * Math.PI * 45;
+
+      function createProgressCircle() {
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", "80");
+        svg.setAttribute("height", "80");
+        svg.setAttribute("viewBox", "0 0 100 100");
+        svg.classList.add("progress-ring");
+
+        const bgCircle = document.createElementNS(svgNS, "circle");
+        bgCircle.setAttribute("cx", "50");
+        bgCircle.setAttribute("cy", "50");
+        bgCircle.setAttribute("r", "45");
+        bgCircle.setAttribute("stroke", "#333");
+        bgCircle.setAttribute("stroke-width", "8");
+        bgCircle.setAttribute("fill", "none");
+        svg.appendChild(bgCircle);
+
+        const progressCircle = document.createElementNS(svgNS, "circle");
+        progressCircle.setAttribute("cx", "50");
+        progressCircle.setAttribute("cy", "50");
+        progressCircle.setAttribute("r", "45");
+        progressCircle.setAttribute("stroke", "#4caf50");
+        progressCircle.setAttribute("stroke-width", "8");
+        progressCircle.setAttribute("fill", "none");
+        progressCircle.setAttribute("stroke-linecap", "round");
+        progressCircle.setAttribute("stroke-dasharray", circumference);
+        progressCircle.setAttribute("stroke-dashoffset", circumference);
+        progressCircle.setAttribute("transform", "rotate(-90 50 50)");
+        svg.appendChild(progressCircle);
+
+        const progressText = document.createElementNS(svgNS, "text");
+        progressText.setAttribute("x", "50");
+        progressText.setAttribute("y", "55");
+        progressText.setAttribute("font-size", "16");
+        progressText.setAttribute("text-anchor", "middle");
+        progressText.setAttribute("fill", "#f3efe9");
+        progressText.textContent = "0%";
+        svg.appendChild(progressText);
+
+        return { svg, progressCircle, progressText };
+      }
+
+      function setCircleProgress(circle, text, percent) {
+        const offset = circumference - (percent / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+        text.textContent = `${Math.round(percent)}%`;
+      }
+
+      function renderRequirementsInputs() {
+        const type = clientTypeSelect.value;
+        requirementsList.innerHTML = "";
+
+        if (!type) {
+          requirementsList.innerHTML =
+            "<p style='font-size:12px;color:#b9ae9d;'>Select a client type first.</p>";
+          return;
+        }
+
+        const allReqs = [...REQUIREMENTS_BASE, ...REQUIREMENTS_TYPES[type]];
+
+        allReqs.forEach((label, idx) => {
+          const row = document.createElement("div");
+          row.className = "file-input-row";
+          row.innerHTML = `
+            <span class="req-index">${idx + 1}.</span>
+            <div class="req-meta">
+              <div class="req-label">${label}</div>
+              <input type="file" class="req-file-input" data-requirement="${label.replace(
+                /"/g,
+                "&quot;"
+              )}" required accept=".pdf,image/*" />
+            </div>
+          `;
+          requirementsList.appendChild(row);
+        });
+      }
+
+      clientTypeSelect.addEventListener("change", renderRequirementsInputs);
+
+      function loadHistory() {
+        const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+        uploadHistoryEl.innerHTML = "";
+        if (!history.length) {
+          uploadHistoryEl.innerHTML =
+            "<p style='font-size:13px;color:#b0a799;'>No upload history yet.</p>";
+          return;
+        }
+
+        history.forEach((entry) => {
+          const wrapper = document.createElement("div");
+          wrapper.className = "upload-entry";
+
+          const main = document.createElement("div");
+          main.className = "upload-entry-main";
+          main.innerHTML = `
+            <strong>${entry.name}</strong><br/>
+            <span class="upload-entry-meta">
+              Client type: ${
+                entry.clientTypeLabel || clientTypeLabels[entry.clientType] || "N/A"
+              } · 1BR: ${entry.num1Bedroom} · 2BR: ${
+            entry.num2Bedroom
+          } · Terms: ${entry.paymentTerms}
+              <br/>Uploaded at ${entry.time}
+            </span>
+            <ul class="upload-entry-files">
+              ${entry.files
+                .map(
+                  (f) =>
+                    `<li><strong>${f.label}:</strong> ${f.name}</li>`
+                )
+                .join("")}
+            </ul>
+          `;
+
+          const { svg, progressCircle, progressText } = createProgressCircle();
+          setCircleProgress(progressCircle, progressText, 100);
+
+          wrapper.appendChild(main);
+          wrapper.appendChild(svg);
+          uploadHistoryEl.appendChild(wrapper);
+        });
+      }
+
+      loadHistory();
+
+      uploadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const name = nameInput.value.trim();
+        const clientType = clientTypeSelect.value;
+        const paymentTerms = paymentTermsSelect.value;
+        const num1Bedroom = Number(num1BedroomInput.value || 0);
+        const num2Bedroom = Number(num2BedroomInput.value || 0);
+
+        if (!clientType) {
+          Toast.show("Please select a client type", "error");
+          return;
+        }
+
+        const fileInputs = Array.from(
+          document.querySelectorAll(".req-file-input")
+        );
+        if (!fileInputs.length) {
+          Toast.show("Please select a client type to load requirements", "error");
+          return;
+        }
+
+        for (let i = 0; i < fileInputs.length; i++) {
+          if (!fileInputs[i].files[0]) {
+            Toast.show("Please attach all required documents", "error");
+            return;
+          }
+        }
+
+        let totalSize = 0;
+        fileInputs.forEach((fi) => {
+          totalSize += fi.files[0].size;
+        });
+
+        const tempEntry = document.createElement("div");
+        tempEntry.className = "upload-entry";
+        const tempMain = document.createElement("div");
+        tempMain.className = "upload-entry-main";
+        tempMain.innerHTML = `
+          <strong>${name}</strong><br/>
+          <span class="upload-entry-meta">Uploading document set…</span>
+        `;
+        const { svg, progressCircle, progressText } = createProgressCircle();
+        tempEntry.appendChild(tempMain);
+        tempEntry.appendChild(svg);
+        uploadHistoryEl.prepend(tempEntry);
+
+        let uploadedSize = 0;
+        const uploadedUrls = [];
+        const uploadedFiles = [];
+
+        try {
+          for (let i = 0; i < fileInputs.length; i++) {
+            const file = fileInputs[i].files[0];
+            const label = fileInputs[i].dataset.requirmentLabel || fileInputs[i].dataset.requirement;
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", "upload_preset");
+
+            await new Promise((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open(
+                "POST",
+                "https://api.cloudinary.com/v1_1/dfklsyjch/upload"
+              );
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const percent =
+                    ((uploadedSize + event.loaded) / totalSize) * 100;
+                  setCircleProgress(progressCircle, progressText, percent);
+                }
+              };
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  const data = JSON.parse(xhr.responseText);
+                  uploadedUrls.push(data.secure_url);
+                  uploadedFiles.push({
+                    label,
+                    name: file.name
+                  });
+                  uploadedSize += file.size;
+                  resolve();
+                } else {
+                  reject(new Error("Upload failed"));
+                }
+              };
+              xhr.onerror = () => reject(new Error("Upload error"));
+              xhr.send(formData);
+            });
+          }
+
+          // build email body
+          const downloadUrls = uploadedUrls.map((u) =>
+            u.replace("/upload/", "/upload/fl_attachment/")
+          );
+          const fileLines = uploadedFiles
+            .map(
+              (f, idx) =>
+                `${idx + 1}. ${f.label}: <a href="${downloadUrls[idx]}">${
+                  f.name
+                }</a>`
+            )
+            .join("<br>");
+
+          const templateParams = {
+            name,
+            paymentTerms,
+            num1Bedroom,
+            num2Bedroom,
+            clientType: clientTypeLabels[clientType] || clientType,
+            time: new Date().toLocaleString(),
+            message: `
+              <p><strong>Client type:</strong> ${
+                clientTypeLabels[clientType] || clientType
+              }</p>
+              <p><strong>1BR units:</strong> ${num1Bedroom}</p>
+              <p><strong>2BR units:</strong> ${num2Bedroom}</p>
+              <p><strong>Payment terms:</strong> ${paymentTerms}</p>
+              <p><strong>Files:</strong><br>${fileLines}</p>
+            `
+          };
+
+          await emailjs.send("service_u1n5d9t", "template_qu1s2lh", templateParams);
+
+          Toast.show("Document set uploaded & emailed", "success");
+
+          // Save to local history
+          const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
+          history.unshift({
+            name,
+            clientType,
+            clientTypeLabel: clientTypeLabels[clientType] || clientType,
+            paymentTerms,
+            num1Bedroom,
+            num2Bedroom,
+            time: new Date().toLocaleString(),
+            files: uploadedFiles
+          });
+          if (history.length > 25) history.pop();
+          localStorage.setItem("uploadHistory", JSON.stringify(history));
+
+          // refresh history list
+          tempEntry.remove();
+          loadHistory();
+
+          uploadForm.reset();
+          requirementsList.innerHTML = "";
+        } catch (error) {
+          console.error(error);
+          Toast.show("Upload or email failed", "error");
+          tempMain.querySelector(
+            ".upload-entry-meta"
+          ).textContent = "Upload failed.";
+        }
+      });
+    }
+
+    // ============================================================
+    // AUTH + INITIAL LOAD
+    // ============================================================
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        alert("You're not signed in. Redirecting to login…");
+        window.location.href = "index.html";
+        return;
+      }
+      
+      setActiveTabOnLoad();
+      
+      // Check if there's a saved tab in localStorage
+      const savedTab = localStorage.getItem('pmActiveTab');
+      
+      // Load the saved tab if it exists, otherwise load dashboard
+      if (savedTab && 
+          ['dashboard', 'inquiries', 'document'].includes(savedTab)) {
+        loadContent(null, savedTab);
+      } else {
+        loadContent(null, "dashboard");
+      }
+    });
+  </script>
+</body>
+</html>
