@@ -5,196 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Property Owner Dashboard – Solano Hills</title>
   <link rel="stylesheet" href="Dashboard.css" />
-  
-  <style>
-    /* IMPROVED HISTORY UI - INJECTED STYLES */
-    .maintenance-history-card {
-      background-color: transparent !important;
-      box-shadow: none !important;
-      border: none !important;
-      padding: 0 !important;
-      max-height: calc(100vh - 140px);
-      overflow-y: auto;
-      padding-right: 5px !important;
-    }
-
-    .history-header {
-      color: #c0933c; /* Solano Accent */
-      font-size: 1.1rem;
-      margin-bottom: 15px;
-      border-bottom: 1px solid rgba(141, 108, 57, 0.3);
-      padding-bottom: 10px;
-    }
-
-    /* Individual Request Card */
-    .history-card-item {
-      background-color: #262626;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-      position: relative;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .history-card-item:hover {
-      border-color: #c0933c;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    /* Status Borders */
-    .history-card-item.status-pending { border-left: 4px solid #f39c12; }
-    .history-card-item.status-progress { border-left: 4px solid #3498db; }
-    .history-card-item.status-complete { border-left: 4px solid #27ae60; background: linear-gradient(to right, rgba(39, 174, 96, 0.05), #262626 40%); }
-
-    /* Card Header Layout */
-    .req-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .req-title {
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 700;
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .req-date {
-      font-size: 0.75rem;
-      color: #888;
-      display: block;
-    }
-
-    /* Badges */
-    .badge-group {
-      display: flex;
-      gap: 6px;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    .badge {
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .badge-priority { background: rgba(255, 255, 255, 0.1); color: #ccc; }
-
-    /* Data Grid for Details */
-    .req-details-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
-      font-size: 0.85rem;
-      margin-bottom: 12px;
-    }
-
-    .req-row {
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .req-label { color: #888; }
-    .req-value { color: #eee; font-weight: 500; text-align: right; }
-    .req-value.highlight { color: #c0933c; font-weight: bold; }
-
-    /* Chat Section */
-    .chat-section {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 6px;
-      padding: 10px;
-      margin-top: 10px;
-    }
-
-    .chat-messages {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 10px;
-      max-height: 150px;
-      overflow-y: auto;
-    }
-
-    .message-bubble {
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      max-width: 85%;
-      line-height: 1.4;
-    }
-
-    .msg-tenant {
-      align-self: flex-end;
-      background-color: #c0933c; /* Gold */
-      color: #fff;
-      border-bottom-right-radius: 0;
-    }
-
-    .msg-admin {
-      align-self: flex-start;
-      background-color: #383838;
-      color: #eee;
-      border-bottom-left-radius: 0;
-    }
-
-    /* Reply Input Area */
-    .reply-area {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .reply-input {
-      width: 100%;
-      background-color: #1a1a1a;
-      border: 1px solid #444;
-      color: #eee;
-      padding: 10px;
-      border-radius: 6px;
-      font-family: inherit;
-      font-size: 0.85rem;
-      resize: vertical;
-      box-sizing: border-box;
-    }
-
-    .reply-input:focus {
-      outline: none;
-      border-color: #c0933c;
-    }
-
-    .reply-btn {
-      align-self: flex-end;
-      background-color: #4a3728;
-      color: #fff;
-      border: 1px solid #5a4738;
-      padding: 6px 16px;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .reply-btn:hover {
-      background-color: #c0933c;
-      color: white;
-    }
-    
-    .loading-spinner-small {
-        width: 20px; height: 20px;
-        border: 2px solid #333; border-top: 2px solid #c0933c;
-        border-radius: 50%; animation: spin 1s linear infinite;
-        margin: 0 auto 10px auto;
-    }
-  </style>
 </head>
 <body>
 
@@ -410,10 +220,17 @@
 
               <div id="expandControls" class="community-expand" style="display:none;">
                 <div class="community-expand-inner">
-                  <p style="margin:0 0 8px;">
-                    Showing <span id="showingCount">4</span> of <span id="totalCount">0</span> feedback items
-                  </p>
-                  <button id="expandAllBtn" class="btn-primary">Show All Feedback</button>
+                  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+                    <p style="margin:0;">
+                      Showing <span id="showingCount">4</span> of <span id="totalCount">0</span> feedback items
+                    </p>
+                    <div style="display: flex; gap: 10px;">
+                      <button id="toggleDetailsBtn" class="btn-primary" style="background: white; color: #4a3728;">
+                        See More Details
+                      </button>
+                      <button id="expandAllBtn" class="btn-primary">Show All Feedback</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -444,6 +261,7 @@
 
           let communityFeedbackData = [];
           let showingAllFeedback = false;
+          let showingAllDetails = false;
 
           // Wait for auth state before loading units
           onAuthStateChanged(auth, async (user) => {
@@ -594,6 +412,7 @@
               setTimeout(() => {
                 const feedbackSortSelect = document.getElementById("feedbackSort");
                 const expandAllBtn = document.getElementById("expandAllBtn");
+                const toggleDetailsBtn = document.getElementById("toggleDetailsBtn");
                 
                 if (feedbackSortSelect) {
                   feedbackSortSelect.addEventListener("change", applyFeedbackSorting);
@@ -608,6 +427,13 @@
                         .querySelector("#communityFeedback")
                         .scrollIntoView({ behavior: "smooth", block: "start" });
                     }
+                  });
+                }
+                
+                if (toggleDetailsBtn) {
+                  toggleDetailsBtn.addEventListener("click", function() {
+                    showingAllDetails = !showingAllDetails;
+                    toggleAllDetails();
                   });
                 }
               }, 100);
@@ -719,6 +545,20 @@
               }
             }
 
+            // Update toggle details button
+            const toggleDetailsBtn = document.getElementById("toggleDetailsBtn");
+            if (toggleDetailsBtn) {
+              if (showingAllDetails) {
+                toggleDetailsBtn.textContent = "See Less Details";
+                toggleDetailsBtn.style.background = "#4a3728";
+                toggleDetailsBtn.style.color = "white";
+              } else {
+                toggleDetailsBtn.textContent = "See More Details";
+                toggleDetailsBtn.style.background = "white";
+                toggleDetailsBtn.style.color = "#4a3728";
+              }
+            }
+
             // Add fade-in animation for each card
             itemsToShow.forEach((feedback, index) => {
               const timeText = feedback.timestamp?.toDate
@@ -765,11 +605,28 @@
                 feedback.q5 ||
                 feedback.q6;
 
-              let bodyHtml = "";
+              // Create simplified view (stars and date only by default)
+              const cardId = `feedback-card-${feedback.id || index}`;
+              
+              // Create the main content (stars and date)
+              const headerHtml = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                  <div style="color: #8d6c39; font-size: 20px;">
+                    ${stars}${emptyStars}
+                    <span style="color: #4a3728; font-size: 15px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
+                  </div>
+                  <div style="color: #8d6c39; font-size: 13px; font-weight: 500;">
+                    ${timeText}
+                  </div>
+                </div>
+              `;
 
+              // Create details content (hidden by default unless showingAllDetails is true)
+              let detailsHtml = "";
+              
               if (hasNewSchema) {
-                bodyHtml = `
-                  <div style="margin-top: 12px;">
+                detailsHtml = `
+                  <div id="${cardId}-details" style="display: ${showingAllDetails ? 'block' : 'none'}; margin-top: 12px; animation: fadeIn 0.3s ease-out;">
                     <div style="margin-bottom: 8px;">
                       <strong style="color: #4a3728; font-size: 14px;">Overall condition and appearance of the property</strong>
                       <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
@@ -800,7 +657,7 @@
                         ${escapeHtml(feedback.q5 || "No answer provided")}
                       </div>
                     </div>
-                    <div>
+                    <div style="margin-bottom: 12px;">
                       <strong style="color: #4a3728; font-size: 14px;">Additional suggestions</strong>
                       <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #4a3728;">
                         ${escapeHtml(feedback.q6 || "No suggestions provided")}
@@ -809,15 +666,15 @@
                   </div>
                 `;
               } else {
-                bodyHtml = `
-                  <div style="margin-top: 12px;">
+                detailsHtml = `
+                  <div id="${cardId}-details" style="display: ${showingAllDetails ? 'block' : 'none'}; margin-top: 12px; animation: fadeIn 0.3s ease-out;">
                     <div style="margin-bottom: 12px;">
                       <strong style="color: #4a3728; font-size: 14px;">What do you like about our services, unit, and facilities?</strong>
                       <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #8d6c39;">
                         ${escapeHtml(feedback.question2 || "No answer provided")}
                       </div>
                     </div>
-                    <div>
+                    <div style="margin-bottom: 12px;">
                       <strong style="color: #4a3728; font-size: 14px;">What can we improve in our unit, services, or facilities?</strong>
                       <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #4a3728;">
                         ${escapeHtml(feedback.question3 || "No answer provided")}
@@ -828,16 +685,8 @@
               }
 
               card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                  <div style="color: #8d6c39; font-size: 20px;">
-                    ${stars}${emptyStars}
-                    <span style="color: #4a3728; font-size: 15px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
-                  </div>
-                  <div style="color: #8d6c39; font-size: 13px; font-weight: 500;">
-                    ${timeText}
-                  </div>
-                </div>
-                ${bodyHtml}
+                ${headerHtml}
+                ${detailsHtml}
               `;
 
               card.addEventListener("mouseenter", () => {
@@ -853,7 +702,7 @@
               communityFeedback.appendChild(card);
             });
 
-            // Add CSS animation
+            // Add CSS animations
             const style = document.createElement('style');
             style.textContent = `
               @keyframes fadeInUp {
@@ -866,8 +715,45 @@
                   transform: translateY(0);
                 }
               }
+              @keyframes fadeIn {
+                from {
+                  opacity: 0;
+                }
+                to {
+                  opacity: 1;
+                }
+              }
             `;
             document.head.appendChild(style);
+          }
+
+          function toggleAllDetails() {
+            const feedbackCards = document.querySelectorAll('#communityFeedback > div');
+            const toggleDetailsBtn = document.getElementById("toggleDetailsBtn");
+            
+            feedbackCards.forEach((card, index) => {
+              const detailsSection = card.querySelector(`[id$="-details"]`);
+              if (detailsSection) {
+                if (showingAllDetails) {
+                  detailsSection.style.display = "block";
+                } else {
+                  detailsSection.style.display = "none";
+                }
+              }
+            });
+            
+            // Update button text and style
+            if (toggleDetailsBtn) {
+              if (showingAllDetails) {
+                toggleDetailsBtn.textContent = "See Less Details";
+                toggleDetailsBtn.style.background = "#4a3728";
+                toggleDetailsBtn.style.color = "white";
+              } else {
+                toggleDetailsBtn.textContent = "See More Details";
+                toggleDetailsBtn.style.background = "white";
+                toggleDetailsBtn.style.color = "#4a3728";
+              }
+            }
           }
 
           // Initialize image slider
@@ -1772,23 +1658,36 @@
           let filteredPayments = [];
 
           async function loadInvoice() {
-            const tenantEmail = await getCurrentUserEmail();
-            const uid = auth.currentUser.uid;
-            const userDoc = await getDoc(doc(db, "users", uid));
-            tenantUnits = userDoc.data()?.unitNumbers || [];
+          const tenantEmail = await getCurrentUserEmail();
+          const uid = auth.currentUser.uid;
+          const userDoc = await getDoc(doc(db, "users", uid));
+          tenantUnits = userDoc.data()?.unitNumbers || [];
 
-            computedAmount = tenantUnits.reduce((total, unit) => {
-              const type = unit.split("-")[0];
-              return total + (unitPricing[type] || 0);
-            }, 0);
+          // Original computed amount for payments (as per your unitPricing)
+          computedAmount = tenantUnits.reduce((total, unit) => {
+            const type = unit.split("-")[0];
+            return total + (unitPricing[type] || 0);
+          }, 0);
 
-            invoiceDetails.innerHTML = `
-              <strong>Unit Owner:</strong> ${tenantEmail}<br>
-              <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
-              <strong>Amount Due:</strong> ₱${computedAmount}<br>
-              <strong>Due Date:</strong> 25th of this month
-            `;
-          }
+          // Calculate displayedAmount based on your custom bedroom pricing
+          let displayedAmount = 0;
+          tenantUnits.forEach(unit => {
+            const type = unit.split("-")[0];
+            if (type === "1B") displayedAmount += 2500;
+            else if (type === "2B") displayedAmount += 5000;
+          });
+
+          // Format displayedAmount to currency string
+          const formattedDisplayedAmount = `₱ ${displayedAmount.toLocaleString()}`;
+
+          invoiceDetails.innerHTML = `
+            <strong>Unit Owner:</strong> ${tenantEmail}<br>
+            <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
+            <strong>Amount Due:</strong> ${formattedDisplayedAmount}<br>
+            <strong>Due Date:</strong> 25th of this month
+          `;
+        }
+
 
           async function loadAllPayments() {
             const tenantEmail = await getCurrentUserEmail();
@@ -2404,3 +2303,4 @@
   </div>
 </body>
 </html>
+
