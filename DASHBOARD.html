@@ -5,10 +5,199 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Property Owner Dashboard – Solano Hills</title>
   <link rel="stylesheet" href="Dashboard.css" />
+  
+  <style>
+    /* IMPROVED HISTORY UI - INJECTED STYLES */
+    .maintenance-history-card {
+      background-color: transparent !important;
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+      padding-right: 5px !important;
+    }
+
+    .history-header {
+      color: #c0933c; /* Solano Accent */
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      border-bottom: 1px solid rgba(141, 108, 57, 0.3);
+      padding-bottom: 10px;
+    }
+
+    /* Individual Request Card */
+    .history-card-item {
+      background-color: #262626;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .history-card-item:hover {
+      border-color: #c0933c;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Status Borders */
+    .history-card-item.status-pending { border-left: 4px solid #f39c12; }
+    .history-card-item.status-progress { border-left: 4px solid #3498db; }
+    .history-card-item.status-complete { border-left: 4px solid #27ae60; background: linear-gradient(to right, rgba(39, 174, 96, 0.05), #262626 40%); }
+
+    /* Card Header Layout */
+    .req-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .req-title {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .req-date {
+      font-size: 0.75rem;
+      color: #888;
+      display: block;
+    }
+
+    /* Badges */
+    .badge-group {
+      display: flex;
+      gap: 6px;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-priority { background: rgba(255, 255, 255, 0.1); color: #ccc; }
+
+    /* Data Grid for Details */
+    .req-details-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+    }
+
+    .req-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .req-label { color: #888; }
+    .req-value { color: #eee; font-weight: 500; text-align: right; }
+    .req-value.highlight { color: #c0933c; font-weight: bold; }
+
+    /* Chat Section */
+    .chat-section {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .message-bubble {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      max-width: 85%;
+      line-height: 1.4;
+    }
+
+    .msg-tenant {
+      align-self: flex-end;
+      background-color: #c0933c; /* Gold */
+      color: #fff;
+      border-bottom-right-radius: 0;
+    }
+
+    .msg-admin {
+      align-self: flex-start;
+      background-color: #383838;
+      color: #eee;
+      border-bottom-left-radius: 0;
+    }
+
+    /* Reply Input Area */
+    .reply-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .reply-input {
+      width: 100%;
+      background-color: #1a1a1a;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .reply-input:focus {
+      outline: none;
+      border-color: #c0933c;
+    }
+
+    .reply-btn {
+      align-self: flex-end;
+      background-color: #4a3728;
+      color: #fff;
+      border: 1px solid #5a4738;
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reply-btn:hover {
+      background-color: #c0933c;
+      color: white;
+    }
+    
+    .loading-spinner-small {
+        width: 20px; height: 20px;
+        border: 2px solid #333; border-top: 2px solid #c0933c;
+        border-radius: 50%; animation: spin 1s linear infinite;
+        margin: 0 auto 10px auto;
+    }
+  </style>
 </head>
 <body>
 
-  <!-- ======================== SIDEBAR ======================== -->
   <div class="sidebar">
     <div class="logo">
       <img src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp" alt="Solano Logo" />
@@ -16,7 +205,6 @@
     <nav>
       <ul>
         <li><a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
-        <!-- <li><a href="#" onclick="loadContent(event, 'profile')">My Profile</a></li> -->
         <li><a href="#" onclick="loadContent(event, 'maintenance')">Maintenance</a></li>
         <li><a href="#" onclick="loadContent(event, 'billing')">Billing and Payments</a></li>
         <li><a href="#" onclick="loadContent(event, 'feedback')">Feedback</a></li>
@@ -25,7 +213,6 @@
     </nav>
   </div>
 
-  <!-- ======================== MAIN CONTENT ======================== -->
   <main class="main-content">
     <div id="mainContent">
       <h1 id="tenantGreeting">Welcome back, Tenant</h1>
@@ -33,12 +220,10 @@
     </div>
   </main>
 
-  <!-- Loading Overlay -->
   <div id="loadingOverlay" class="loading-overlay hidden">
     <div class="loading-spinner"></div>
   </div>
 
-  <!-- ======================== THIRD‑PARTY SCRIPTS ======================== -->
   <script src="https://www.paypal.com/sdk/js?client-id=ASbUIe1_A3shQqfiUe1_TnYnp7jGyD-_pClj10rYjAG7Fmbu_sPi6s8LoJD2bRv6bT2XkJBo-FpPO5t4&currency=PHP"></script>
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <script>
@@ -47,7 +232,6 @@
     })();
   </script>
 
-  <!-- ======================== APP SCRIPT (MODULE) ======================== -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
     import {
@@ -1161,63 +1345,20 @@
             );
           }
 
-          // Add CSS animations for completed requests
-          const completedStyles = document.createElement('style');
-          completedStyles.textContent = `
-            @keyframes pulse {
-              0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
-              70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
-            }
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateY(10px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes checkmarkPop {
-              0% { transform: scale(0); opacity: 0; }
-              70% { transform: scale(1.2); opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes shimmer {
-              0% { background-position: -1000px 0; }
-              100% { background-position: 1000px 0; }
-            }
-            .completed-item {
-              animation: fadeIn 0.5s ease-out;
-              position: relative;
-              overflow: hidden;
-            }
-            .completed-item::before {
-              content: '';
-              position: absolute;
-              top: 0;
-              left: -100%;
-              width: 100%;
-              height: 100%;
-              background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-              animation: shimmer 3s infinite;
-            }
-            .status-complete {
-              color: #27ae60 !important;
-              font-weight: bold !important;
-              position: relative;
-              padding-left: 20px;
-            }
-            .status-complete::before {
-              content: '✓';
-              position: absolute;
-              left: 0;
-              animation: checkmarkPop 0.5s ease-out;
-            }
-          `;
-          document.head.appendChild(completedStyles);
-
-          // Load maintenance request history + responses
+          /* ===================== IMPROVED HISTORY LOADER ===================== */
           async function loadHistory() {
-            historyList.innerHTML = "<p>Loading your requests...</p>";
+            const historyList = document.getElementById("historyList");
+            historyList.innerHTML = `
+              <div style="text-align:center; padding:20px;">
+                <div class="loading-spinner-small"></div>
+                <p style="color:#888; font-size:0.9rem;">Loading history...</p>
+              </div>`;
+
             try {
               const tenantEmail = await getCurrentUserEmail();
               const qCol = collection(db, "maintenanceRequests");
+              
+              // Fetch requests
               const querySnapshot = await getDocs(
                 query(
                   qCol,
@@ -1226,311 +1367,163 @@
                   limit(10)
                 )
               );
+
               if (querySnapshot.empty) {
-                historyList.innerHTML = "<p>No maintenance requests found.</p>";
+                historyList.innerHTML = `
+                  <div style="text-align:center; padding:30px; color:#666; border:1px dashed #444; border-radius:8px;">
+                    <p>No maintenance requests found.</p>
+                  </div>`;
                 return;
               }
 
-              historyList.innerHTML = "";
+              historyList.innerHTML = ""; // Clear loading
+
+              // Loop through each document
               for (const docSnap of querySnapshot.docs) {
                 const data = docSnap.data();
                 const docId = docSnap.id;
-                const timeStamp = data.timestamp
-                  ? formatDateTimeAMPM(data.timestamp)
-                  : "N/A";
+                
+                // -- Data Formatting --
                 const status = data.status || "Pending";
-                const responseTime = data.responseTime
-                  ? formatDateTimeAMPM(data.responseTime)
-                  : "Not yet responded";
-                const maintenanceName = data.maintenanceName || "Not assigned";
-                const scheduledVisit = data.preferredVisitTime
-                  ? formatDateTimeAMPM(data.preferredVisitTime)
-                  : "Not scheduled";
+                const problem = data.problem || "Unspecified Issue";
+                const unit = data.unitNumber || "N/A";
+                const personnel = data.maintenanceName || "Not assigned yet";
+                const priority = data.priority || "medium";
+                const waitTime = calculateWaitTime(priority);
                 
-                // Calculate estimated wait time for this request
-                const estimatedWaitTime = calculateWaitTime(data.priority);
-                
-                // Calculate days/hours since request was submitted
-                let timeSinceRequest = "";
-                if (data.timestamp) {
-                  const requestDate = data.timestamp.toDate();
-                  const now = new Date();
-                  const diffMs = now - requestDate;
-                  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                  const diffDays = Math.floor(diffHours / 24);
-                  
-                  if (diffDays > 0) {
-                    timeSinceRequest = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                  } else if (diffHours > 0) {
-                    timeSinceRequest = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-                  } else {
-                    timeSinceRequest = "Recently";
-                  }
-                }
+                // Dates
+                const submittedDate = data.timestamp ? formatDateTimeAMPM(data.timestamp) : "Unknown Date";
+                const scheduledDate = data.preferredVisitTime ? formatDateTimeAMPM(data.preferredVisitTime) : "Not scheduled";
 
+                // Status Styling Class
+                let statusClass = "status-pending";
+                let statusColor = "#f39c12"; // orange
+                if (status === "In Progress") { statusClass = "status-progress"; statusColor = "#3498db"; } 
+                if (status === "Complete") { statusClass = "status-complete"; statusColor = "#27ae60"; }
+
+                // -- Build the Card HTML --
                 const item = document.createElement("div");
-                item.style.borderBottom = "1px solid #ddd";
-                item.style.padding = "10px 0";
-                item.style.position = "relative";
-                item.style.overflow = "hidden";
+                item.className = `history-card-item ${statusClass}`;
                 
-                // SPECIAL EFFECTS FOR COMPLETED REQUESTS
-                if (status === "Complete") {
-                  // Green gradient background for completed requests
-                  item.style.background = "linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(46, 204, 113, 0.05) 100%)";
-                  item.style.borderLeft = "4px solid #27ae60";
-                  item.style.borderRadius = "8px 0 0 8px";
-                  item.style.marginBottom = "15px";
-                  item.style.boxShadow = "0 2px 10px rgba(39, 174, 96, 0.1)";
-                  
-                  // Add subtle animation on hover
-                  item.style.transition = "all 0.3s ease";
-                  item.addEventListener("mouseenter", function() {
-                    this.style.transform = "translateX(5px)";
-                    this.style.boxShadow = "0 4px 15px rgba(39, 174, 96, 0.25)";
-                  });
-                  item.addEventListener("mouseleave", function() {
-                    this.style.transform = "translateX(0)";
-                    this.style.boxShadow = "0 2px 10px rgba(39, 174, 96, 0.1)";
-                  });
-                  
-                  item.classList.add("completed-item");
-                  
-                  // Add checkmark badge
-                  const checkmarkBadge = document.createElement("div");
-                  checkmarkBadge.innerHTML = "✅ COMPLETED";
-                  checkmarkBadge.style.position = "absolute";
-                  checkmarkBadge.style.top = "10px";
-                  checkmarkBadge.style.right = "10px";
-                  checkmarkBadge.style.background = "linear-gradient(135deg, #27ae60, #2ecc71)";
-                  checkmarkBadge.style.color = "white";
-                  checkmarkBadge.style.padding = "5px 12px";
-                  checkmarkBadge.style.borderRadius = "20px";
-                  checkmarkBadge.style.fontSize = "11px";
-                  checkmarkBadge.style.fontWeight = "bold";
-                  checkmarkBadge.style.boxShadow = "0 2px 5px rgba(39, 174, 96, 0.3)";
-                  checkmarkBadge.style.animation = "pulse 2s infinite";
-                  checkmarkBadge.style.zIndex = "2";
-                  
-                  // Add celebration emoji
-                  const celebration = document.createElement("div");
-                  celebration.innerHTML = "🎉";
-                  celebration.style.position = "absolute";
-                  celebration.style.top = "10px";
-                  celebration.style.right = "100px";
-                  celebration.style.fontSize = "20px";
-                  celebration.style.animation = "checkmarkPop 0.5s ease-out 0.5s both";
-                  
-                  item.appendChild(checkmarkBadge);
-                  item.appendChild(celebration);
-                } else if (status === "In Progress") {
-                  // Blue styling for in-progress requests
-                  item.style.borderLeft = "4px solid #3498db";
-                  item.style.background = "rgba(52, 152, 219, 0.03)";
-                } else {
-                  // Orange styling for pending requests
-                  item.style.borderLeft = "4px solid #f39c12";
-                  item.style.background = "rgba(243, 156, 18, 0.03)";
-                }
-
-                const responsesContainer = document.createElement("div");
-                responsesContainer.style.marginTop = "8px";
-                responsesContainer.style.paddingLeft = "10px";
-                responsesContainer.style.borderLeft = "3px solid #8d6c39";
-                responsesContainer.style.display = "flex";
-                responsesContainer.style.flexDirection = "column";
-                responsesContainer.style.gap = "6px";
-                responsesContainer.innerHTML = "<em>Loading messages...</em>";
-
-                // Format status with special class for completed
-                const statusDisplay = status === "Complete" 
-                  ? `<span class="status-complete">${status}</span>`
-                  : status;
-
                 item.innerHTML = `
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="flex: 1;">
-                      <strong>Issue:</strong> ${data.problem}<br/>
-                      <strong>Unit Number:</strong> ${data.unitNumber || "N/A"}<br/>
-                      <strong>Description:</strong> ${data.comment || "-"}<br/>
-                      <strong>Scheduled Visit:</strong> ${scheduledVisit}<br/>
-                      <strong>Status:</strong> ${statusDisplay}<br/>
-                      <strong>Maintenance Personnel: </strong><span style="color:#b08d35; font-weight:700;">${maintenanceName}</span><br/>
-                      <strong>Response Time:</strong> ${responseTime}<br/>
-                      <strong>Submitted:</strong> ${timeStamp} (${timeSinceRequest})<br/>
-                      ${data.completionTime ? `<div style="margin-top: 8px; padding: 8px; background: rgba(39, 174, 96, 0.1); border-radius: 6px; border-left: 3px solid #27ae60;">
-                        <strong style="color: #27ae60;">✅ Work Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}
-                      </div>` : ''}
+                  <div class="req-header">
+                    <div>
+                      <span class="req-title">${problem}</span>
+                      <span class="req-date">Ref: ${docId.substring(0,6)} • ${submittedDate}</span>
                     </div>
-                    <div style="min-width: 150px; text-align: right;">
-                      <div style="background-color: rgba(141, 108, 57, 0.1); padding: 8px; border-radius: 6px; margin-bottom: 8px;">
-                        <strong style="color: #4a3728; font-size: 13px;">Estimated Wait:</strong><br/>
-                        <span style="color: #8d6c39; font-weight: bold; font-size: 14px;">${estimatedWaitTime}</span>
+                    <div class="badge-group">
+                      <span class="badge" style="color:${statusColor}; border:1px solid ${statusColor}">${status}</span>
+                      <span class="badge badge-priority">${priority}</span>
+                    </div>
+                  </div>
+
+                  <div class="req-details-grid">
+                    <div class="req-row">
+                      <span class="req-label">Unit:</span>
+                      <span class="req-value">${unit}</span>
+                    </div>
+                    <div class="req-row">
+                      <span class="req-label">Personnel:</span>
+                      <span class="req-value highlight">${personnel}</span>
+                    </div>
+                    <div class="req-row">
+                      <span class="req-label">Est. Wait:</span>
+                      <span class="req-value">${waitTime}</span>
+                    </div>
+                     <div class="req-row">
+                      <span class="req-label">Scheduled:</span>
+                      <span class="req-value">${scheduledDate}</span>
+                    </div>
+                  </div>
+                  
+                  <div class="chat-section" id="chat-${docId}">
+                      <div class="chat-messages" id="messages-${docId}">
+                          <small style="color:#666; font-style:italic;">Loading conversation...</small>
                       </div>
-                      ${data.priority ? `<div><strong>Priority:</strong> ${data.priority}</div>` : ''}
-                    </div>
+                      
+                      ${status !== "Complete" ? `
+                      <div class="reply-area">
+                          <textarea id="input-${docId}" class="reply-input" rows="2" placeholder="Type a message to admin..."></textarea>
+                          <button id="btn-${docId}" class="reply-btn">Send Reply</button>
+                      </div>
+                      ` : `<div style="text-align:center; color:#27ae60; font-size:0.8rem; margin-top:5px;">✓ Request Completed</div>`}
                   </div>
                 `;
 
-                const imagesContainer = document.createElement("div");
-                imagesContainer.style.marginTop = "10px";
-                imagesContainer.style.display = "flex";
-                imagesContainer.style.flexWrap = "wrap";
-                imagesContainer.style.gap = "8px";
-                if (data.imageUrls && data.imageUrls.length > 0) {
-                  const imagesLabel = document.createElement("strong");
-                  imagesLabel.textContent = "Uploaded Images:";
-                  imagesContainer.appendChild(imagesLabel);
-                  imagesContainer.appendChild(document.createElement("br"));
-                  data.imageUrls.forEach(url => {
-                    const img = document.createElement("img");
-                    img.src = url;
-                    img.style.width = "100px";
-                    img.style.height = "auto";
-                    img.style.borderRadius = "6px";
-                    img.style.boxShadow = "0 0 5px rgba(0,0,0,0.3)";
-                    img.style.objectFit = "cover";
-                    
-                    // Add hover effect for images
-                    img.style.transition = "transform 0.3s ease";
-                    img.addEventListener("mouseenter", () => {
-                      img.style.transform = "scale(1.05)";
-                      img.style.boxShadow = "0 0 10px rgba(0,0,0,0.5)";
-                    });
-                    img.addEventListener("mouseleave", () => {
-                      img.style.transform = "scale(1)";
-                      img.style.boxShadow = "0 0 5px rgba(0,0,0,0.3)";
-                    });
-                    
-                    imagesContainer.appendChild(img);
-                  });
-                } else {
-                  imagesContainer.innerHTML = "<em>No images uploaded.</em>";
-                }
-
-                item.appendChild(imagesContainer);
-                item.appendChild(responsesContainer);
                 historyList.appendChild(item);
 
-                // ---- load conversation messages (admin + tenant) ----
+                // -- Load Messages Logic (Same as before but cleaner injection) --
                 const responsesQuery = query(
                   collection(db, "maintenanceRequests", docId, "responses"),
                   orderBy("timestamp", "asc")
                 );
-                const responsesSnapshot = await getDocs(responsesQuery);
-                if (responsesSnapshot.empty) {
-                  responsesContainer.innerHTML =
-                    "<em>No messages yet. You can send a reply below.</em>";
-                } else {
-                  responsesContainer.innerHTML = "";
-                  responsesSnapshot.forEach(respDoc => {
-                    const respData = respDoc.data();
-                    const time = respData.timestamp
-                      ? formatDateTimeAMPM(respData.timestamp)
-                      : "No timestamp";
-                    const isTenant = respData.sender === "tenant";
-
-                    const senderLabel = isTenant
-                      ? "You"
-                      : respData.adminEmail ||
-                        respData.senderEmail ||
-                        "Maintenance";
-
-                    const respDiv = document.createElement("div");
-                    respDiv.style.marginBottom = "4px";
-                    respDiv.style.padding = "6px 8px";
-                    respDiv.style.borderRadius = "6px";
-                    respDiv.style.maxWidth = "90%";
-                    respDiv.style.background = isTenant
-                      ? "rgba(141,108,57,0.2)"
-                      : "rgba(255,255,255,0.08)";
-                    respDiv.style.alignSelf = isTenant ? "flex-end" : "flex-start";
-                    respDiv.style.transition = "transform 0.2s ease";
-                    
-                    respDiv.addEventListener("mouseenter", () => {
-                      respDiv.style.transform = "translateY(-2px)";
+                
+                // We load messages asynchronously for each card
+                getDocs(responsesQuery).then(snaps => {
+                  const msgContainer = document.getElementById(`messages-${docId}`);
+                  msgContainer.innerHTML = ""; // Clear loading text
+                  
+                  if (snaps.empty) {
+                    msgContainer.innerHTML = `<small style="color:#666; display:block; text-align:center;">No messages yet.</small>`;
+                  } else {
+                    snaps.forEach(r => {
+                      const rData = r.data();
+                      const isTenant = rData.sender === "tenant";
+                      const bubble = document.createElement("div");
+                      bubble.className = `message-bubble ${isTenant ? 'msg-tenant' : 'msg-admin'}`;
+                      bubble.textContent = rData.message;
+                      msgContainer.appendChild(bubble);
                     });
-                    respDiv.addEventListener("mouseleave", () => {
-                      respDiv.style.transform = "translateY(0)";
-                    });
+                    // Scroll to bottom
+                    msgContainer.scrollTop = msgContainer.scrollHeight;
+                  }
+                });
 
-                    respDiv.innerHTML = `
-                      <strong>${senderLabel}</strong> <small>(${time})</small><br/>
-                      <span>${respData.message}</span>
-                    `;
-                    responsesContainer.appendChild(respDiv);
-                  });
-                }
-
-                // ---- REPLY BOX (TENANT) ----
-                // Only show reply box if request is not completed
+                // -- Attach Reply Event Listener --
                 if (status !== "Complete") {
-                  const replyContainer = document.createElement("div");
-                  replyContainer.style.marginTop = "8px";
-                  replyContainer.style.paddingLeft = "10px";
-
-                  replyContainer.innerHTML = `
-                    <textarea rows="2" placeholder="Type a reply to maintenance..." 
-                      style="width:100%; padding:6px; border-radius:6px; border:1px solid #ccc; resize:vertical;"></textarea>
-                    <button class="tenant-reply-btn" 
-                      style="margin-top:6px; padding:6px 12px; background:#8d6c39; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px;">
-                      Send Reply
-                    </button>
-                    <small style="display:block; margin-top:4px; color:#ccc;">Replies are visible to Admin.</small>
-                  `;
-
-                  const replyTextarea = replyContainer.querySelector("textarea");
-                  const replyButton = replyContainer.querySelector(".tenant-reply-btn");
-
-                  replyButton.addEventListener("click", async () => {
-                    const message = replyTextarea.value.trim();
-                    if (!message) {
-                      await showPopup("Please type a message before sending.");
-                      return;
-                    }
+                    const btn = document.getElementById(`btn-${docId}`);
+                    const input = document.getElementById(`input-${docId}`);
                     
-                    // Show loading on button
-                    setButtonLoading(replyButton, true);
-                    
-                    try {
-                      await sendTenantReply(docId, message);
-                      replyTextarea.value = "";
-                      
-                      // Add visual feedback
-                      replyButton.style.background = "#27ae60";
-                      replyButton.textContent = "✓ Sent!";
-                      
-                      setTimeout(() => {
-                        replyButton.style.background = "#8d6c39";
-                        replyButton.textContent = "Send Reply";
-                        replyButton.disabled = false;
-                      }, 1500);
-                      
-                      await loadHistory(); // Refresh to show new message
-                    } catch (err) {
-                      console.error("Failed to send reply:", err);
-                      await showPopup("Failed to send reply. Please try again.");
-                      setButtonLoading(replyButton, false);
-                    }
-                  });
+                    btn.addEventListener("click", async () => {
+                       const txt = input.value.trim();
+                       if(!txt) return;
+                       
+                       btn.textContent = "Sending...";
+                       btn.disabled = true;
+                       
+                       try {
+                          await sendTenantReply(docId, txt); // Use your existing helper
+                          input.value = "";
+                          
+                          // Optimistic Update (Add bubble immediately)
+                          const msgContainer = document.getElementById(`messages-${docId}`);
+                          const bubble = document.createElement("div");
+                          bubble.className = `message-bubble msg-tenant`;
+                          bubble.textContent = txt;
+                          msgContainer.appendChild(bubble);
+                          msgContainer.scrollTop = msgContainer.scrollHeight;
 
-                  item.appendChild(replyContainer);
-                } else {
-                  // Show completed message instead of reply box
-                  const completedMessage = document.createElement("div");
-                  completedMessage.innerHTML = `
-                    <div style="margin-top: 10px; padding: 8px; background: rgba(39, 174, 96, 0.1); border-radius: 6px; border-left: 3px solid #27ae60;">
-                      <strong style="color: #27ae60;">✓ This request has been completed.</strong><br>
-                      <small style="color: #666;">No further replies needed.</small>
-                    </div>
-                  `;
-                  item.appendChild(completedMessage);
+                          // Remove "No messages" text if it exists
+                          const emptyMsg = msgContainer.querySelector("small");
+                          if(emptyMsg) emptyMsg.remove();
+                          
+                       } catch(e) {
+                          console.error(e);
+                          alert("Failed to send");
+                       } finally {
+                          btn.textContent = "Send Reply";
+                          btn.disabled = false;
+                       }
+                    });
                 }
               }
+
             } catch (error) {
-              historyList.innerHTML = `<p style="color:red;">Failed to load history: ${error.message}</p>`;
+              console.error("History Error", error);
+              historyList.innerHTML = `<p style="color:red;">Error loading history.</p>`;
             }
           }
+          
           loadHistory();
 
           async function uploadToCloudinary(file) {
@@ -2104,7 +2097,6 @@
               <p id="statusMessage" class="status-text"></p>
             </form>
             
-            <!-- Cooldown info note -->
             <div id="cooldownInfo" style="margin-top: 15px; padding: 10px; background: rgba(141, 108, 57, 0.1); border-radius: 6px; border-left: 3px solid #8d6c39;">
               <p style="margin: 0; color: #4a3728; font-size: 13px;">
                 <strong>Note:</strong> You can submit feedback once per week to ensure everyone has a chance to share their thoughts.
@@ -2404,7 +2396,6 @@
     });
   </script>
 
-  <!-- ======================== POPUP ======================== -->
   <div id="customPopup" class="popup hidden">
     <div class="popup-content">
       <p id="popupMessage">Your message goes here</p>
