@@ -847,3 +847,190 @@ body {
         border-radius: 5px;
         cursor: pointer;
     }
+        /* IMPROVED HISTORY UI - INJECTED STYLES */
+    .maintenance-history-card {
+      background-color: transparent !important;
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+      padding-right: 5px !important;
+    }
+
+    .history-header {
+      color: #c0933c; /* Solano Accent */
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      border-bottom: 1px solid rgba(141, 108, 57, 0.3);
+      padding-bottom: 10px;
+    }
+
+    /* Individual Request Card */
+    .history-card-item {
+      background-color: #262626;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .history-card-item:hover {
+      border-color: #c0933c;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Status Borders */
+    .history-card-item.status-pending { border-left: 4px solid #f39c12; }
+    .history-card-item.status-progress { border-left: 4px solid #3498db; }
+    .history-card-item.status-complete { border-left: 4px solid #27ae60; background: linear-gradient(to right, rgba(39, 174, 96, 0.05), #262626 40%); }
+
+    /* Card Header Layout */
+    .req-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .req-title {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .req-date {
+      font-size: 0.75rem;
+      color: #888;
+      display: block;
+    }
+
+    /* Badges */
+    .badge-group {
+      display: flex;
+      gap: 6px;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-priority { background: rgba(255, 255, 255, 0.1); color: #ccc; }
+
+    /* Data Grid for Details */
+    .req-details-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+    }
+
+    .req-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .req-label { color: #888; }
+    .req-value { color: #eee; font-weight: 500; text-align: right; }
+    .req-value.highlight { color: #c0933c; font-weight: bold; }
+
+    /* Chat Section */
+    .chat-section {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .message-bubble {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      max-width: 85%;
+      line-height: 1.4;
+    }
+
+    .msg-tenant {
+      align-self: flex-end;
+      background-color: #c0933c; /* Gold */
+      color: #fff;
+      border-bottom-right-radius: 0;
+    }
+
+    .msg-admin {
+      align-self: flex-start;
+      background-color: #383838;
+      color: #eee;
+      border-bottom-left-radius: 0;
+    }
+
+    /* Reply Input Area */
+    .reply-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .reply-input {
+      width: 100%;
+      background-color: #1a1a1a;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .reply-input:focus {
+      outline: none;
+      border-color: #c0933c;
+    }
+
+    .reply-btn {
+      align-self: flex-end;
+      background-color: #4a3728;
+      color: #fff;
+      border: 1px solid #5a4738;
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reply-btn:hover {
+      background-color: #c0933c;
+      color: white;
+    }
+    
+    .loading-spinner-small {
+        width: 20px; height: 20px;
+        border: 2px solid #333; border-top: 2px solid #c0933c;
+        border-radius: 50%; animation: spin 1s linear infinite;
+        margin: 0 auto 10px auto;
+    }
