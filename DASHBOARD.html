@@ -38,7 +38,7 @@
     <div class="loading-spinner"></div>
   </div>
 
-  <!-- ======================== THIRD-PARTY SCRIPTS ======================== -->
+  <!-- ======================== THIRD‑PARTY SCRIPTS ======================== -->
   <script src="https://www.paypal.com/sdk/js?client-id=ASbUIe1_A3shQqfiUe1_TnYnp7jGyD-_pClj10rYjAG7Fmbu_sPi6s8LoJD2bRv6bT2XkJBo-FpPO5t4&currency=PHP"></script>
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <script>
@@ -61,8 +61,7 @@
       orderBy,
       doc,
       getDoc,
-      limit,
-      updateDoc
+      limit
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
     import { getStorage } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-storage.js";
@@ -82,41 +81,39 @@
     const auth = getAuth(app);
     const storage = getStorage(app);
 
-    /* ==================== SIMPLE LOADING & BUTTON HELPERS ==================== */
-function showLoading() {
-  const overlay = document.getElementById("loadingOverlay");
-  if (overlay) overlay.classList.remove("hidden");
-}
+    /* ==================== SIMPLE LOADING FUNCTIONS ==================== */
+    window.showLoading = function() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.remove('hidden');
+      }
+    };
 
-function hideLoading() {
-  const overlay = document.getElementById("loadingOverlay");
-  if (overlay) overlay.classList.add("hidden");
-}
+    window.hideLoading = function() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+    };
 
-function setButtonLoading(button, isLoading) {
-  if (!button) return;
-
-  if (isLoading) {
-    button.disabled = true;
-    button.classList.add("button-loading");
-    const originalText = button.textContent;
-    button.setAttribute("data-original-text", originalText);
-    button.textContent = "Loading...";
-  } else {
-    button.disabled = false;
-    button.classList.remove("button-loading");
-    const originalText = button.getAttribute("data-original-text");
-    if (originalText) {
-      button.textContent = originalText;
-    }
-  }
-}
-
-// expose to inline handlers / other scripts if needed
-window.showLoading = showLoading;
-window.hideLoading = hideLoading;
-window.setButtonLoading = setButtonLoading;
-
+    window.setButtonLoading = function(button, isLoading) {
+      if (!button) return;
+      
+      if (isLoading) {
+        button.disabled = true;
+        button.classList.add('button-loading');
+        const originalText = button.textContent;
+        button.setAttribute('data-original-text', originalText);
+        button.textContent = 'Loading...';
+      } else {
+        button.disabled = false;
+        button.classList.remove('button-loading');
+        const originalText = button.getAttribute('data-original-text');
+        if (originalText) {
+          button.textContent = originalText;
+        }
+      }
+    };
 
     function getCurrentUserEmail() {
       return new Promise(resolve => {
@@ -129,536 +126,24 @@ window.setButtonLoading = setButtonLoading;
 
     const mainContent = document.getElementById("mainContent");
 
-    /* ======================== DASHBOARD INIT FUNCTION ======================== */
-    async function initDashboard() {
-      function escapeHtml(text) {
-        if (!text) return "";
-        return text
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-
-      let communityFeedbackData = [];
-      let showingAllFeedback = false;
-
-      // Wait for auth state before loading units
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          await populateMyUnits();
-          // Load feedback after units are loaded
-          setTimeout(() => {
-            loadCommunityFeedback();
-          }, 300);
-        } else {
-          const unitListEl = document.getElementById("myUnitList");
-          if (unitListEl) unitListEl.textContent = "Please log in to view units.";
-        }
-      });
-
-      async function populateMyUnits() {
-        try {
-          const currentUser = auth.currentUser;
-          if (!currentUser) {
-            console.log("No user logged in");
-            return;
-          }
-
-          const unitListEl = document.getElementById("myUnitList");
-          if (!unitListEl) return;
-
-          const tenantDocSnap = await getDoc(doc(db, "users", currentUser.uid));
-          
-          if (!tenantDocSnap.exists()) {
-            unitListEl.textContent = "No units found.";
-            return;
-          }
-
-          const units = tenantDocSnap.data().unitNumbers || [];
-          
-          if (units.length === 0) {
-            unitListEl.textContent = "No units assigned.";
-            return;
-          }
-
-          unitListEl.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              ${units.map(u => `
-                <div style="
-                  padding: 8px 12px;
-                  background: rgba(255,255,255,0.1);
-                  border-radius: 6px;
-                  border-left: 3px solid #8d6c39;
-                  font-weight: 500;
-                  transition: all 0.3s ease;
-                ">
-                  ${u}
-                </div>
-              `).join("")}
-            </div>
-          `;
-          
-          const unitItems = document.querySelectorAll("#myUnitList > div > div");
-          unitItems.forEach(item => {
-            item.addEventListener("mouseenter", () => {
-              item.style.transform = "translateX(5px)";
-              item.style.background = "rgba(141, 108, 57, 0.2)";
-            });
-            item.addEventListener("mouseleave", () => {
-              item.style.transform = "translateX(0)";
-              item.style.background = "rgba(255,255,255,0.1)";
-            });
-          });
-          
-        } catch (e) {
-          console.error("Error fetching units:", e);
-          const unitListEl = document.getElementById("myUnitList");
-          if (!unitListEl) return;
-          unitListEl.innerHTML = `
-            <div style="color: #ff6b6b; padding: 10px; background: rgba(255,107,107,0.1); border-radius: 6px;">
-              Failed to load units. Please try refreshing the page.
-            </div>
-          `;
-        }
-      }
-
-      async function loadCommunityFeedback() {
-        const communityFeedback = document.getElementById("communityFeedback");
-        if (!communityFeedback) {
-          console.error("Community feedback element not found");
-          return;
-        }
-        
-        const currentUser = auth.currentUser;
-        const currentUserEmail = currentUser ? currentUser.email : null;
-
-        try {
-          const snapshot = await getDocs(collection(db, "feedback"));
-
-          if (snapshot.empty) {
-            communityFeedback.innerHTML =
-              '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available yet.</p>';
-            const msg = document.getElementById("feedbackMessage");
-            if (msg) msg.style.display = "none";
-            return;
-          }
-
-          communityFeedbackData = [];
-          let totalRating = 0;
-          const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-
-          snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-
-            communityFeedbackData.push({
-              id: docSnap.id,
-              ...data
-            });
-
-            const rating = data.rating || 0;
-            if (rating >= 1 && rating <= 5) {
-              totalRating += rating;
-              ratingCounts[rating]++;
-            }
-          });
-
-          if (communityFeedbackData.length === 0) {
-            communityFeedback.innerHTML =
-              '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback from other unit owners yet.</p>';
-            const msg = document.getElementById("feedbackMessage");
-            if (msg) msg.style.display = "block";
-            return;
-          }
-
-          // Update stats with animation
-          animateCounter("totalFeedback", communityFeedbackData.length);
-          const avgEl = document.getElementById("avgRating");
-          if (avgEl) {
-            avgEl.textContent = (totalRating / communityFeedbackData.length).toFixed(1);
-          }
-          animateCounter("rating5", ratingCounts[5]);
-          animateCounter("rating4", ratingCounts[4]);
-          animateCounter("rating3", ratingCounts[3]);
-          animateCounter("rating2", ratingCounts[2]);
-          animateCounter("rating1", ratingCounts[1]);
-
-          if (communityFeedbackData.length > 4) {
-            const controls = document.getElementById("expandControls");
-            if (controls) controls.style.display = "block";
-            const totalCountEl = document.getElementById("totalCount");
-            if (totalCountEl) totalCountEl.textContent = communityFeedbackData.length;
-          }
-
-          applyFeedbackSorting();
-          const msg = document.getElementById("feedbackMessage");
-          if (msg) msg.style.display = "block";
-          
-          setTimeout(() => {
-            const feedbackSortSelect = document.getElementById("feedbackSort");
-            const expandAllBtn = document.getElementById("expandAllBtn");
-            
-            if (feedbackSortSelect) {
-              feedbackSortSelect.addEventListener("change", applyFeedbackSorting);
-            }
-            
-            if (expandAllBtn) {
-              expandAllBtn.addEventListener("click", function () {
-                showingAllFeedback = !showingAllFeedback;
-                applyFeedbackSorting();
-                if (showingAllFeedback) {
-                  document
-                    .querySelector("#communityFeedback")
-                    .scrollIntoView({ behavior: "smooth", block: "start" });
-                }
-              });
-            }
-          }, 100);
-          
-        } catch (error) {
-          console.error("Error loading community feedback:", error);
-          communityFeedback.innerHTML = `<p style="color: white; text-align: center; grid-column: 1 / -1; color: #ffcccc;">Error loading community feedback: ${error.message}</p>`;
-        }
-      }
-
-      function animateCounter(elementId, targetValue, duration = 1000) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-        
-        let startValue = parseInt(element.textContent) || 0;
-        let startTime = null;
-        
-        function updateCounter(timestamp) {
-          if (!startTime) startTime = timestamp;
-          const progress = timestamp - startTime;
-          const percentage = Math.min(progress / duration, 1);
-          
-          const easeOutQuad = t => t * (2 - t);
-          const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuad(percentage));
-          
-          element.textContent = currentValue;
-          
-          if (percentage < 1) {
-            requestAnimationFrame(updateCounter);
-          } else {
-            element.textContent = targetValue;
-          }
-        }
-        
-        requestAnimationFrame(updateCounter);
-      }
-
-      function applyFeedbackSorting() {
-        const sortValue = document.getElementById("feedbackSort")?.value || "date-desc";
-        if (communityFeedbackData.length === 0) return;
-
-        let sortedFeedback = [...communityFeedbackData];
-
-        switch (sortValue) {
-          case "date-desc":
-            sortedFeedback.sort(
-              (a, b) =>
-                (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)
-            );
-            break;
-          case "date-asc":
-            sortedFeedback.sort(
-              (a, b) =>
-                (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0)
-            );
-            break;
-          case "rating-desc":
-            sortedFeedback.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-            break;
-          case "rating-asc":
-            sortedFeedback.sort((a, b) => (a.rating || 0) - (b.rating || 0));
-            break;
-          case "random":
-            for (let i = sortedFeedback.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [sortedFeedback[i], sortedFeedback[j]] = [
-                sortedFeedback[j],
-                sortedFeedback[i]
-              ];
-            }
-            break;
-        }
-
-        renderCommunityFeedback(sortedFeedback);
-      }
-
-      function renderCommunityFeedback(feedbackArray) {
-        const communityFeedback = document.getElementById("communityFeedback");
-        if (!communityFeedback) return;
-
-        if (feedbackArray.length === 0) {
-          communityFeedback.innerHTML =
-            '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available.</p>';
-          return;
-        }
-
-        communityFeedback.innerHTML = "";
-
-        let itemsToShow = feedbackArray;
-        if (!showingAllFeedback && feedbackArray.length > 4) {
-          itemsToShow = feedbackArray.slice(0, 4);
-          const showingEl = document.getElementById("showingCount");
-          if (showingEl) showingEl.textContent = "4";
-        } else {
-          const showingEl = document.getElementById("showingCount");
-          if (showingEl) showingEl.textContent = feedbackArray.length;
-        }
-
-        const expandBtn = document.getElementById("expandAllBtn");
-        if (expandBtn) {
-          if (showingAllFeedback) {
-            expandBtn.textContent = "Show Less (First 4)";
-            expandBtn.style.background = "#4a3728";
-            expandBtn.style.color = "white";
-          } else {
-            expandBtn.textContent = `Show All ${feedbackArray.length} Feedback Items`;
-            expandBtn.style.background = "white";
-            expandBtn.style.color = "#4a3728";
-          }
-        }
-
-        itemsToShow.forEach((feedback, index) => {
-          const timeText = feedback.timestamp?.toDate
-            ? feedback.timestamp
-                .toDate()
-                .toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric"
-                })
-            : "Recent";
-
-          const stars = "⭐".repeat(feedback.rating || 0);
-          const emptyStars = "☆".repeat(5 - (feedback.rating || 0));
-
-          let bgColor = "#f5f1e8";
-          let borderColor = "#d4c9b8";
-
-          if (feedback.rating >= 4) {
-            bgColor = "#e8e0d1";
-            borderColor = "#c9b89c";
-          }
-          if (feedback.rating <= 2) {
-            bgColor = "#f0e6d6";
-            borderColor = "#d9c6a9";
-          }
-
-          const card = document.createElement("div");
-          card.style.background = bgColor;
-          card.style.border = `2px solid ${borderColor}`;
-          card.style.borderRadius = "10px";
-          card.style.padding = "18px";
-          card.style.boxShadow = "0 3px 8px rgba(74, 55, 40, 0.15)";
-          card.style.transition = "all 0.3s ease";
-          card.style.opacity = "0";
-          card.style.transform = "translateY(20px)";
-          card.style.animation = `fadeInUp 0.5s ease-out ${index * 0.1}s forwards`;
-
-          const hasNewSchema =
-            feedback.q1 ||
-            feedback.q2 ||
-            feedback.q3 ||
-            feedback.q4 ||
-            feedback.q5 ||
-            feedback.q6;
-
-          let bodyHtml = "";
-
-          if (hasNewSchema) {
-            bodyHtml = `
-              <div style="margin-top: 12px;">
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #4a3728; font-size: 14px;">Overall condition and appearance of the property</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
-                    ${escapeHtml(feedback.q1 || "No answer provided")}
-                  </div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #4a3728; font-size: 14px;">Maintenance services (unit, hallway, garden)</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
-                    ${escapeHtml(feedback.q2 || "No answer provided")}
-                  </div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #4a3728; font-size: 14px;">Professionalism of property management staff</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
-                    ${escapeHtml(feedback.q3 || "No answer provided")}
-                  </div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #4a3728; font-size: 14px;">Ease of paying monthly dues/rent</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
-                    ${escapeHtml(feedback.q4 || "No answer provided")}
-                  </div>
-                </div>
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #4a3728; font-size: 14px;">Amenities (gym, pool, clubhouse)</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
-                    ${escapeHtml(feedback.q5 || "No answer provided")}
-                  </div>
-                </div>
-                <div>
-                  <strong style="color: #4a3728; font-size: 14px;">Additional suggestions</strong>
-                  <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #4a3728;">
-                    ${escapeHtml(feedback.q6 || "No suggestions provided")}
-                  </div>
-                </div>
-              </div>
-            `;
-          } else {
-            bodyHtml = `
-              <div style="margin-top: 12px;">
-                <div style="margin-bottom: 12px;">
-                  <strong style="color: #4a3728; font-size: 14px;">What do you like about our services, unit, and facilities?</strong>
-                  <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #8d6c39;">
-                    ${escapeHtml(feedback.question2 || "No answer provided")}
-                  </div>
-                </div>
-                <div>
-                  <strong style="color: #4a3728; font-size: 14px;">What can we improve in our unit, services, or facilities?</strong>
-                  <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #4a3728;">
-                    ${escapeHtml(feedback.question3 || "No answer provided")}
-                  </div>
-                </div>
-              </div>
-            `;
-          }
-
-          card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <div style="color: #8d6c39; font-size: 20px;">
-                ${stars}${emptyStars}
-                <span style="color: #4a3728; font-size: 15px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
-              </div>
-              <div style="color: #8d6c39; font-size: 13px; font-weight: 500;">
-                ${timeText}
-              </div>
-            </div>
-            ${bodyHtml}
-          `;
-
-          card.addEventListener("mouseenter", () => {
-            card.style.transform = "translateY(-5px)";
-            card.style.boxShadow = "0 8px 25px rgba(74, 55, 40, 0.3)";
-          });
-
-          card.addEventListener("mouseleave", () => {
-            card.style.transform = "translateY(0)";
-            card.style.boxShadow = "0 3px 8px rgba(74, 55, 40, 0.15)";
-          });
-
-          communityFeedback.appendChild(card);
-        });
-
-        const style = document.createElement('style');
-        style.textContent = `
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-
-      // Image slider
-      (function initImageSlider() {
-        let slideIndexLocal = 1;
-        const slides = () => document.querySelectorAll(".welcome-slider .slide");
-
-        function showSlidesLocal(n) {
-          const nodeList = slides();
-          if (!nodeList || nodeList.length === 0) return;
-          if (n > nodeList.length) slideIndexLocal = 1;
-          if (n < 1) slideIndexLocal = nodeList.length;
-          nodeList.forEach(s => (s.style.display = "none"));
-          nodeList[slideIndexLocal - 1].style.display = "block";
-        }
-
-        setTimeout(() => {
-          showSlidesLocal(slideIndexLocal);
-          
-          const sliderPrev = document.getElementById("sliderPrev");
-          const sliderNext = document.getElementById("sliderNext");
-          
-          if (sliderPrev) {
-            sliderPrev.addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
-          }
-          if (sliderNext) {
-            sliderNext.addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
-          }
-
-          const sliderInterval = setInterval(
-            () => showSlidesLocal(++slideIndexLocal),
-            5000
-          );
-          const sliderEl = document.querySelector(".welcome-slider");
-          if (sliderEl) {
-            sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
-          }
-        }, 200);
-      })();
-
-      // Calendar
-      (function initCalendar() {
-        function generateCalendar() {
-          const calendar = document.getElementById("calendar");
-          if (!calendar) return;
-
-          const today = new Date();
-          const monthName = today.toLocaleString("default", { month: "long" });
-          const year = today.getFullYear();
-          const firstDay = new Date(year, today.getMonth(), 1);
-          const lastDay = new Date(year, today.getMonth() + 1, 0);
-          const startDay = firstDay.getDay();
-
-          let html = "<table class='cal-table'>";
-          html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
-          html +=
-            "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
-
-          for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
-
-          for (let day = 1; day <= lastDay.getDate(); day++) {
-            const isToday = day === today.getDate();
-            html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
-            if ((day + startDay) % 7 === 0 && day !== lastDay.getDate())
-              html += "</tr><tr>";
-          }
-          html += "</tr></table>";
-          calendar.innerHTML = html;
-        }
-        
-        setTimeout(() => {
-          generateCalendar();
-        }, 200);
-      })();
-    }
-
     /* ======================== MAIN ROUTER ======================== */
     window.loadContent = function (event, section) {
+      // Save the active tab to localStorage
       localStorage.setItem('activeTab', section);
+      
+      // Show loading when switching sections
       showLoading();
       
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }
 
+      // remove active class from all sidebar links
       document
         .querySelectorAll(".sidebar nav ul li a")
         .forEach(link => link.classList.remove("active"));
 
+      // add active class to clicked or default link
       if (event && event.target) {
         event.target.classList.add("active");
       } else {
@@ -754,11 +239,529 @@ window.setButtonLoading = setButtonLoading;
             </section>
           `;
 
+          // Initialize dashboard functions after DOM is ready
           setTimeout(() => {
             initDashboard();
-            hideLoading();
+            hideLoading(); // Hide loading after content is ready
           }, 100);
           break;
+
+        // Add this function outside the switch statement or at the top level
+        async function initDashboard() {
+          function escapeHtml(text) {
+            if (!text) return "";
+            return text
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+          }
+
+          let communityFeedbackData = [];
+          let showingAllFeedback = false;
+
+          // Wait for auth state before loading units
+          onAuthStateChanged(auth, async (user) => {
+            if (user) {
+              await populateMyUnits();
+              // Load feedback after units are loaded
+              setTimeout(() => {
+                loadCommunityFeedback();
+              }, 300);
+            } else {
+              document.getElementById("myUnitList").textContent = "Please log in to view units.";
+            }
+          });
+
+          async function populateMyUnits() {
+            try {
+              const currentUser = auth.currentUser;
+              if (!currentUser) {
+                console.log("No user logged in");
+                return;
+              }
+
+              console.log("Fetching units for user:", currentUser.uid);
+              const tenantDocSnap = await getDoc(doc(db, "users", currentUser.uid));
+              
+              if (!tenantDocSnap.exists()) {
+                document.getElementById("myUnitList").textContent = "No units found.";
+                return;
+              }
+
+              const units = tenantDocSnap.data().unitNumbers || [];
+              console.log("Units found:", units);
+              
+              if (units.length === 0) {
+                document.getElementById("myUnitList").textContent = "No units assigned.";
+                return;
+              }
+
+              // Create a more visually appealing unit list
+              document.getElementById("myUnitList").innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  ${units.map(u => `
+                    <div style="
+                      padding: 8px 12px;
+                      background: rgba(255,255,255,0.1);
+                      border-radius: 6px;
+                      border-left: 3px solid #8d6c39;
+                      font-weight: 500;
+                      transition: all 0.3s ease;
+                    ">
+                      ${u}
+                    </div>
+                  `).join("")}
+                </div>
+              `;
+              
+              // Add hover effect
+              const unitItems = document.querySelectorAll("#myUnitList > div > div");
+              unitItems.forEach(item => {
+                item.addEventListener("mouseenter", () => {
+                  item.style.transform = "translateX(5px)";
+                  item.style.background = "rgba(141, 108, 57, 0.2)";
+                });
+                item.addEventListener("mouseleave", () => {
+                  item.style.transform = "translateX(0)";
+                  item.style.background = "rgba(255,255,255,0.1)";
+                });
+              });
+              
+            } catch (e) {
+              console.error("Error fetching units:", e);
+              document.getElementById("myUnitList").innerHTML = `
+                <div style="color: #ff6b6b; padding: 10px; background: rgba(255,107,107,0.1); border-radius: 6px;">
+                  Failed to load units. Please try refreshing the page.
+                </div>
+              `;
+            }
+          }
+
+          async function loadCommunityFeedback() {
+            const communityFeedback = document.getElementById("communityFeedback");
+            if (!communityFeedback) {
+              console.error("Community feedback element not found");
+              return;
+            }
+            
+            const currentUser = auth.currentUser;
+            const currentUserEmail = currentUser ? currentUser.email : null;
+
+            try {
+              console.log("Loading community feedback...");
+              const snapshot = await getDocs(collection(db, "feedback"));
+
+              if (snapshot.empty) {
+                communityFeedback.innerHTML =
+                  '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available yet.</p>';
+                document.getElementById("feedbackMessage").style.display = "none";
+                return;
+              }
+
+              communityFeedbackData = [];
+              let totalRating = 0;
+              const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+              snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+
+                communityFeedbackData.push({
+                  id: docSnap.id,
+                  ...data
+                });
+
+                const rating = data.rating || 0;
+                if (rating >= 1 && rating <= 5) {
+                  totalRating += rating;
+                  ratingCounts[rating]++;
+                }
+              });
+
+              if (communityFeedbackData.length === 0) {
+                communityFeedback.innerHTML =
+                  '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback from other unit owners yet.</p>';
+                document.getElementById("feedbackMessage").style.display = "block";
+                return;
+              }
+
+              // Update stats with animation
+              animateCounter("totalFeedback", communityFeedbackData.length);
+              document.getElementById("avgRating").textContent = (
+                totalRating / communityFeedbackData.length
+              ).toFixed(1);
+              animateCounter("rating5", ratingCounts[5]);
+              animateCounter("rating4", ratingCounts[4]);
+              animateCounter("rating3", ratingCounts[3]);
+              animateCounter("rating2", ratingCounts[2]);
+              animateCounter("rating1", ratingCounts[1]);
+
+              if (communityFeedbackData.length > 4) {
+                document.getElementById("expandControls").style.display = "block";
+                document.getElementById("totalCount").textContent = communityFeedbackData.length;
+              }
+
+              // Initialize sorting
+              applyFeedbackSorting();
+              document.getElementById("feedbackMessage").style.display = "block";
+              
+              // Setup event listeners after DOM is ready
+              setTimeout(() => {
+                const feedbackSortSelect = document.getElementById("feedbackSort");
+                const expandAllBtn = document.getElementById("expandAllBtn");
+                
+                if (feedbackSortSelect) {
+                  feedbackSortSelect.addEventListener("change", applyFeedbackSorting);
+                }
+                
+                if (expandAllBtn) {
+                  expandAllBtn.addEventListener("click", function () {
+                    showingAllFeedback = !showingAllFeedback;
+                    applyFeedbackSorting();
+                    if (showingAllFeedback) {
+                      document
+                        .querySelector("#communityFeedback")
+                        .scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  });
+                }
+              }, 100);
+              
+            } catch (error) {
+              console.error("Error loading community feedback:", error);
+              communityFeedback.innerHTML = `<p style="color: white; text-align: center; grid-column: 1 / -1; color: #ffcccc;">Error loading community feedback: ${error.message}</p>`;
+            }
+          }
+
+          // Helper function for animated counters
+          function animateCounter(elementId, targetValue, duration = 1000) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            let startValue = parseInt(element.textContent) || 0;
+            let startTime = null;
+            
+            function updateCounter(timestamp) {
+              if (!startTime) startTime = timestamp;
+              const progress = timestamp - startTime;
+              const percentage = Math.min(progress / duration, 1);
+              
+              // Easing function for smooth animation
+              const easeOutQuad = t => t * (2 - t);
+              const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuad(percentage));
+              
+              element.textContent = currentValue;
+              
+              if (percentage < 1) {
+                requestAnimationFrame(updateCounter);
+              } else {
+                element.textContent = targetValue;
+              }
+            }
+            
+            requestAnimationFrame(updateCounter);
+          }
+
+          function applyFeedbackSorting() {
+            const sortValue = document.getElementById("feedbackSort")?.value || "date-desc";
+            if (communityFeedbackData.length === 0) return;
+
+            let sortedFeedback = [...communityFeedbackData];
+
+            switch (sortValue) {
+              case "date-desc":
+                sortedFeedback.sort(
+                  (a, b) =>
+                    (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)
+                );
+                break;
+              case "date-asc":
+                sortedFeedback.sort(
+                  (a, b) =>
+                    (a.timestamp?.toDate?.() || 0) - (b.timestamp?.toDate?.() || 0)
+                );
+                break;
+              case "rating-desc":
+                sortedFeedback.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+                break;
+              case "rating-asc":
+                sortedFeedback.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+                break;
+              case "random":
+                for (let i = sortedFeedback.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [sortedFeedback[i], sortedFeedback[j]] = [
+                    sortedFeedback[j],
+                    sortedFeedback[i]
+                  ];
+                }
+                break;
+            }
+
+            renderCommunityFeedback(sortedFeedback);
+          }
+
+          function renderCommunityFeedback(feedbackArray) {
+            const communityFeedback = document.getElementById("communityFeedback");
+            if (!communityFeedback) return;
+
+            if (feedbackArray.length === 0) {
+              communityFeedback.innerHTML =
+                '<p style="color: white; text-align: center; grid-column: 1 / -1;">No community feedback available.</p>';
+              return;
+            }
+
+            communityFeedback.innerHTML = "";
+
+            let itemsToShow = feedbackArray;
+            if (!showingAllFeedback && feedbackArray.length > 4) {
+              itemsToShow = feedbackArray.slice(0, 4);
+              document.getElementById("showingCount").textContent = "4";
+            } else {
+              document.getElementById("showingCount").textContent = feedbackArray.length;
+            }
+
+            const expandBtn = document.getElementById("expandAllBtn");
+            if (expandBtn) {
+              if (showingAllFeedback) {
+                expandBtn.textContent = "Show Less (First 4)";
+                expandBtn.style.background = "#4a3728";
+                expandBtn.style.color = "white";
+              } else {
+                expandBtn.textContent = `Show All ${feedbackArray.length} Feedback Items`;
+                expandBtn.style.background = "white";
+                expandBtn.style.color = "#4a3728";
+              }
+            }
+
+            // Add fade-in animation for each card
+            itemsToShow.forEach((feedback, index) => {
+              const timeText = feedback.timestamp?.toDate
+                ? feedback.timestamp
+                    .toDate()
+                    .toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric"
+                    })
+                : "Recent";
+
+              const stars = "⭐".repeat(feedback.rating || 0);
+              const emptyStars = "☆".repeat(5 - (feedback.rating || 0));
+
+              let bgColor = "#f5f1e8";
+              let borderColor = "#d4c9b8";
+
+              if (feedback.rating >= 4) {
+                bgColor = "#e8e0d1";
+                borderColor = "#c9b89c";
+              }
+              if (feedback.rating <= 2) {
+                bgColor = "#f0e6d6";
+                borderColor = "#d9c6a9";
+              }
+
+              const card = document.createElement("div");
+              card.style.background = bgColor;
+              card.style.border = `2px solid ${borderColor}`;
+              card.style.borderRadius = "10px";
+              card.style.padding = "18px";
+              card.style.boxShadow = "0 3px 8px rgba(74, 55, 40, 0.15)";
+              card.style.transition = "all 0.3s ease";
+              card.style.opacity = "0";
+              card.style.transform = "translateY(20px)";
+              card.style.animation = `fadeInUp 0.5s ease-out ${index * 0.1}s forwards`;
+
+              const hasNewSchema =
+                feedback.q1 ||
+                feedback.q2 ||
+                feedback.q3 ||
+                feedback.q4 ||
+                feedback.q5 ||
+                feedback.q6;
+
+              let bodyHtml = "";
+
+              if (hasNewSchema) {
+                bodyHtml = `
+                  <div style="margin-top: 12px;">
+                    <div style="margin-bottom: 8px;">
+                      <strong style="color: #4a3728; font-size: 14px;">Overall condition and appearance of the property</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
+                        ${escapeHtml(feedback.q1 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong style="color: #4a3728; font-size: 14px;">Maintenance services (unit, hallway, garden)</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
+                        ${escapeHtml(feedback.q2 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong style="color: #4a3728; font-size: 14px;">Professionalism of property management staff</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
+                        ${escapeHtml(feedback.q3 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong style="color: #4a3728; font-size: 14px;">Ease of paying monthly dues/rent</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
+                        ${escapeHtml(feedback.q4 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <strong style="color: #4a3728; font-size: 14px;">Amenities (gym, pool, clubhouse)</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #8d6c39;">
+                        ${escapeHtml(feedback.q5 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div>
+                      <strong style="color: #4a3728; font-size: 14px;">Additional suggestions</strong>
+                      <div style="margin-top: 6px; padding: 8px; background: rgba(255,255,255,0.7); border-radius:6px; font-size:14px; color:#5a4738; border-left:3px solid #4a3728;">
+                        ${escapeHtml(feedback.q6 || "No suggestions provided")}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              } else {
+                bodyHtml = `
+                  <div style="margin-top: 12px;">
+                    <div style="margin-bottom: 12px;">
+                      <strong style="color: #4a3728; font-size: 14px;">What do you like about our services, unit, and facilities?</strong>
+                      <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #8d6c39;">
+                        ${escapeHtml(feedback.question2 || "No answer provided")}
+                      </div>
+                    </div>
+                    <div>
+                      <strong style="color: #4a3728; font-size: 14px;">What can we improve in our unit, services, or facilities?</strong>
+                      <div style="margin-top: 6px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 6px; font-size: 14px; color: #5a4738; border-left: 3px solid #4a3728;">
+                        ${escapeHtml(feedback.question3 || "No answer provided")}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+
+              card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                  <div style="color: #8d6c39; font-size: 20px;">
+                    ${stars}${emptyStars}
+                    <span style="color: #4a3728; font-size: 15px; margin-left: 8px;">(${feedback.rating || 0}/5)</span>
+                  </div>
+                  <div style="color: #8d6c39; font-size: 13px; font-weight: 500;">
+                    ${timeText}
+                  </div>
+                </div>
+                ${bodyHtml}
+              `;
+
+              card.addEventListener("mouseenter", () => {
+                card.style.transform = "translateY(-5px)";
+                card.style.boxShadow = "0 8px 25px rgba(74, 55, 40, 0.3)";
+              });
+
+              card.addEventListener("mouseleave", () => {
+                card.style.transform = "translateY(0)";
+                card.style.boxShadow = "0 3px 8px rgba(74, 55, 40, 0.15)";
+              });
+
+              communityFeedback.appendChild(card);
+            });
+
+            // Add CSS animation
+            const style = document.createElement('style');
+            style.textContent = `
+              @keyframes fadeInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+
+          // Initialize image slider
+          (function initImageSlider() {
+            let slideIndexLocal = 1;
+            const slides = () => document.querySelectorAll(".welcome-slider .slide");
+
+            function showSlidesLocal(n) {
+              const nodeList = slides();
+              if (!nodeList || nodeList.length === 0) return;
+              if (n > nodeList.length) slideIndexLocal = 1;
+              if (n < 1) slideIndexLocal = nodeList.length;
+              nodeList.forEach(s => (s.style.display = "none"));
+              nodeList[slideIndexLocal - 1].style.display = "block";
+            }
+
+            // Wait for DOM to be ready
+            setTimeout(() => {
+              showSlidesLocal(slideIndexLocal);
+              
+              const sliderPrev = document.getElementById("sliderPrev");
+              const sliderNext = document.getElementById("sliderNext");
+              
+              if (sliderPrev) {
+                sliderPrev.addEventListener("click", () => showSlidesLocal(--slideIndexLocal));
+              }
+              if (sliderNext) {
+                sliderNext.addEventListener("click", () => showSlidesLocal(++slideIndexLocal));
+              }
+
+              const sliderInterval = setInterval(
+                () => showSlidesLocal(++slideIndexLocal),
+                5000
+              );
+              const sliderEl = document.querySelector(".welcome-slider");
+              if (sliderEl) {
+                sliderEl.addEventListener("mouseenter", () => clearInterval(sliderInterval));
+              }
+            }, 200);
+          })();
+
+          // Initialize calendar
+          (function initCalendar() {
+            function generateCalendar() {
+              const calendar = document.getElementById("calendar");
+              if (!calendar) return;
+
+              const today = new Date();
+              const monthName = today.toLocaleString("default", { month: "long" });
+              const year = today.getFullYear();
+              const firstDay = new Date(year, today.getMonth(), 1);
+              const lastDay = new Date(year, today.getMonth() + 1, 0);
+              const startDay = firstDay.getDay();
+
+              let html = "<table class='cal-table'>";
+              html += `<tr><th class='cal-header' colspan='7'>${monthName} ${year}</th></tr>`;
+              html +=
+                "<tr class='cal-weekdays'><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr><tr>";
+
+              for (let i = 0; i < startDay; i++) html += "<td class='cal-empty'></td>";
+
+              for (let day = 1; day <= lastDay.getDate(); day++) {
+                const isToday = day === today.getDate();
+                html += `<td${isToday ? " class='today'" : ""}>${day}</td>`;
+                if ((day + startDay) % 7 === 0 && day !== lastDay.getDate())
+                  html += "</tr><tr>";
+              }
+              html += "</tr></table>";
+              calendar.innerHTML = html;
+            }
+            
+            // Wait for calendar element to be ready
+            setTimeout(() => {
+              generateCalendar();
+            }, 200);
+          })();
+        }
+        break;
 
         /* ======================== MAINTENANCE ======================== */
         case "maintenance":
@@ -775,9 +778,6 @@ window.setButtonLoading = setButtonLoading;
                 <section class="card maintenance-form">
                   <h2 class="section-title">New Request</h2>
                   <p><strong>What issue do you want to report?</strong></p>
-                  <p style="font-size:0.85rem; color:var(--solano-text-muted); margin-top:4px;">
-                    Step 1: Select unit · Step 2: Choose issue · Step 3: Add date & photos · Step 4: Submit
-                  </p>
 
                   <label for="unitSelect">Select Unit:</label>
                   <select id="unitSelect" required>
@@ -838,7 +838,6 @@ window.setButtonLoading = setButtonLoading;
                   <div id="detailsSection" style="display:none; margin-top:10px;">
                     <label for="imageUpload" style="display:block;">Upload 1 or 2 JPEG images (optional, required for "Others"):</label>
                     <input type="file" id="imageUpload" accept="image/jpeg" multiple>
-                    <div id="imagePreview" class="image-preview-row"></div>
 
                     <label for="preferredDate" style="margin-top:15px; display:block;">Select preferred maintenance visit date and time:</label>
                     <label>Preferred Date:</label>
@@ -922,9 +921,10 @@ window.setButtonLoading = setButtonLoading;
             </div>
           `;
 
+          // Hide loading after content is rendered
           hideLoading();
 
-          /* ------ Maintenance logic (same as last version, unchanged) ------ */
+          // ===================== TENANT REPLY SUPPORT + HISTORY =====================
           function formatDateTimeAMPM(date) {
             if (!(date instanceof Date)) date = date?.toDate ? date.toDate() : null;
             if (!date) return "No Response Yet";
@@ -938,40 +938,51 @@ window.setButtonLoading = setButtonLoading;
             return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
           }
 
-          function getStatusPill(status) {
-            const normalized = (status || "").toLowerCase();
-            let cls = "status-pill ";
-            if (normalized === "pending") cls += "pending";
-            else if (normalized === "in progress") cls += "in-progress";
-            else if (normalized === "complete" || normalized === "completed") cls += "completed";
-            else if (normalized === "cancelled") cls += "cancelled";
-            else cls += "rejected";
-            return `<span class="${cls}">${status}</span>`;
-          }
-
+          // Function to calculate estimated wait time
           function calculateWaitTime(priority) {
             const waitTimes = {
               'high': '1-2 hours',
               'medium': '4-6 hours', 
               'low': '24-48 hours'
             };
-            if (priority && waitTimes[priority]) return waitTimes[priority];
+            
+            // Categorize issues by priority
+            const highPriority = [
+              'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
+              'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
+            ];
+            
+            const mediumPriority = [
+              'Outlet / Switch', 'Main Door Lockset', 'Window Grills',
+              'Bidet Installation', 'ACU Cleaning (Split Type)', 'ACU Installation',
+              'ACU Re-Opening / Adjustment', 'Smoke Detector Installation'
+            ];
+            
+            // If priority is provided, use it
+            if (priority && waitTimes[priority]) {
+              return waitTimes[priority];
+            }
+            
+            // Default to medium priority
             return waitTimes['medium'];
           }
 
           const preferredDateInput = document.getElementById("preferredDate");
           const preferredTimeSelect = document.getElementById("preferredTime");
 
+          // ----- LIMIT DATE PICKER TO MON–SAT -----
           preferredDateInput.addEventListener("change", () => {
             const selected = new Date(preferredDateInput.value);
-            const day = selected.getDay();
+            const day = selected.getDay(); // 0 = Sun, 6 = Sat
 
+            // Block Sundays (0)
             if (day === 0) {
               showPopup("Maintenance is NOT available on Sundays. Please pick Monday to Saturday.");
               preferredDateInput.value = "";
               return;
             }
 
+            // Block past dates
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             selected.setHours(0, 0, 0, 0);
@@ -982,11 +993,14 @@ window.setButtonLoading = setButtonLoading;
             }
           });
 
+          // Add time validation when time is selected
           preferredTimeSelect.addEventListener("change", function() {
             const selectedDate = preferredDateInput.value;
             const selectedTime = this.value;
+            
             if (!selectedDate || !selectedTime) return;
             
+            // Time conversion map from 12-hour to 24-hour format
             const timeMap = {
               "10:00 AM": "10:00",
               "11:00 AM": "11:00", 
@@ -1009,13 +1023,13 @@ window.setButtonLoading = setButtonLoading;
             
             if (selectedDateTime < now) {
               showPopup("Preferred visit time cannot be in the past.");
-              this.value = "";
+              this.value = ""; // Clear the invalid time selection
             }
           });
 
           const nowMaint = new Date();
           nowMaint.setMinutes(Math.ceil(nowMaint.getMinutes() / 15) * 15);
-          preferredDateInput.min = nowMaint.toISOString().slice(0, 10);
+          preferredDateInput.min = nowMaint.toISOString().slice(0, 16);
 
           const problemSelect = document.getElementById("problem");
           const otherSection = document.getElementById("otherSection");
@@ -1023,31 +1037,12 @@ window.setButtonLoading = setButtonLoading;
           const submitButton = document.getElementById("submitReport");
           const statusMessageMaint = document.getElementById("statusMessage");
           const imageUpload = document.getElementById("imageUpload");
-          const imagePreview = document.getElementById("imagePreview");
           const otherComment = document.getElementById("otherComment");
           const historyList = document.getElementById("historyList");
           const unitSelect = document.getElementById("unitSelect");
+
+          // Add estimated wait time display element
           let estimatedWaitTimeElement = null;
-
-          imageUpload.addEventListener("change", () => {
-            const files = Array.from(imageUpload.files || []);
-            if (files.length > 2) {
-              showPopup("You can upload a maximum of 2 images.");
-              imageUpload.value = "";
-              if (imagePreview) imagePreview.innerHTML = "";
-              return;
-            }
-
-            if (!imagePreview) return;
-            imagePreview.innerHTML = "";
-            files.forEach(file => {
-              if (!file.type.startsWith("image/")) return;
-              const img = document.createElement("img");
-              img.className = "image-preview-thumb";
-              img.src = URL.createObjectURL(file);
-              imagePreview.appendChild(img);
-            });
-          });
 
           problemSelect.addEventListener("change", () => {
             otherSection.style.display =
@@ -1055,6 +1050,7 @@ window.setButtonLoading = setButtonLoading;
             detailsSection.style.display =
               problemSelect.value !== "" ? "block" : "none";
               
+            // Update estimated wait time when problem changes
             if (problemSelect.value !== "") {
               updateEstimatedWaitTime(problemSelect.value);
             } else {
@@ -1064,18 +1060,23 @@ window.setButtonLoading = setButtonLoading;
               preferredDateInput.value = "";
               preferredTimeSelect.value = "";
               imageUpload.value = "";
-              if (imagePreview) imagePreview.innerHTML = "";
             }
           });
 
+          // Function to update estimated wait time display
           function updateEstimatedWaitTime(problemType) {
+            // Determine priority based on problem type
             let priority = 'medium';
+            
+            // High priority issues (urgent/emergency)
             if ([
               'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
               'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
             ].includes(problemType)) {
               priority = 'high';
-            } else if ([
+            }
+            // Low priority issues (non-urgent)
+            else if ([
               'Drilling Works', 'Peephole Installation', 'PVC Door',
               'Vinyl Tiles', 'Door Repainting', 'Painting / Repainting',
               'Exhaust Fan Cleaning', 'Electrical Panel Cleaning',
@@ -1086,30 +1087,41 @@ window.setButtonLoading = setButtonLoading;
             
             const waitTime = calculateWaitTime(priority);
             
+            // Create or update the wait time display
             if (!estimatedWaitTimeElement) {
               estimatedWaitTimeElement = document.createElement("div");
               estimatedWaitTimeElement.className = "estimated-wait-time";
               estimatedWaitTimeElement.style.marginTop = "15px";
+              estimatedWaitTimeElement.style.padding = "12px";
+              estimatedWaitTimeElement.style.backgroundColor = "rgba(141, 108, 57, 0.1)";
+              estimatedWaitTimeElement.style.border = "1px solid rgba(141, 108, 57, 0.3)";
+              estimatedWaitTimeElement.style.borderRadius = "8px";
+              estimatedWaitTimeElement.style.fontSize = "14px";
+              
+              // Insert after the details section
               const submitButton = document.getElementById("submitReport");
               submitButton.parentNode.insertBefore(estimatedWaitTimeElement, submitButton);
             }
             
-            let priorityColor = "#f39c12";
-            if (priority === 'high') priorityColor = "#e74c3c";
-            if (priority === 'low') priorityColor = "#27ae60";
+            // Get priority color
+            let priorityColor = "#f39c12"; // orange for medium (default)
+            if (priority === 'high') priorityColor = "#e74c3c"; // red for high
+            if (priority === 'low') priorityColor = "#27ae60"; // green for low
             
             estimatedWaitTimeElement.innerHTML = `
-              <div style="display:flex; flex-direction:column; gap:4px;">
-                <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:rgba(141,108,57,0.15); font-size:0.85rem;">
-                  <span>⏱️</span>
-                  <span><strong>Estimated wait:</strong> ${waitTime}</span>
-                </div>
-                <div style="color:#ccc; font-size:0.8rem;">
-                  Priority: <span style="color:${priorityColor}; font-weight:bold;">${priority.toUpperCase()}</span>
-                </div>
-                <div style="color:#777; font-size:0.75rem;">
-                  <em>Note: Actual time may vary based on technician availability.</em>
-                </div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span style="color: #4a3728; font-weight: bold;">⏱️ Estimated Wait Time:</span>
+                <span style="color: ${priorityColor}; font-weight: bold; font-size: 15px;">${waitTime}</span>
+              </div>
+              <div style="color: #666; font-size: 13px;">
+                <strong>Priority Level:</strong> 
+                <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span>
+                ${priority === 'high' ? ' (Emergency/Urgent)' : 
+                  priority === 'medium' ? ' (Standard)' : 
+                  ' (Non-Urgent)'}
+              </div>
+              <div style="color: #666; font-size: 12px; margin-top: 6px;">
+                <em>Note: This is an estimate. Actual time may vary based on technician availability and workload.</em>
               </div>
             `;
             estimatedWaitTimeElement.style.display = "block";
@@ -1124,10 +1136,6 @@ window.setButtonLoading = setButtonLoading;
                 unitSelect.innerHTML =
                   `<option value="">-- Select Unit --</option>` +
                   units.map(u => `<option value="${u}">${u}</option>`).join("");
-
-                if (units.length === 1) {
-                  unitSelect.value = units[0];
-                }
               }
             } catch (e) {
               console.error("Error fetching tenant units:", e);
@@ -1135,6 +1143,7 @@ window.setButtonLoading = setButtonLoading;
           }
           populateUnits();
 
+          // helper to write tenant reply into Firestore
           async function sendTenantReply(requestId, message) {
             const user = auth.currentUser;
             if (!user) {
@@ -1152,6 +1161,7 @@ window.setButtonLoading = setButtonLoading;
             );
           }
 
+          // Add CSS animations for completed requests
           const completedStyles = document.createElement('style');
           completedStyles.textContent = `
             @keyframes pulse {
@@ -1202,6 +1212,7 @@ window.setButtonLoading = setButtonLoading;
           `;
           document.head.appendChild(completedStyles);
 
+          // Load maintenance request history + responses
           async function loadHistory() {
             historyList.innerHTML = "<p>Loading your requests...</p>";
             try {
@@ -1236,8 +1247,10 @@ window.setButtonLoading = setButtonLoading;
                   ? formatDateTimeAMPM(data.preferredVisitTime)
                   : "Not scheduled";
                 
+                // Calculate estimated wait time for this request
                 const estimatedWaitTime = calculateWaitTime(data.priority);
                 
+                // Calculate days/hours since request was submitted
                 let timeSinceRequest = "";
                 if (data.timestamp) {
                   const requestDate = data.timestamp.toDate();
@@ -1256,17 +1269,21 @@ window.setButtonLoading = setButtonLoading;
                 }
 
                 const item = document.createElement("div");
-                item.style.borderBottom = "1px solid #333";
+                item.style.borderBottom = "1px solid #ddd";
                 item.style.padding = "10px 0";
                 item.style.position = "relative";
                 item.style.overflow = "hidden";
                 
-                if (status === "Complete" || status === "Completed") {
+                // SPECIAL EFFECTS FOR COMPLETED REQUESTS
+                if (status === "Complete") {
+                  // Green gradient background for completed requests
                   item.style.background = "linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(46, 204, 113, 0.05) 100%)";
                   item.style.borderLeft = "4px solid #27ae60";
                   item.style.borderRadius = "8px 0 0 8px";
                   item.style.marginBottom = "15px";
                   item.style.boxShadow = "0 2px 10px rgba(39, 174, 96, 0.1)";
+                  
+                  // Add subtle animation on hover
                   item.style.transition = "all 0.3s ease";
                   item.addEventListener("mouseenter", function() {
                     this.style.transform = "translateX(5px)";
@@ -1279,6 +1296,7 @@ window.setButtonLoading = setButtonLoading;
                   
                   item.classList.add("completed-item");
                   
+                  // Add checkmark badge
                   const checkmarkBadge = document.createElement("div");
                   checkmarkBadge.innerHTML = "✅ COMPLETED";
                   checkmarkBadge.style.position = "absolute";
@@ -1289,10 +1307,12 @@ window.setButtonLoading = setButtonLoading;
                   checkmarkBadge.style.padding = "5px 12px";
                   checkmarkBadge.style.borderRadius = "20px";
                   checkmarkBadge.style.fontSize = "11px";
+                  checkmarkBadge.style.fontWeight = "bold";
                   checkmarkBadge.style.boxShadow = "0 2px 5px rgba(39, 174, 96, 0.3)";
                   checkmarkBadge.style.animation = "pulse 2s infinite";
                   checkmarkBadge.style.zIndex = "2";
                   
+                  // Add celebration emoji
                   const celebration = document.createElement("div");
                   celebration.innerHTML = "🎉";
                   celebration.style.position = "absolute";
@@ -1304,12 +1324,11 @@ window.setButtonLoading = setButtonLoading;
                   item.appendChild(checkmarkBadge);
                   item.appendChild(celebration);
                 } else if (status === "In Progress") {
+                  // Blue styling for in-progress requests
                   item.style.borderLeft = "4px solid #3498db";
                   item.style.background = "rgba(52, 152, 219, 0.03)";
-                } else if (status === "Cancelled") {
-                  item.style.borderLeft = "4px solid #777";
-                  item.style.background = "rgba(120, 120, 120, 0.03)";
                 } else {
+                  // Orange styling for pending requests
                   item.style.borderLeft = "4px solid #f39c12";
                   item.style.background = "rgba(243, 156, 18, 0.03)";
                 }
@@ -1321,45 +1340,35 @@ window.setButtonLoading = setButtonLoading;
                 responsesContainer.style.display = "flex";
                 responsesContainer.style.flexDirection = "column";
                 responsesContainer.style.gap = "6px";
-                responsesContainer.className = "history-thread";
                 responsesContainer.innerHTML = "<em>Loading messages...</em>";
 
-                const statusDisplay = getStatusPill(status);
+                // Format status with special class for completed
+                const statusDisplay = status === "Complete" 
+                  ? `<span class="status-complete">${status}</span>`
+                  : status;
 
                 item.innerHTML = `
-                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                    <div>
-                      <div style="font-weight:600; font-size:0.95rem;">${data.problem}</div>
-                      <div style="font-size:0.8rem; color:#aaa;">Unit ${data.unitNumber || "N/A"} • ${timeSinceRequest}</div>
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                      <strong>Issue:</strong> ${data.problem}<br/>
+                      <strong>Unit Number:</strong> ${data.unitNumber || "N/A"}<br/>
+                      <strong>Description:</strong> ${data.comment || "-"}<br/>
+                      <strong>Scheduled Visit:</strong> ${scheduledVisit}<br/>
+                      <strong>Status:</strong> ${statusDisplay}<br/>
+                      <strong>Maintenance Personnel: </strong><span style="color:#b08d35; font-weight:700;">${maintenanceName}</span><br/>
+                      <strong>Response Time:</strong> ${responseTime}<br/>
+                      <strong>Submitted:</strong> ${timeStamp} (${timeSinceRequest})<br/>
+                      ${data.completionTime ? `<div style="margin-top: 8px; padding: 8px; background: rgba(39, 174, 96, 0.1); border-radius: 6px; border-left: 3px solid #27ae60;">
+                        <strong style="color: #27ae60;">✅ Work Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}
+                      </div>` : ''}
                     </div>
-                    <div style="text-align:right;">
-                      ${statusDisplay}<br/>
-                      ${data.priority ? `<span style="font-size:0.75rem; color:#ccc;">Priority: ${data.priority}</span>` : ""}
+                    <div style="min-width: 150px; text-align: right;">
+                      <div style="background-color: rgba(141, 108, 57, 0.1); padding: 8px; border-radius: 6px; margin-bottom: 8px;">
+                        <strong style="color: #4a3728; font-size: 13px;">Estimated Wait:</strong><br/>
+                        <span style="color: #8d6c39; font-weight: bold; font-size: 14px;">${estimatedWaitTime}</span>
+                      </div>
+                      ${data.priority ? `<div><strong>Priority:</strong> ${data.priority}</div>` : ''}
                     </div>
-                  </div>
-                  <div style="margin-top:4px; font-size:0.85rem; line-height:1.5;">
-                    <strong>Description:</strong> ${data.comment || "-"}<br/>
-                    <strong>Scheduled Visit:</strong> ${scheduledVisit}<br/>
-                    <strong>Maintenance Personnel:</strong>
-                    <span style="color:#b08d35; font-weight:700;">
-                      ${maintenanceName}
-                    </span>
-                    ${data.maintenanceType ? `<span style="font-size:0.8rem; color:#aaa;"> (${data.maintenanceType})</span>` : ""}<br/>
-                    <strong>Response Time:</strong> ${responseTime}<br/>
-                    <strong>Submitted:</strong> ${timeStamp}
-                  </div>
-                  <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:rgba(141,108,57,0.15); font-size:0.8rem;">
-                      <span>⏱️</span>
-                      <span><strong>Est. Wait:</strong> ${estimatedWaitTime}</span>
-                    </div>
-                    ${
-                      data.completionTime
-                        ? `<div style="padding:6px 10px; background:rgba(39,174,96,0.1); border-radius:999px; border:1px solid #27ae60; font-size:0.78rem; color:#27ae60;">
-                            ✓ Work Completed: ${formatDateTimeAMPM(data.completionTime)}
-                          </div>`
-                        : ""
-                    }
                   </div>
                 `;
 
@@ -1381,6 +1390,8 @@ window.setButtonLoading = setButtonLoading;
                     img.style.borderRadius = "6px";
                     img.style.boxShadow = "0 0 5px rgba(0,0,0,0.3)";
                     img.style.objectFit = "cover";
+                    
+                    // Add hover effect for images
                     img.style.transition = "transform 0.3s ease";
                     img.addEventListener("mouseenter", () => {
                       img.style.transform = "scale(1.05)";
@@ -1390,6 +1401,7 @@ window.setButtonLoading = setButtonLoading;
                       img.style.transform = "scale(1)";
                       img.style.boxShadow = "0 0 5px rgba(0,0,0,0.3)";
                     });
+                    
                     imagesContainer.appendChild(img);
                   });
                 } else {
@@ -1400,6 +1412,7 @@ window.setButtonLoading = setButtonLoading;
                 item.appendChild(responsesContainer);
                 historyList.appendChild(item);
 
+                // ---- load conversation messages (admin + tenant) ----
                 const responsesQuery = query(
                   collection(db, "maintenanceRequests", docId, "responses"),
                   orderBy("timestamp", "asc")
@@ -1424,55 +1437,43 @@ window.setButtonLoading = setButtonLoading;
                         "Maintenance";
 
                     const respDiv = document.createElement("div");
-                    respDiv.classList.add("chat-bubble", isTenant ? "tenant" : "staff");
+                    respDiv.style.marginBottom = "4px";
+                    respDiv.style.padding = "6px 8px";
+                    respDiv.style.borderRadius = "6px";
+                    respDiv.style.maxWidth = "90%";
+                    respDiv.style.background = isTenant
+                      ? "rgba(141,108,57,0.2)"
+                      : "rgba(255,255,255,0.08)";
+                    respDiv.style.alignSelf = isTenant ? "flex-end" : "flex-start";
+                    respDiv.style.transition = "transform 0.2s ease";
+                    
+                    respDiv.addEventListener("mouseenter", () => {
+                      respDiv.style.transform = "translateY(-2px)";
+                    });
+                    respDiv.addEventListener("mouseleave", () => {
+                      respDiv.style.transform = "translateY(0)";
+                    });
 
                     respDiv.innerHTML = `
-                      <div class="chat-meta">
-                        <strong>${senderLabel}</strong> · <small>${time}</small>
-                      </div>
-                      <div>${respData.message}</div>
+                      <strong>${senderLabel}</strong> <small>(${time})</small><br/>
+                      <span>${respData.message}</span>
                     `;
                     responsesContainer.appendChild(respDiv);
                   });
                 }
 
-                if (status === "Complete" || status === "Completed") {
-                  const completedMessage = document.createElement("div");
-                  completedMessage.innerHTML = `
-                    <div style="margin-top: 10px; padding: 8px; background: rgba(39, 174, 96, 0.1); border-radius: 6px; border-left: 3px solid #27ae60;">
-                      <strong style="color: #27ae60;">✓ This request has been completed.</strong><br>
-                      <small style="color: #666;">If the issue is still not resolved, let us know below.</small>
-                    </div>
-                  `;
-                  item.appendChild(completedMessage);
-
-                  const actions = document.createElement("div");
-                  actions.className = "history-actions";
-                  actions.innerHTML = `
-                    <button class="btn-ghost history-notresolved-btn">Issue not resolved</button>
-                  `;
-                  item.appendChild(actions);
-
-                  const notResolvedBtn = actions.querySelector(".history-notresolved-btn");
-                  notResolvedBtn.addEventListener("click", async () => {
-                    const details = window.prompt("Tell us what is still not fixed:");
-                    if (!details) return;
-                    try {
-                      await sendTenantReply(docId, `[Issue not resolved] ${details}`);
-                      await updateDoc(doc(db, "maintenanceRequests", docId), { status: "In Progress" });
-                      showPopup("Thank you. We've reopened this ticket and will review it.");
-                      await loadHistory();
-                    } catch (err) {
-                      console.error(err);
-                      showPopup("Could not reopen the ticket. Please try again.");
-                    }
-                  });
-                } else {
+                // ---- REPLY BOX (TENANT) ----
+                // Only show reply box if request is not completed
+                if (status !== "Complete") {
                   const replyContainer = document.createElement("div");
-                  replyContainer.className = "history-reply";
+                  replyContainer.style.marginTop = "8px";
+                  replyContainer.style.paddingLeft = "10px";
+
                   replyContainer.innerHTML = `
-                    <textarea rows="2" placeholder="Type a reply to maintenance..."></textarea>
-                    <button class="tenant-reply-btn btn-primary">
+                    <textarea rows="2" placeholder="Type a reply to maintenance..." 
+                      style="width:100%; padding:6px; border-radius:6px; border:1px solid #ccc; resize:vertical;"></textarea>
+                    <button class="tenant-reply-btn" 
+                      style="margin-top:6px; padding:6px 12px; background:#8d6c39; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px;">
                       Send Reply
                     </button>
                     <small style="display:block; margin-top:4px; color:#ccc;">Replies are visible to Admin.</small>
@@ -1488,12 +1489,14 @@ window.setButtonLoading = setButtonLoading;
                       return;
                     }
                     
+                    // Show loading on button
                     setButtonLoading(replyButton, true);
                     
                     try {
                       await sendTenantReply(docId, message);
                       replyTextarea.value = "";
                       
+                      // Add visual feedback
                       replyButton.style.background = "#27ae60";
                       replyButton.textContent = "✓ Sent!";
                       
@@ -1503,7 +1506,7 @@ window.setButtonLoading = setButtonLoading;
                         replyButton.disabled = false;
                       }, 1500);
                       
-                      await loadHistory();
+                      await loadHistory(); // Refresh to show new message
                     } catch (err) {
                       console.error("Failed to send reply:", err);
                       await showPopup("Failed to send reply. Please try again.");
@@ -1512,43 +1515,16 @@ window.setButtonLoading = setButtonLoading;
                   });
 
                   item.appendChild(replyContainer);
-
-                  const actions = document.createElement("div");
-                  actions.className = "history-actions";
-                  actions.innerHTML = `
-                    <button class="btn-secondary history-resched-btn">Request Reschedule</button>
-                    <button class="btn-ghost history-cancel-btn">Cancel Request</button>
+                } else {
+                  // Show completed message instead of reply box
+                  const completedMessage = document.createElement("div");
+                  completedMessage.innerHTML = `
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(39, 174, 96, 0.1); border-radius: 6px; border-left: 3px solid #27ae60;">
+                      <strong style="color: #27ae60;">✓ This request has been completed.</strong><br>
+                      <small style="color: #666;">No further replies needed.</small>
+                    </div>
                   `;
-                  item.appendChild(actions);
-
-                  const reschedBtn = actions.querySelector(".history-resched-btn");
-                  const cancelBtn = actions.querySelector(".history-cancel-btn");
-
-                  reschedBtn.addEventListener("click", async () => {
-                    const newTime = window.prompt("Enter your new preferred date & time (e.g. 12/20/2025 3:00 PM):");
-                    if (!newTime) return;
-                    try {
-                      await sendTenantReply(docId, `[Reschedule Request] Tenant prefers: ${newTime}`);
-                      showPopup("Your reschedule request has been sent to the admin.");
-                    } catch (err) {
-                      console.error(err);
-                      showPopup("Could not send reschedule request. Please try again.");
-                    }
-                  });
-
-                  cancelBtn.addEventListener("click", async () => {
-                    const confirmCancel = window.confirm("Are you sure you want to cancel this maintenance request?");
-                    if (!confirmCancel) return;
-                    try {
-                      await sendTenantReply(docId, "[Cancellation Request] Tenant would like to cancel this maintenance request.");
-                      await updateDoc(doc(db, "maintenanceRequests", docId), { status: "Cancelled" });
-                      showPopup("Your cancellation request has been recorded.");
-                      await loadHistory();
-                    } catch (err) {
-                      console.error(err);
-                      showPopup("Could not cancel the request. Please try again.");
-                    }
-                  });
+                  item.appendChild(completedMessage);
                 }
               }
             } catch (error) {
@@ -1558,6 +1534,7 @@ window.setButtonLoading = setButtonLoading;
           loadHistory();
 
           async function uploadToCloudinary(file) {
+            // Show loading during upload
             showLoading();
             try {
               const url = "https://api.cloudinary.com/v1_1/dfklsyjch/upload";
@@ -1598,6 +1575,8 @@ window.setButtonLoading = setButtonLoading;
               return;
             }
             
+            // ---- COMBINED DATE + TIME VALIDATION ----
+            // Time conversion map from 12-hour to 24-hour format
             const timeMap = {
               "10:00 AM": "10:00",
               "11:00 AM": "11:00", 
@@ -1646,6 +1625,7 @@ window.setButtonLoading = setButtonLoading;
             statusMessageMaint.textContent = "Submitting your request...";
 
             try {
+              // Show loading on button
               setButtonLoading(submitButton, true);
               
               const tenantEmail = await getCurrentUserEmail();
@@ -1656,6 +1636,7 @@ window.setButtonLoading = setButtonLoading;
                 }
               }
               
+              // Determine priority based on problem type
               let priority = 'medium';
               if ([
                 'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
@@ -1688,6 +1669,7 @@ window.setButtonLoading = setButtonLoading;
               statusMessageMaint.textContent =
                 "Maintenance request submitted successfully! ✅\nEstimated wait time: " + calculateWaitTime(priority);
               
+              // Add celebration effect to success message
               statusMessageMaint.style.fontWeight = "bold";
               statusMessageMaint.style.padding = "10px";
               statusMessageMaint.style.background = "rgba(39, 174, 96, 0.1)";
@@ -1697,7 +1679,6 @@ window.setButtonLoading = setButtonLoading;
               problemSelect.value = "";
               otherComment.value = "";
               imageUpload.value = "";
-              if (imagePreview) imagePreview.innerHTML = "";
               otherSection.style.display = "none";
               detailsSection.style.display = "none";
               preferredDateInput.value = "";
@@ -1707,6 +1688,7 @@ window.setButtonLoading = setButtonLoading;
                 estimatedWaitTimeElement.style.display = "none";
               }
               
+              // Refresh history
               setTimeout(() => {
                 loadHistory();
               }, 1000);
@@ -1779,6 +1761,7 @@ window.setButtonLoading = setButtonLoading;
             </div>
           `;
 
+          // Hide loading after content is rendered
           hideLoading();
 
           const invoiceDetails = document.getElementById("invoiceDetails");
@@ -1970,6 +1953,7 @@ window.setButtonLoading = setButtonLoading;
                   });
                 },
                 onApprove: async function (data, actions) {
+                  // Show loading during payment processing
                   showLoading();
                   try {
                     const order = await actions.order.capture();
@@ -2021,7 +2005,7 @@ window.setButtonLoading = setButtonLoading;
         /* ======================== FEEDBACK ======================== */
         case "feedback":
           loadFeedbackForm();
-          hideLoading();
+          hideLoading(); // Hide loading after content is rendered
           break;
 
         default:
@@ -2032,7 +2016,6 @@ window.setButtonLoading = setButtonLoading;
 
     /* ======================== FEEDBACK FORM FUNCTION ======================== */
     function loadFeedbackForm() {
-      const mainContent = document.getElementById("mainContent");
       mainContent.innerHTML = `
         <div class="tab-header">
           <div>
@@ -2121,6 +2104,7 @@ window.setButtonLoading = setButtonLoading;
               <p id="statusMessage" class="status-text"></p>
             </form>
             
+            <!-- Cooldown info note -->
             <div id="cooldownInfo" style="margin-top: 15px; padding: 10px; background: rgba(141, 108, 57, 0.1); border-radius: 6px; border-left: 3px solid #8d6c39;">
               <p style="margin: 0; color: #4a3728; font-size: 13px;">
                 <strong>Note:</strong> You can submit feedback once per week to ensure everyone has a chance to share their thoughts.
@@ -2136,6 +2120,7 @@ window.setButtonLoading = setButtonLoading;
       const statusMessage = document.getElementById("statusMessage");
       const sendBtn = document.getElementById("sendFeedbackBtn");
 
+      // Star rating functionality
       ratingStars.forEach(star => {
         star.style.opacity = "0.3";
         star.style.transition = "opacity 0.3s ease";
@@ -2147,6 +2132,7 @@ window.setButtonLoading = setButtonLoading;
           });
         });
         
+        // Add hover effect
         star.addEventListener("mouseenter", () => {
           if (!star.style.opacity || star.style.opacity === "0.3") {
             star.style.transform = "scale(1.1)";
@@ -2172,6 +2158,7 @@ window.setButtonLoading = setButtonLoading;
         sendBtn.style.opacity = "1";
       }
 
+      // Function to format time in user-friendly way
       function formatTimeRemaining(milliseconds) {
         const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
         const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -2189,6 +2176,7 @@ window.setButtonLoading = setButtonLoading;
         }
       }
 
+      // Function to format time for countdown display
       function formatCountdownTime(milliseconds) {
         const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
         const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -2204,11 +2192,17 @@ window.setButtonLoading = setButtonLoading;
         return parts.join(" ");
       }
 
+      // Check for existing cooldown (1 week = 7 days)
       const cooldownEnd = localStorage.getItem("feedbackCooldownEnd");
       if (cooldownEnd && Date.now() < cooldownEnd) {
         disableButtonForCooldown();
         const remainingMs = cooldownEnd - Date.now();
+        const formattedTime = formatTimeRemaining(remainingMs);
         
+        statusMessage.style.color = "#f39c12";
+        statusMessage.textContent = `Feedback submitted. You can send another in ${formattedTime}.`;
+
+        // Start countdown timer
         const countdown = setInterval(() => {
           const timeLeftMs = cooldownEnd - Date.now();
           
@@ -2219,6 +2213,7 @@ window.setButtonLoading = setButtonLoading;
             statusMessage.style.color = "";
             localStorage.removeItem("feedbackCooldownEnd");
             
+            // Show ready message briefly
             statusMessage.style.color = "#27ae60";
             statusMessage.textContent = "Ready to submit feedback!";
             setTimeout(() => {
@@ -2246,6 +2241,7 @@ window.setButtonLoading = setButtonLoading;
               return;
             }
 
+            // Validate all required fields
             const requiredFields = ['q1', 'q2', 'q3', 'q4', 'q5'];
             for (const fieldId of requiredFields) {
               const field = document.getElementById(fieldId);
@@ -2256,6 +2252,7 @@ window.setButtonLoading = setButtonLoading;
               }
             }
 
+            // Show loading on button
             setButtonLoading(sendBtn, true);
             statusMessage.style.color = "#3498db";
             statusMessage.textContent = "Sending your feedback...";
@@ -2273,23 +2270,28 @@ window.setButtonLoading = setButtonLoading;
                 timestamp: serverTimestamp()
               });
 
+              // Success state
               statusMessage.style.color = "#27ae60";
               statusMessage.textContent = "✅ Feedback sent successfully! Thank you for sharing your thoughts.";
               
+              // Add success animation
               statusMessage.style.fontWeight = "bold";
               statusMessage.style.padding = "10px";
               statusMessage.style.background = "rgba(39, 174, 96, 0.1)";
               statusMessage.style.borderRadius = "6px";
               statusMessage.style.border = "2px solid #27ae60";
 
+              // Reset form
               form.reset();
               ratingStars.forEach(s => (s.style.opacity = "0.3"));
               ratingValueInput.value = "";
 
+              // Set 1-week cooldown (7 days × 24 hours × 60 minutes × 60 seconds × 1000ms)
               const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
               const cooldownTime = Date.now() + ONE_WEEK;
               localStorage.setItem("feedbackCooldownEnd", cooldownTime);
 
+              // Start countdown timer
               let countdown = setInterval(() => {
                 const timeLeftMs = cooldownTime - Date.now();
                 
@@ -2301,6 +2303,7 @@ window.setButtonLoading = setButtonLoading;
                   statusMessage.style.border = "";
                   localStorage.removeItem("feedbackCooldownEnd");
                   
+                  // Show ready message
                   statusMessage.style.color = "#27ae60";
                   statusMessage.textContent = "Ready to submit feedback again!";
                   setTimeout(() => {
@@ -2320,6 +2323,7 @@ window.setButtonLoading = setButtonLoading;
               statusMessage.textContent = "❌ Error sending feedback. Please try again.";
               enableButton();
               
+              // Reset button after 5 seconds
               setTimeout(() => {
                 statusMessage.textContent = "";
               }, 5000);
@@ -2330,6 +2334,20 @@ window.setButtonLoading = setButtonLoading;
     }
 
     /* ======================== GREETING & POPUP ======================== */
+    function updateGreeting() {
+      onAuthStateChanged(auth, user => {
+        if (user) {
+          const greeting =
+            document.getElementById("tenantGreeting") ||
+            document.getElementById("tenantGreeting1");
+          const nameToShow = user.displayName || user.email;
+          if (greeting) {
+            greeting.textContent = `Welcome back, ${nameToShow}`;
+          }
+        }
+      });
+    }
+
     function showWelcomeBack() {
       onAuthStateChanged(auth, user => {
         if (user) {
@@ -2344,35 +2362,25 @@ window.setButtonLoading = setButtonLoading;
 
     showWelcomeBack();
 
-    /* ======================== POPUP HELPERS ======================== */
-function showPopup(message) {
-  const msgEl = document.getElementById("popupMessage");
-  const popupEl = document.getElementById("customPopup");
-  if (!msgEl || !popupEl) return;
+    window.showPopup = function (message) {
+      document.getElementById("popupMessage").innerHTML = message;
+      document.getElementById("customPopup").classList.remove("hidden");
+    };
 
-  msgEl.innerHTML = message;
-  popupEl.classList.remove("hidden");
-}
-
-function closePopup() {
-  const popupEl = document.getElementById("customPopup");
-  if (!popupEl) return;
-  popupEl.classList.add("hidden");
-}
-
-// make them available to the inline "onclick" on the Close button
-window.showPopup = showPopup;
-window.closePopup = closePopup;
-
+    window.closePopup = function () {
+      document.getElementById("customPopup").classList.add("hidden");
+    };
 
     /* ======================== TAB PERSISTENCE ======================== */
     function setActiveTabOnLoad() {
       const savedTab = localStorage.getItem('activeTab');
       if (savedTab) {
+        // Remove active class from all links first
         document.querySelectorAll(".sidebar nav ul li a").forEach(link => {
           link.classList.remove("active");
         });
         
+        // Add active class to the saved tab link
         const savedTabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${savedTab}"]`);
         if (savedTabLink) {
           savedTabLink.classList.add("active");
@@ -2380,18 +2388,20 @@ window.closePopup = closePopup;
       }
     }
 
-   window.addEventListener("DOMContentLoaded", () => {
-  // safety: make sure overlay is hidden when the app boots
-  hideLoading();
-
-  setActiveTabOnLoad();
-  const savedTab = localStorage.getItem("activeTab");
-  if (savedTab && ["dashboard", "maintenance", "billing", "feedback"].includes(savedTab)) {
-    loadContent(null, savedTab);
-  } else {
-    loadContent(null, "dashboard");
-  }
-});
+    window.addEventListener("DOMContentLoaded", () => {
+      setActiveTabOnLoad();
+      
+      // Check if there's a saved tab in localStorage
+      const savedTab = localStorage.getItem('activeTab');
+      
+      // Load the saved tab if it exists, otherwise load dashboard
+      if (savedTab && 
+          ['dashboard', 'maintenance', 'billing', 'feedback'].includes(savedTab)) {
+        loadContent(null, savedTab);
+      } else {
+        loadContent(null, "dashboard");
+      }
+    });
   </script>
 
   <!-- ======================== POPUP ======================== -->
