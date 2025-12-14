@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <script>
     (function () {
-      emailjs.init("avvdJIIs04H8nGyu_");
+      emailjs.init("JOQqxoCLq72v5huex");
     })();
   </script>
 </head>
@@ -24,8 +24,14 @@
     </div>
     <nav>
       <ul>
-        <li><a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
-        <li><a href="#" onclick="loadContent(event, 'inquiries')">Inquiries</a></li>
+        <li>
+          <a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a>
+          <span class="notification-badge" id="dashboardNotification"></span>
+        </li>
+        <li>
+          <a href="#" onclick="loadContent(event, 'inquiries')">Inquiries</a>
+          <span class="inquiries-indicator" id="inquiriesNotification"></span>
+        </li>
         <li><a href="#" onclick="loadContent(event, 'document')">Document</a></li>
         <li><a href="LogIn.html">Logout</a></li>
       </ul>
@@ -65,13 +71,15 @@
       updateDoc,
       doc,
       getDoc,
-      deleteDoc
+      deleteDoc,
+      where,
+      onSnapshot
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
     // ================= FIREBASE CONFIG =================
     const firebaseConfig = {
       apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
-      authDomain: "solanodb-a4f65.firebaseapp.com",
+      authDomain: "solanodb-a4f65.firebasestorage.app",
       projectId: "solanodb-a4f65",
       storageBucket: "solanodb-a4f65.firebasestorage.app",
       messagingSenderId: "98081894649",
@@ -81,6 +89,195 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    /* ==================== NOTIFICATION FUNCTIONS ==================== */
+    let unreadInquiriesCount = 0;
+    let unreadMessagesCount = 0;
+    let unsubscribeNotificationListeners = null;
+
+    // Function to check for unread inquiries (status = 'new')
+    async function checkUnreadInquiries() {
+      try {
+        console.log("Checking for unread inquiries...");
+        const q = query(
+          collection(db, "inquiries"),
+          where("status", "==", "new")
+        );
+        
+        const snapshot = await getDocs(q);
+        const count = snapshot.size;
+        console.log(`Found ${count} unread inquiries`);
+        return count;
+      } catch (error) {
+        console.error("Error checking unread inquiries:", error);
+        return 0;
+      }
+    }
+
+    // Function to check for unread messages from users
+    async function checkUnreadUserMessages() {
+      try {
+        console.log("Checking for unread messages...");
+        const q = query(collection(db, "inquiries"));
+        const snapshot = await getDocs(q);
+        let totalUnread = 0;
+
+        for (const docSnap of snapshot.docs) {
+          const messagesQuery = query(
+            collection(db, "inquiries", docSnap.id, "messages"),
+            where("sender", "!=", "admin"),
+            where("readByPM", "==", false)
+          );
+          
+          const messagesSnapshot = await getDocs(messagesQuery);
+          totalUnread += messagesSnapshot.size;
+        }
+        
+        console.log(`Found ${totalUnread} unread messages`);
+        return totalUnread;
+      } catch (error) {
+        console.error("Error checking unread messages:", error);
+        return 0;
+      }
+    }
+
+    // Function to update notification badges
+    async function updateNotificationBadges() {
+      try {
+        console.log("Updating notification badges...");
+        unreadInquiriesCount = await checkUnreadInquiries();
+        unreadMessagesCount = await checkUnreadUserMessages();
+
+        const totalUnread = unreadInquiriesCount + unreadMessagesCount;
+        
+        console.log(`Unread inquiries: ${unreadInquiriesCount}, Unread messages: ${unreadMessagesCount}, Total: ${totalUnread}`);
+        
+        const dashboardBadge = document.getElementById('dashboardNotification');
+        const inquiriesBadge = document.getElementById('inquiriesNotification');
+
+        // Update dashboard badge (for inbox)
+        if (dashboardBadge) {
+          if (totalUnread > 0) {
+            dashboardBadge.textContent = totalUnread > 9 ? '9+' : totalUnread;
+            dashboardBadge.style.display = 'block';
+            console.log("Dashboard badge shown with count:", totalUnread);
+          } else {
+            dashboardBadge.style.display = 'none';
+            console.log("Dashboard badge hidden");
+          }
+        } else {
+          console.log("Dashboard badge element not found");
+        }
+
+        // Update inquiries tab badge
+        if (inquiriesBadge) {
+          if (unreadInquiriesCount > 0) {
+            inquiriesBadge.style.display = 'block';
+            console.log("Inquiries badge shown");
+          } else {
+            inquiriesBadge.style.display = 'none';
+            console.log("Inquiries badge hidden");
+          }
+        } else {
+          console.log("Inquiries badge element not found");
+        }
+        
+        return totalUnread;
+      } catch (error) {
+        console.error("Error updating notification badges:", error);
+        return 0;
+      }
+    }
+
+    // Function to mark inquiry messages as read
+    async function markInquiryMessagesAsRead(inquiryId) {
+      try {
+        console.log(`Marking messages as read for inquiry: ${inquiryId}`);
+        // First, mark the inquiry as responded if it's new
+        const inquiryRef = doc(db, "inquiries", inquiryId);
+        const inquiryDoc = await getDoc(inquiryRef);
+        
+        if (inquiryDoc.exists()) {
+          const inquiryData = inquiryDoc.data();
+          if (inquiryData.status === "new") {
+            console.log(`Updating inquiry ${inquiryId} status from 'new' to 'responded'`);
+            await updateDoc(inquiryRef, {
+              status: "responded"
+            });
+          }
+        }
+        
+        // Then mark all user messages as read
+        const messagesQuery = query(
+          collection(db, "inquiries", inquiryId, "messages"),
+          where("sender", "!=", "admin"),
+          where("readByPM", "==", false)
+        );
+        
+        const messagesSnapshot = await getDocs(messagesQuery);
+        const updatePromises = [];
+        
+        messagesSnapshot.forEach(docSnap => {
+          console.log(`Marking message ${docSnap.id} as read`);
+          updatePromises.push(
+            updateDoc(doc(db, "inquiries", inquiryId, "messages", docSnap.id), {
+              readByPM: true
+            })
+          );
+        });
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log(`Marked ${updatePromises.length} messages as read`);
+        }
+        
+        await updateNotificationBadges();
+        console.log("Notification badges updated after marking messages as read");
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+      }
+    }
+
+    // Set up real-time listeners for notifications
+    function setupNotificationListeners() {
+      console.log("Setting up notification listeners...");
+      
+      // Clean up existing listeners if any
+      if (unsubscribeNotificationListeners) {
+        unsubscribeNotificationListeners();
+      }
+      
+      // Listen for new inquiries
+      const inquiriesQuery = query(collection(db, "inquiries"));
+      const unsubscribeInquiries = onSnapshot(inquiriesQuery, (snapshot) => {
+        console.log("Inquiries collection changed, updating notifications...");
+        updateNotificationBadges();
+      });
+
+      // Listen for message updates in all inquiries
+      let unsubscribeMessages = [];
+      getDocs(collection(db, "inquiries")).then(snapshot => {
+        snapshot.docs.forEach(docSnap => {
+          const messagesQuery = query(
+            collection(db, "inquiries", docSnap.id, "messages")
+          );
+          const unsubscribe = onSnapshot(messagesQuery, () => {
+            console.log(`Messages for inquiry ${docSnap.id} changed, updating notifications...`);
+            updateNotificationBadges();
+          });
+          unsubscribeMessages.push(unsubscribe);
+        });
+      });
+
+      // Clean up function
+      unsubscribeNotificationListeners = () => {
+        unsubscribeInquiries();
+        unsubscribeMessages.forEach(unsub => unsub());
+        unsubscribeMessages = [];
+      };
+
+      return unsubscribeNotificationListeners;
+    }
 
     /* ==================== LOADING FUNCTIONS ==================== */
     window.showLoading = function() {
@@ -149,7 +346,7 @@
     
 
     // ----------------- NAV / ROUTER -----------------
-    window.loadContent = function (event, section) {
+    window.loadContent = async function (event, section) {
       // Save active tab to localStorage
       localStorage.setItem('pmActiveTab', section);
       
@@ -185,6 +382,11 @@
         default:
           renderDashboard();
       }
+      
+      // Update notifications when switching tabs
+      setTimeout(async () => {
+        await updateNotificationBadges();
+      }, 500);
     };
 
     // Function to set active tab on page load
@@ -223,7 +425,12 @@
             <div class="kpi-label">INQUIRIES</div>
             <div class="kpi-value" id="kpiInquiriesCount">0</div>
             <div class="kpi-meta" id="kpiInquiriesMeta">–</div>
-            <button class="kpi-cta" type="button">CLICK TO VIEW INBOX</button>
+            <div style="position: relative; display: inline-block;">
+              <button class="kpi-cta" type="button" id="inboxButton">
+                CLICK TO VIEW INBOX
+                <span class="dashboard-inbox-notification" id="dashboardInboxNotification"></span>
+              </button>
+            </div>
           </div>
 
           <div class="card kpi-card" id="kpi-calculations">
@@ -284,8 +491,28 @@
       buildCalendar();
       loadDashboardData();
       
+      // Update inbox notification on dashboard
+      updateDashboardInboxNotification();
+      
       // Hide loading after content is rendered
       setTimeout(() => hideLoading(), 300);
+    }
+
+    // Update the inbox notification on dashboard button
+    async function updateDashboardInboxNotification() {
+      try {
+        const totalUnread = await updateNotificationBadges();
+        const inboxNotification = document.getElementById('dashboardInboxNotification');
+        
+        if (inboxNotification && totalUnread > 0) {
+          inboxNotification.textContent = totalUnread > 9 ? '9+' : totalUnread;
+          inboxNotification.style.display = 'block';
+        } else if (inboxNotification) {
+          inboxNotification.style.display = 'none';
+        }
+      } catch (error) {
+        console.error("Error updating dashboard inbox notification:", error);
+      }
     }
 
     function hookDashboardDrilldown() {
@@ -601,577 +828,737 @@
     // INQUIRIES & MORTGAGE
     // ============================================================
 
-    function renderInquiries() {
-      mainContent.innerHTML = `
-        <div class="inquiries-header">
-          <div>
-            <h1 class="inquiries-title">Inquiries & Mortgage Calculations</h1>
-          </div>
-          <div class="filter-bar">
-            <span class="filter-label">View</span>
-            <div class="filter-pill-group">
-              <button id="toggleViewBtn" class="filter-pill">All</button>
-              <button id="showInquiriesBtn" class="filter-pill">Inquiries</button>
-              <button id="showCalculationsBtn" class="filter-pill">Calculations</button>
-            </div>
-          </div>
+function renderInquiries() {
+  mainContent.innerHTML = `
+    <div class="inquiries-header">
+      <div>
+        <h1 class="inquiries-title">Inquiries & Mortgage Calculations</h1>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-label">View</span>
+        <div class="filter-pill-group">
+          <button id="toggleViewBtn" class="filter-pill">All</button>
+          <button id="showInquiriesBtn" class="filter-pill">Inquiries</button>
+          <button id="showCalculationsBtn" class="filter-pill">Calculations</button>
         </div>
+      </div>
+    </div>
 
-        <div id="dataContainer"></div>
+    <div id="dataContainer"></div>
 
-        <!-- Messages Popup Panel -->
-        <div id="messagesPopupPanel" class="messages-popup-panel">
-          <div class="messages-popup-content">
-            <div class="messages-popup-header">
-              <h3 id="messagesPanelTitle" class="messages-popup-title">Messages</h3>
-              <button id="closeMessagesPanelBtn" class="messages-popup-close">×</button>
-            </div>
-            <div class="messages-popup-body">
-              <div id="messagesContainer"></div>
-              <div class="reply-section">
-                <h4 style="margin-top:0;">Send Reply</h4>
-                <textarea id="replyMessage" class="reply-textarea" placeholder="Type your reply here..."></textarea>
+    <!-- Messages Popup Panel -->
+    <div id="messagesPopupPanel" class="messages-popup-panel">
+      <div class="messages-popup-content">
+        <div class="messages-popup-header">
+          <h3 id="messagesPanelTitle" class="messages-popup-title">Messages</h3>
+          <button id="closeMessagesPanelBtn" class="messages-popup-close">×</button>
+        </div>
+        <div class="messages-popup-body">
+          <div id="messagesContainer"></div>
+          <div class="reply-section">
+            <h4 style="margin-top:0;">Send Reply</h4>
+            <textarea id="replyMessage" class="reply-textarea" placeholder="Type your reply here..."></textarea>
 
-                <div class="quick-replies">
-                  <p class="quick-replies-label">Quick replies:</p>
-                  <div class="quick-reply-buttons">
-                    <button class="quickReplyBtn" data-template="thankyou">Thank you</button>
-                    <button class="quickReplyBtn" data-template="followup">Follow-up</button>
-                    <button class="quickReplyBtn" data-template="pricelist_1bed">Send 1-BR pricelist</button>
-                    <button class="quickReplyBtn" data-template="pricelist_2bed">Send 2-BR pricelist</button>
-                    <button class="quickReplyBtn" data-template="appointment">Schedule appointment</button>
-                  </div>
-                </div>
-
-                <div class="reply-buttons">
-                  <button id="sendReplyBtn" class="send">Send reply</button>
-                  <button id="cancelReplyBtn" class="cancel">Clear</button>
-                </div>
-                <div id="replyStatus" style="margin-top:8px;font-size:12px;"></div>
+            <div class="quick-replies">
+              <p class="quick-replies-label">Quick replies:</p>
+              <div class="quick-reply-buttons">
+                <button class="quickReplyBtn" data-template="thankyou">Thank you</button>
+                <button class="quickReplyBtn" data-template="followup">Follow-up</button>
+                <button class="quickReplyBtn" data-template="pricelist_1bed">Send 1-BR pricelist</button>
+                <button class="quickReplyBtn" data-template="pricelist_2bed">Send 2-BR pricelist</button>
+                <button class="quickReplyBtn" data-template="appointment">Schedule appointment</button>
               </div>
             </div>
+
+            <div class="reply-buttons">
+              <button id="sendReplyBtn" class="send">Send reply</button>
+              <button id="cancelReplyBtn" class="cancel">Clear</button>
+            </div>
+            <div id="replyStatus" style="margin-top:8px;font-size:12px;"></div>
           </div>
         </div>
+      </div>
+    </div>
+  `;
+
+  setupInquiriesLogic();
+  // Hide loading after content is rendered
+  setTimeout(() => hideLoading(), 300);
+}
+
+function setupInquiriesLogic() {
+  const dataContainer = document.getElementById("dataContainer");
+  let currentView =
+    window.__initialInquiryView === "inquiries"
+      ? "inquiries"
+      : window.__initialInquiryView === "calculations"
+      ? "calculations"
+      : "all";
+
+  // Reset after using
+  window.__initialInquiryView = "all";
+
+  const MORTGAGE_CALCULATOR_LINK =
+    "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
+
+  const inquiryTopicMap = {
+    payment: "Payment / Price",
+    interested_1b: "Interested in 1 Bedroom unit",
+    interested_2b: "Interested in 2 Bedroom unit",
+    interested_both: "Interested in both bedroom units",
+    other: "Other (explained in message)"
+  };
+
+  const paymentInfoMap = {
+    downpayment: "Downpayment",
+    monthly_amortization: "Monthly amortization",
+    total_price: "Total price",
+    payment_terms: "Payment terms",
+    other_payment: "Other payment info"
+  };
+
+  // Filter pill interactions
+  const allBtn = document.getElementById("toggleViewBtn");
+  const inqBtn = document.getElementById("showInquiriesBtn");
+  const calcBtn = document.getElementById("showCalculationsBtn");
+
+  function updateFilterPills() {
+    [allBtn, inqBtn, calcBtn].forEach((b) => b.classList.remove("active"));
+    if (currentView === "all") allBtn.classList.add("active");
+    else if (currentView === "inquiries") inqBtn.classList.add("active");
+    else calcBtn.classList.add("active");
+  }
+
+  allBtn.addEventListener("click", () => {
+    currentView = "all";
+    updateFilterPills();
+    loadData();
+  });
+  inqBtn.addEventListener("click", () => {
+    currentView = "inquiries";
+    updateFilterPills();
+    loadData();
+  });
+  calcBtn.addEventListener("click", () => {
+    currentView = "calculations";
+    updateFilterPills();
+    loadData();
+  });
+
+  updateFilterPills();
+
+  // Setup mark all as read button
+  const markAllReadBtn = document.getElementById('markAllInquiriesReadBtn');
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', async () => {
+      setButtonLoading(markAllReadBtn, true);
+      try {
+        // Mark all inquiries as read
+        const q = query(collection(db, "inquiries"));
+        const snapshot = await getDocs(q);
+        
+        const updatePromises = [];
+        
+        for (const docSnap of snapshot.docs) {
+          // Update inquiry status if it's new
+          const data = docSnap.data();
+          if (data.status === "new") {
+            updatePromises.push(
+              updateDoc(doc(db, "inquiries", docSnap.id), {
+                status: "responded"
+              })
+            );
+          }
+          
+          // Mark all user messages as read
+          const messagesQuery = query(
+            collection(db, "inquiries", docSnap.id, "messages"),
+            where("sender", "!=", "admin"),
+            where("readByPM", "==", false)
+          );
+          
+          const messagesSnapshot = await getDocs(messagesQuery);
+          messagesSnapshot.forEach(msgDoc => {
+            updatePromises.push(
+              updateDoc(doc(db, "inquiries", docSnap.id, "messages", msgDoc.id), {
+                readByPM: true
+              })
+            );
+          });
+        }
+        
+        await Promise.all(updatePromises);
+        await updateNotificationBadges();
+        
+        // Refresh the data
+        await loadData();
+        
+        Toast.show("All inquiries marked as read!", "success");
+      } catch (error) {
+        console.error("Error marking all as read:", error);
+        Toast.show("Error marking inquiries as read", "error");
+      } finally {
+        setButtonLoading(markAllReadBtn, false);
+      }
+    });
+  }
+
+  // MESSAGES PANEL SETUP
+  const messagesPanel = document.getElementById("messagesPopupPanel");
+  const closeMessagesPanelBtn = document.getElementById(
+    "closeMessagesPanelBtn"
+  );
+  const sendReplyBtn = document.getElementById("sendReplyBtn");
+  const cancelReplyBtn = document.getElementById("cancelReplyBtn");
+  const quickReplyBtns = document.querySelectorAll(".quickReplyBtn");
+
+  // Store current inquiry ID globally for easy access
+  let currentOpenInquiryId = null;
+
+  // Function to remove "New" tags when closing panel
+  function closeMessagesAndRemoveNewTags() {
+    // Remove "New" from panel title if it exists
+    const panelTitle = document.getElementById("messagesPanelTitle");
+    if (panelTitle && panelTitle.textContent.includes('(New)')) {
+      panelTitle.textContent = panelTitle.textContent.replace(' (New)', '');
+    }
+    
+    // Remove "New" badge from the inquiry in the list
+    if (currentOpenInquiryId) {
+      // Find all inquiry items with this ID
+      const inquiryItems = document.querySelectorAll('.inquiry-item');
+      inquiryItems.forEach(item => {
+        const viewBtn = item.querySelector('.view');
+        if (viewBtn && viewBtn.getAttribute('onclick')?.includes(currentOpenInquiryId)) {
+          // Remove unread badge if it exists
+          const unreadBadge = item.querySelector('.unread-badge');
+          if (unreadBadge) {
+            unreadBadge.remove();
+          }
+          
+          // Remove unread-inquiry class
+          item.classList.remove('unread-inquiry');
+          
+          // Update button text if it says "📬 View Chat"
+          if (viewBtn.textContent.includes('📬')) {
+            viewBtn.textContent = 'View Chat';
+          }
+        }
+      });
+    }
+    
+    // Close the panel
+    messagesPanel.style.display = "none";
+    currentOpenInquiryId = null;
+  }
+
+  // Set up close button with new functionality
+  closeMessagesPanelBtn.addEventListener("click", closeMessagesAndRemoveNewTags);
+  messagesPanel.addEventListener("click", (e) => {
+    if (e.target === messagesPanel) closeMessagesAndRemoveNewTags();
+  });
+
+  cancelReplyBtn.addEventListener("click", () => {
+    document.getElementById("replyMessage").value = "";
+    document.getElementById("replyStatus").textContent = "";
+  });
+
+  const MORT_LINK = MORTGAGE_CALCULATOR_LINK;
+
+  quickReplyBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const template = btn.dataset.template;
+      let message = "";
+      switch (template) {
+        case "thankyou":
+          message =
+            "Thank you for your inquiry about Solano Hillside Residences. We appreciate your interest and would be happy to assist you further with any questions you may have.";
+          break;
+        case "followup":
+          message =
+            "I'm following up on your recent inquiry about our units. Are you still interested, or would you like to schedule a site viewing so we can walk you through the options?";
+          break;
+        case "pricelist_1bed":
+          message = `Here are the details for our 1-Bedroom units:\n\n• Floor area: 24–28 sqm\n• Price range: ₱2.8M–₱3.2M\n• Typical downpayment: ₱150,000\n• Sample monthly amortization available upon request.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+          break;
+        case "pricelist_2bed":
+          message = `Here are the details for our 2-Bedroom units:\n\n• Floor area: 36–42 sqm\n• Price range: ₱3.8M–₱4.2M\n• Flexible payment terms available.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+          break;
+        case "appointment":
+          message =
+            "We'd be glad to schedule a site viewing for you. Please let us know your preferred date and time (weekday or weekend), and we'll coordinate the visit for you.";
+          break;
+      }
+      const textarea = document.getElementById("replyMessage");
+      textarea.value = message;
+      textarea.focus();
+    });
+  });
+
+  sendReplyBtn.addEventListener("click", async () => {
+    const replyMessage = document
+      .getElementById("replyMessage")
+      .value.trim();
+    const currentInquiryId = messagesPanel.dataset.inquiryId;
+    const replyStatus = document.getElementById("replyStatus");
+
+    if (!replyMessage) {
+      Toast.show("Please enter a reply message", "error");
+      return;
+    }
+
+    // Show loading on button
+    setButtonLoading(sendReplyBtn, true);
+
+    try {
+      await addDoc(
+        collection(db, "inquiries", currentInquiryId, "messages"),
+        {
+          sender: "admin",
+          senderName: "Project Manager",
+          senderId: "admin_pm",
+          content: replyMessage,
+          timestamp: serverTimestamp(),
+          readByPM: true,
+          readByUser: false
+        }
+      );
+
+      await updateDoc(doc(db, "inquiries", currentInquiryId), {
+        status: "responded"
+      });
+
+      document.getElementById("replyMessage").value = "";
+      await loadInquiryMessages(currentInquiryId);
+
+      Toast.show("Reply sent successfully", "success");
+      replyStatus.textContent = "✓ Reply sent successfully.";
+      replyStatus.style.color = "#4caf50";
+      
+      // Update notifications
+      await updateNotificationBadges();
+    } catch (error) {
+      console.error(error);
+      Toast.show("Failed to send reply", "error");
+      replyStatus.textContent = "✗ Failed to send reply.";
+      replyStatus.style.color = "#f44336";
+    } finally {
+      setButtonLoading(sendReplyBtn, false);
+    }
+  });
+
+  // View messages - updated to store current inquiry ID
+  window.viewInquiryMessages = async function (inquiryId) {
+    try {
+      const messagesContainer =
+        document.getElementById("messagesContainer");
+      const panelTitle = document.getElementById("messagesPanelTitle");
+      messagesContainer.innerHTML =
+        "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading messages…</div>";
+
+      const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+      if (!inquiryDoc.exists()) {
+        Toast.show("Inquiry not found", "error");
+        return;
+      }
+      const data = inquiryDoc.data();
+      
+      // Store current inquiry ID globally
+      currentOpenInquiryId = inquiryId;
+      
+      // Update panel title with "(New)" if inquiry is unread
+      if (data.status === "new") {
+        panelTitle.textContent = `Conversation with ${data.name || "Client"} (New)`;
+      } else {
+        panelTitle.textContent = `Conversation with ${data.name || "Client"}`;
+      }
+      
+      messagesPanel.dataset.inquiryId = inquiryId;
+      messagesPanel.style.display = "flex";
+
+      // Mark messages as read FIRST before loading them
+      await markInquiryMessagesAsRead(inquiryId);
+      
+      // Now load the messages (they won't have NEW tags since they're marked as read)
+      await loadInquiryMessages(inquiryId);
+    } catch (error) {
+      console.error(error);
+      Toast.show("Failed to load messages", "error");
+    }
+  };
+
+  async function loadInquiryMessages(inquiryId) {
+    const messagesContainer = document.getElementById("messagesContainer");
+    messagesContainer.innerHTML = "";
+
+    const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+    const data = inquiryDoc.data();
+
+    const topicText =
+      inquiryTopicMap[data.inquiry_topic] || "No topic selected";
+    const paymentText = paymentInfoMap[data.payment_info] || "";
+    const created = data.createdAt?.toDate
+      ? data.createdAt.toDate().toLocaleString()
+      : "N/A";
+
+    const header = document.createElement("div");
+    header.className = "message-bubble client";
+    header.innerHTML = `
+      <div class="message-header">
+        <div class="message-sender">${data.name || "Client"}</div>
+        <div class="message-time">${created}</div>
+      </div>
+      <div style="font-size:13px;">
+        <strong>Inquiry topic:</strong> ${topicText}<br/>
+        ${
+          paymentText
+            ? `<strong>Payment info:</strong> ${paymentText}<br/>`
+            : ""
+        }
+        <strong>Email:</strong> ${data.email}<br/>
+        <strong>Phone:</strong> ${data.number || "N/A"}<br/>
+      </div>
+    `;
+    messagesContainer.appendChild(header);
+
+    const messagesSnap = await getDocs(
+      query(
+        collection(db, "inquiries", inquiryId, "messages"),
+        orderBy("timestamp", "asc")
+      )
+    );
+
+    if (messagesSnap.empty) {
+      const empty = document.createElement("div");
+      empty.style.cssText =
+        "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
+      empty.textContent =
+        "No chat history yet. Use the reply form below to send the first message.";
+      messagesContainer.appendChild(empty);
+    } else {
+      // Load messages WITHOUT "NEW" tags
+      messagesSnap.forEach((m) => {
+        const msg = m.data();
+        const isAdmin = msg.sender === "admin";
+
+        const div = document.createElement("div");
+        div.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
+        const t = msg.timestamp?.toDate
+          ? msg.timestamp.toDate().toLocaleString()
+          : "N/A";
+        
+        // DO NOT show "NEW" tag - messages are already marked as read
+        div.innerHTML = `
+          <div class="message-header">
+            <div class="message-sender">${
+              isAdmin ? "You (Admin)" : data.name || "Client"
+            }</div>
+            <div class="message-time">${t}</div>
+          </div>
+          <div class="message-content" style="white-space:pre-wrap;">${
+            msg.content
+          }</div>
+        `;
+        messagesContainer.appendChild(div);
+      });
+    }
+
+    setTimeout(
+      () => (messagesContainer.scrollTop = messagesContainer.scrollHeight),
+      100
+    );
+  }
+
+  // Function to mark messages as read in database
+  async function markInquiryMessagesAsRead(inquiryId) {
+    try {
+      // Get all unread user messages
+      const unreadMessagesQuery = query(
+        collection(db, "inquiries", inquiryId, "messages"),
+        where("sender", "!=", "admin"),
+        where("readByPM", "==", false)
+      );
+      
+      const unreadSnapshot = await getDocs(unreadMessagesQuery);
+      
+      const updatePromises = [];
+      unreadSnapshot.forEach(docSnap => {
+        updatePromises.push(
+          updateDoc(doc(db, "inquiries", inquiryId, "messages", docSnap.id), {
+            readByPM: true
+          })
+        );
+      });
+      
+      // Also update the inquiry status if it's "new"
+      const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
+      if (inquiryDoc.exists() && inquiryDoc.data().status === "new") {
+        updatePromises.push(
+          updateDoc(doc(db, "inquiries", inquiryId), {
+            status: "responded"
+          })
+        );
+      }
+      
+      await Promise.all(updatePromises);
+      
+      // Update notification badges
+      await updateNotificationBadges();
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      return false;
+    }
+  }
+
+  // Delete calculation
+  window.deleteCalculation = async function (calcId) {
+    if (
+      !confirm("Delete this mortgage calculation? This action is permanent.")
+    )
+      return;
+    try {
+      await deleteDoc(doc(db, "mortgage_calculations", calcId));
+      Toast.show("Calculation deleted", "success");
+      loadData();
+    } catch (error) {
+      console.error(error);
+      Toast.show("Delete failed", "error");
+    }
+  };
+
+  // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
+  async function loadData() {
+    try {
+      // Show loading indicator
+      dataContainer.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #b9ae9d;">
+          <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #2b2520; border-top: 3px solid #cfa85b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <p style="margin-top: 10px;">Loading data...</p>
+        </div>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
       `;
 
-      setupInquiriesLogic();
-      // Hide loading after content is rendered
-      setTimeout(() => hideLoading(), 300);
-    }
+      const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
+        getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
+      ]);
 
-    function setupInquiriesLogic() {
-      const dataContainer = document.getElementById("dataContainer");
-      let currentView =
-        window.__initialInquiryView === "inquiries"
-          ? "inquiries"
-          : window.__initialInquiryView === "calculations"
-          ? "calculations"
-          : "all";
+      const inquiriesData = inquiriesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        type: "inquiry",
+        data: doc.data()
+      }));
 
-      // Reset after using
-      window.__initialInquiryView = "all";
+      const calculationsData = calculationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        type: "calculation",
+        data: doc.data()
+      }));
 
-      const MORTGAGE_CALCULATOR_LINK =
-        "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
-
-      const inquiryTopicMap = {
-        payment: "Payment / Price",
-        interested_1b: "Interested in 1 Bedroom unit",
-        interested_2b: "Interested in 2 Bedroom unit",
-        interested_both: "Interested in both bedroom units",
-        other: "Other (explained in message)"
-      };
-
-      const paymentInfoMap = {
-        downpayment: "Downpayment",
-        monthly_amortization: "Monthly amortization",
-        total_price: "Total price",
-        payment_terms: "Payment terms",
-        other_payment: "Other payment info"
-      };
-
-      // Filter pill interactions
-      const allBtn = document.getElementById("toggleViewBtn");
-      const inqBtn = document.getElementById("showInquiriesBtn");
-      const calcBtn = document.getElementById("showCalculationsBtn");
-
-      function updateFilterPills() {
-        [allBtn, inqBtn, calcBtn].forEach((b) => b.classList.remove("active"));
-        if (currentView === "all") allBtn.classList.add("active");
-        else if (currentView === "inquiries") inqBtn.classList.add("active");
-        else calcBtn.classList.add("active");
+      let filteredData;
+      if (currentView === "inquiries") {
+        filteredData = inquiriesData;
+      } else if (currentView === "calculations") {
+        filteredData = calculationsData;
+      } else {
+        filteredData = [...inquiriesData, ...calculationsData];
       }
 
-      allBtn.addEventListener("click", () => {
-        currentView = "all";
-        updateFilterPills();
-        loadData();
-      });
-      inqBtn.addEventListener("click", () => {
-        currentView = "inquiries";
-        updateFilterPills();
-        loadData();
-      });
-      calcBtn.addEventListener("click", () => {
-        currentView = "calculations";
-        updateFilterPills();
-        loadData();
+      filteredData.sort((a, b) => {
+        const dateA =
+          a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
+        const dateB =
+          b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
+        return dateB - dateA;
       });
 
-      updateFilterPills();
-
-      // MESSAGES PANEL SETUP
-      const messagesPanel = document.getElementById("messagesPopupPanel");
-      const closeMessagesPanelBtn = document.getElementById(
-        "closeMessagesPanelBtn"
-      );
-      const sendReplyBtn = document.getElementById("sendReplyBtn");
-      const cancelReplyBtn = document.getElementById("cancelReplyBtn");
-      const quickReplyBtns = document.querySelectorAll(".quickReplyBtn");
-
-      function closeMessages() {
-        messagesPanel.style.display = "none";
-      }
-
-      closeMessagesPanelBtn.addEventListener("click", closeMessages);
-      messagesPanel.addEventListener("click", (e) => {
-        if (e.target === messagesPanel) closeMessages();
-      });
-
-      cancelReplyBtn.addEventListener("click", () => {
-        document.getElementById("replyMessage").value = "";
-        document.getElementById("replyStatus").textContent = "";
-      });
-
-      const MORT_LINK = MORTGAGE_CALCULATOR_LINK;
-
-      quickReplyBtns.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const template = btn.dataset.template;
-          let message = "";
-          switch (template) {
-            case "thankyou":
-              message =
-                "Thank you for your inquiry about Solano Hillside Residences. We appreciate your interest and would be happy to assist you further with any questions you may have.";
-              break;
-            case "followup":
-              message =
-                "I'm following up on your recent inquiry about our units. Are you still interested, or would you like to schedule a site viewing so we can walk you through the options?";
-              break;
-            case "pricelist_1bed":
-              message = `Here are the details for our 1-Bedroom units:\n\n• Floor area: 24–28 sqm\n• Price range: ₱2.8M–₱3.2M\n• Typical downpayment: ₱150,000\n• Sample monthly amortization available upon request.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
-              break;
-            case "pricelist_2bed":
-              message = `Here are the details for our 2-Bedroom units:\n\n• Floor area: 36–42 sqm\n• Price range: ₱3.8M–₱4.2M\n• Flexible payment terms available.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
-              break;
-            case "appointment":
-              message =
-                "We’d be glad to schedule a site viewing for you. Please let us know your preferred date and time (weekday or weekend), and we’ll coordinate the visit for you.";
-              break;
-          }
-          const textarea = document.getElementById("replyMessage");
-          textarea.value = message;
-          textarea.focus();
-        });
-      });
-
-      sendReplyBtn.addEventListener("click", async () => {
-        const replyMessage = document
-          .getElementById("replyMessage")
-          .value.trim();
-        const currentInquiryId = messagesPanel.dataset.inquiryId;
-        const replyStatus = document.getElementById("replyStatus");
-
-        if (!replyMessage) {
-          Toast.show("Please enter a reply message", "error");
-          return;
-        }
-
-        // Show loading on button
-        setButtonLoading(sendReplyBtn, true);
-
-        try {
-          await addDoc(
-            collection(db, "inquiries", currentInquiryId, "messages"),
-            {
-              sender: "admin",
-              senderName: "Project Manager",
-              senderId: "admin_pm",
-              content: replyMessage,
-              timestamp: serverTimestamp(),
-              readByPM: true,
-              readByUser: false
-            }
-          );
-
-          await updateDoc(doc(db, "inquiries", currentInquiryId), {
-            status: "responded"
-          });
-
-          document.getElementById("replyMessage").value = "";
-          await loadInquiryMessages(currentInquiryId);
-
-          Toast.show("Reply sent successfully", "success");
-          replyStatus.textContent = "✓ Reply sent successfully.";
-          replyStatus.style.color = "#4caf50";
-        } catch (error) {
-          console.error(error);
-          Toast.show("Failed to send reply", "error");
-          replyStatus.textContent = "✗ Failed to send reply.";
-          replyStatus.style.color = "#f44336";
-        } finally {
-          setButtonLoading(sendReplyBtn, false);
-        }
-      });
-
-      // View messages
-      window.viewInquiryMessages = async function (inquiryId) {
-        try {
-          const messagesContainer =
-            document.getElementById("messagesContainer");
-          const panelTitle = document.getElementById("messagesPanelTitle");
-          messagesContainer.innerHTML =
-            "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading messages…</div>";
-
-          const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
-          if (!inquiryDoc.exists()) {
-            Toast.show("Inquiry not found", "error");
-            return;
-          }
-          const data = inquiryDoc.data();
-          panelTitle.textContent = `Conversation with ${
-            data.name || "Client"
-          }`;
-          messagesPanel.dataset.inquiryId = inquiryId;
-          messagesPanel.style.display = "flex";
-
-          await loadInquiryMessages(inquiryId);
-        } catch (error) {
-          console.error(error);
-          Toast.show("Failed to load messages", "error");
-        }
-      };
-
-      async function loadInquiryMessages(inquiryId) {
-        const messagesContainer = document.getElementById("messagesContainer");
-        messagesContainer.innerHTML = "";
-
-        const inquiryDoc = await getDoc(doc(db, "inquiries", inquiryId));
-        const data = inquiryDoc.data();
-
-        const topicText =
-          inquiryTopicMap[data.inquiry_topic] || "No topic selected";
-        const paymentText = paymentInfoMap[data.payment_info] || "";
-        const created = data.createdAt?.toDate
-          ? data.createdAt.toDate().toLocaleString()
-          : "N/A";
-
-        const header = document.createElement("div");
-        header.className = "message-bubble client";
-        header.innerHTML = `
-          <div class="message-header">
-            <div class="message-sender">${data.name || "Client"}</div>
-            <div class="message-time">${created}</div>
-          </div>
-          <div style="font-size:13px;">
-            <strong>Inquiry topic:</strong> ${topicText}<br/>
-            ${
-              paymentText
-                ? `<strong>Payment info:</strong> ${paymentText}<br/>`
-                : ""
-            }
-            <strong>Email:</strong> ${data.email}<br/>
-            <strong>Phone:</strong> ${data.number || "N/A"}<br/>
+      if (filteredData.length === 0) {
+        dataContainer.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #b9ae9d;">
+            <p style="font-size: 16px; margin-bottom: 10px;">
+              No ${currentView === "all" ? "data" : currentView} yet.
+            </p>
+            <p style="font-size: 14px; color: #8e8272;">
+              Check back later for new inquiries and calculations.
+            </p>
           </div>
         `;
-        messagesContainer.appendChild(header);
-
-        const messagesSnap = await getDocs(
-          query(
-            collection(db, "inquiries", inquiryId, "messages"),
-            orderBy("timestamp", "asc")
-          )
-        );
-
-        if (messagesSnap.empty) {
-          const empty = document.createElement("div");
-          empty.style.cssText =
-            "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
-          empty.textContent =
-            "No chat history yet. Use the reply form below to send the first message.";
-          messagesContainer.appendChild(empty);
-        } else {
-          messagesSnap.forEach((m) => {
-            const msg = m.data();
-            const isAdmin = msg.sender === "admin";
-            const div = document.createElement("div");
-            div.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
-            const t = msg.timestamp?.toDate
-              ? msg.timestamp.toDate().toLocaleString()
-              : "N/A";
-            div.innerHTML = `
-              <div class="message-header">
-                <div class="message-sender">${
-                  isAdmin ? "You (Admin)" : data.name || "Client"
-                }</div>
-                <div class="message-time">${t}</div>
-              </div>
-              <div class="message-content" style="white-space:pre-wrap;">${
-                msg.content
-              }</div>
-            `;
-            messagesContainer.appendChild(div);
-          });
-        }
-
-        setTimeout(
-          () => (messagesContainer.scrollTop = messagesContainer.scrollHeight),
-          100
-        );
+        return;
       }
 
-      // Delete calculation
-      window.deleteCalculation = async function (calcId) {
-        if (
-          !confirm("Delete this mortgage calculation? This action is permanent.")
-        )
-          return;
-        try {
-          await deleteDoc(doc(db, "mortgage_calculations", calcId));
-          Toast.show("Calculation deleted", "success");
-          loadData();
-        } catch (error) {
-          console.error(error);
-          Toast.show("Delete failed", "error");
-        }
-      };
+      // Group items by email
+      const emailGroups = new Map();
 
-      // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
-      async function loadData() {
-        try {
-          // Show loading indicator
-          dataContainer.innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #b9ae9d;">
-              <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #2b2520; border-top: 3px solid #cfa85b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-              <p style="margin-top: 10px;">Loading data...</p>
+      filteredData.forEach(item => {
+        const email = item.data.email || "No email provided";
+        if (!emailGroups.has(email)) {
+          emailGroups.set(email, {
+            email,
+            name: item.data.name || "Client",
+            inquiries: [],
+            calculations: []
+          });
+        }
+
+        const group = emailGroups.get(email);
+        if (item.type === "inquiry") {
+          group.inquiries.push(item);
+        } else if (item.type === "calculation") {
+          group.calculations.push(item);
+        }
+      });
+
+      const fragment = document.createDocumentFragment();
+
+      for (const [, group] of emailGroups) {
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "email-group";
+        // darker, matching your CSS
+        groupDiv.style.cssText =
+          "border: 1px solid #3a3329; padding: 16px 18px; margin-bottom: 18px; border-radius: 12px; background-color: #1c1813; box-shadow: 0 10px 24px rgba(0,0,0,0.4);";
+
+        let groupHTML = `
+          <div class="email-group-header">
+            <div>
+              <div class="email-group-name">${group.name}</div>
+              <div style="font-size:13px;color:#d6cec0;">
+                Email: <span>${group.email}</span>
+              </div>
             </div>
-            <style>
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            </style>
+            <div>
+              <span class="badge inquiry">
+                ${group.inquiries.length} Inquiry${group.inquiries.length !== 1 ? "ies" : ""}
+              </span>
+              <span class="badge calculation">
+                ${group.calculations.length} Calculation${group.calculations.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        `;
+
+        // ----- Inquiries -----
+        if (group.inquiries.length > 0) {
+          groupHTML += `
+            <h4 style="color:#ead39e;margin:4px 0 6px;font-size:13px;">Inquiries</h4>
           `;
 
-          const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
-            getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
-          ]);
+          group.inquiries.forEach(inquiry => {
+            const d = inquiry.data;
+            const inquiryTopicText =
+              inquiryTopicMap[d.inquiry_topic] || "No topic selected";
+            const paymentInfoText =
+              paymentInfoMap[d.payment_info] || "";
+            const inquiryDate = d.createdAt?.toDate
+              ? d.createdAt.toDate().toLocaleString()
+              : "Not available";
 
-          const inquiriesData = inquiriesSnapshot.docs.map(doc => ({
-            id: doc.id,
-            type: "inquiry",
-            data: doc.data()
-          }));
+            const statusColor =
+              d.status === "responded"
+                ? "#4CAF50"
+                : d.status === "pending"
+                ? "#ffb74d"
+                : d.status === "new"
+                ? "#f44336"
+                : "#9e9e9e";
+                
+            const isUnread = d.status === "new";
 
-          const calculationsData = calculationsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            type: "calculation",
-            data: doc.data()
-          }));
-
-          let filteredData;
-          if (currentView === "inquiries") {
-            filteredData = inquiriesData;
-          } else if (currentView === "calculations") {
-            filteredData = calculationsData;
-          } else {
-            filteredData = [...inquiriesData, ...calculationsData];
-          }
-
-          filteredData.sort((a, b) => {
-            const dateA =
-              a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
-            const dateB =
-              b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
-            return dateB - dateA;
-          });
-
-          if (filteredData.length === 0) {
-            dataContainer.innerHTML = `
-              <div style="text-align: center; padding: 40px; color: #b9ae9d;">
-                <p style="font-size: 16px; margin-bottom: 10px;">
-                  No ${currentView === "all" ? "data" : currentView} yet.
-                </p>
-                <p style="font-size: 14px; color: #8e8272;">
-                  Check back later for new inquiries and calculations.
-                </p>
-              </div>
-            `;
-            return;
-          }
-
-          // Group items by email
-          const emailGroups = new Map();
-
-          filteredData.forEach(item => {
-            const email = item.data.email || "No email provided";
-            if (!emailGroups.has(email)) {
-              emailGroups.set(email, {
-                email,
-                name: item.data.name || "Client",
-                inquiries: [],
-                calculations: []
-              });
-            }
-
-            const group = emailGroups.get(email);
-            if (item.type === "inquiry") {
-              group.inquiries.push(item);
-            } else if (item.type === "calculation") {
-              group.calculations.push(item);
-            }
-          });
-
-          const fragment = document.createDocumentFragment();
-
-          for (const [, group] of emailGroups) {
-            const groupDiv = document.createElement("div");
-            groupDiv.className = "email-group";
-            groupDiv.style.cssText =
-              "border: 1px solid #3a3329; padding: 16px 18px; margin-bottom: 18px; border-radius: 12px; background-color: #1c1813; box-shadow: 0 10px 24px rgba(0,0,0,0.4);";
-
-            let groupHTML = `
-              <div class="email-group-header">
-                <div>
-                  <div class="email-group-name">${group.name}</div>
-                  <div style="font-size:13px;color:#d6cec0;">
-                    Email: <span>${group.email}</span>
+            groupHTML += `
+              <div class="inquiry-item ${isUnread ? 'unread-inquiry' : ''}">
+                <div class="item-content">
+                  <div class="item-details">
+                    ${isUnread ? '<div class="unread-badge">NEW</div>' : ''}
+                    <div><strong>Inquiry Topic:</strong> ${inquiryTopicText}</div>
+                    ${paymentInfoText ? `<div><strong>Payment Info:</strong> ${paymentInfoText}</div>` : ""}
+                    <div><strong>Date:</strong> ${inquiryDate}</div>
+                    <div><strong>Status:</strong>
+                      <span style="color:${statusColor};font-weight:600;">
+                        ${d.status || "new"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <span class="badge inquiry">
-                    ${group.inquiries.length} Inquiry${group.inquiries.length !== 1 ? "ies" : ""}
-                  </span>
-                  <span class="badge calculation">
-                    ${group.calculations.length} Calculation${group.calculations.length !== 1 ? "s" : ""}
-                  </span>
+                  <div class="item-actions">
+                    <button class="item-action-btn view"
+                            onclick="viewInquiryMessages('${inquiry.id}')">
+                      ${isUnread ? '📬 View Chat' : 'View Chat'}
+                    </button>
+                  </div>
                 </div>
               </div>
             `;
-
-            // ----- Inquiries -----
-            if (group.inquiries.length > 0) {
-              groupHTML += `
-                <h4 style="color:#ead39e;margin:4px 0 6px;font-size:13px;">Inquiries</h4>
-              `;
-
-              group.inquiries.forEach(inquiry => {
-                const d = inquiry.data;
-                const inquiryTopicText =
-                  inquiryTopicMap[d.inquiry_topic] || "No topic selected";
-                const paymentInfoText =
-                  paymentInfoMap[d.payment_info] || "";
-                const inquiryDate = d.createdAt?.toDate
-                  ? d.createdAt.toDate().toLocaleString()
-                  : "Not available";
-
-                const statusColor =
-                  d.status === "responded"
-                    ? "#4CAF50"
-                    : d.status === "pending"
-                    ? "#ffb74d"
-                    : "#f44336";
-
-                groupHTML += `
-                  <div class="inquiry-item">
-                    <div class="item-content">
-                      <div class="item-details">
-                        <div><strong>Inquiry Topic:</strong> ${inquiryTopicText}</div>
-                        ${paymentInfoText ? `<div><strong>Payment Info:</strong> ${paymentInfoText}</div>` : ""}
-                        <div><strong>Date:</strong> ${inquiryDate}</div>
-                        <div><strong>Status:</strong>
-                          <span style="color:${statusColor};font-weight:600;">
-                            ${d.status || "new"}
-                          </span>
-                        </div>
-                      </div>
-                      <div class="item-actions">
-                        <button class="item-action-btn view"
-                                onclick="viewInquiryMessages('${inquiry.id}')">
-                          View Chat
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              });
-            }
-
-            // ----- Mortgage calculations -----
-            if (group.calculations.length > 0) {
-              groupHTML += `
-                <h4 style="color:#c8f7d5;margin:8px 0 4px;font-size:13px;">Mortgage Calculations</h4>
-              `;
-
-              group.calculations.forEach(calc => {
-                const d = calc.data;
-                const calcSummary = d.formatted || {};
-
-                groupHTML += `
-                  <div class="calculation-item">
-                    <div class="item-content">
-                      <div class="item-details">
-                        <div><strong>Property Price:</strong>
-                          ${calcSummary.propertyPrice || formatCurrency(d.propertyPrice)}</div>
-                        <div><strong>Downpayment:</strong>
-                          ${d.downpaymentPercent}% (${calcSummary.downpayment || formatCurrency(d.downpaymentAmount)})</div>
-                        <div><strong>Loan Amount:</strong>
-                          ${calcSummary.loanAmount || formatCurrency(d.loanAmount)}</div>
-                        <div><strong>Monthly Payment:</strong>
-                          ${
-                            calcSummary.monthlyPayment ||
-                            formatCurrencyDecimal(d.monthlyPayment)
-                          }</div>
-                        <div><strong>Term:</strong>
-                          ${d.loanTermYears} years @ ${d.interestRate}%</div>
-                      </div>
-                      <div class="item-actions">
-                        <button class="item-action-btn delete"
-                                onclick="deleteCalculation('${calc.id}')">
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              });
-            }
-
-            groupDiv.innerHTML = groupHTML;
-            fragment.appendChild(groupDiv);
-          }
-
-          dataContainer.innerHTML = "";
-          dataContainer.appendChild(fragment);
-
-          Toast.show(`Loaded ${filteredData.length} items`, "info", 1500);
-        } catch (error) {
-          console.error(error);
-          Toast.show(`Failed to load data: ${error.message}`, "error");
-          dataContainer.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: #f44336;">
-              <p style="font-size: 16px; margin-bottom: 10px;">Failed to load data</p>
-              <p style="font-size: 14px; color: #999; margin-bottom: 20px;">
-                ${error.message}
-              </p>
-            </div>
-          `;
+          });
         }
+
+        // ----- Mortgage calculations -----
+        if (group.calculations.length > 0) {
+          groupHTML += `
+            <h4 style="color:#c8f7d5;margin:8px 0 4px;font-size:13px;">Mortgage Calculations</h4>
+          `;
+
+          group.calculations.forEach(calc => {
+            const d = calc.data;
+            const calcSummary = d.formatted || {};
+
+            groupHTML += `
+              <div class="calculation-item">
+                <div class="item-content">
+                  <div class="item-details">
+                    <div><strong>Property Price:</strong>
+                      ${calcSummary.propertyPrice || formatCurrency(d.propertyPrice)}</div>
+                    <div><strong>Downpayment:</strong>
+                      ${d.downpaymentPercent}% (${calcSummary.downpayment || formatCurrency(d.downpaymentAmount)})</div>
+                    <div><strong>Loan Amount:</strong>
+                      ${calcSummary.loanAmount || formatCurrency(d.loanAmount)}</div>
+                    <div><strong>Monthly Payment:</strong>
+                      ${
+                        calcSummary.monthlyPayment ||
+                        formatCurrencyDecimal(d.monthlyPayment)
+                      }</div>
+                    <div><strong>Term:</strong>
+                      ${d.loanTermYears} years @ ${d.interestRate}%</div>
+                  </div>
+                  <div class="item-actions">
+                    <button class="item-action-btn delete"
+                            onclick="deleteCalculation('${calc.id}')">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        groupDiv.innerHTML = groupHTML;
+        fragment.appendChild(groupDiv);
       }
-      loadData();
+
+      dataContainer.innerHTML = "";
+      dataContainer.appendChild(fragment);
+
+      Toast.show(`Loaded ${filteredData.length} items`, "info", 1500);
+    } catch (error) {
+      console.error(error);
+      Toast.show(`Failed to load data: ${error.message}`, "error");
+      dataContainer.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #f44336;">
+          <p style="font-size: 16px; margin-bottom: 10px;">Failed to load data</p>
+          <p style="font-size: 14px; color: #999; margin-bottom: 20px;">
+            ${error.message}
+          </p>
+        </div>
+      `;
     }
-
+  }
+  loadData();
+}
     // ============================================================
     // DOCUMENTS – CLIENT DOCUMENT SETS
     // ============================================================
@@ -1207,12 +1594,12 @@
 
                 <div class="form-field">
                   <label class="field-label" for="num1Bedroom"># of 1BR units</label>
-                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="-" required/>
                 </div>
 
                 <div class="form-field">
                   <label class="field-label" for="num2Bedroom"># of 2BR units</label>
-                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="-" required/>
                 </div>
 
                 <div class="form-field full">
@@ -1461,13 +1848,19 @@
               <br/>Uploaded at ${entry.time}
             </span>
             <ul class="upload-entry-files">
-              ${entry.files
-                .map(
-                  (f) =>
-                    `<li><strong>${f.label}:</strong> ${f.name}</li>`
-                )
-                .join("")}
-            </ul>
+            ${entry.files
+              .map(
+                (f) => `
+                  <li>
+                    <strong>${f.label}:</strong>
+                    <ul style="margin:4px 0 0 14px;">
+                      <li>${f.name}</li>
+                    </ul>
+                  </li>
+                `
+              )
+              .join("")}
+          </ul>
           `;
 
           const { svg, progressCircle, progressText } = createProgressCircle();
@@ -1586,25 +1979,25 @@
             )
             .join("<br>");
 
-          const templateParams = {
+            const formattedFilesForEmail = uploadedFiles
+              .map((f, idx) =>
+                `${idx + 1}. ${f.label}:<br>- <a href="${uploadedUrls[idx]}" target="_blank" rel="noopener noreferrer">${f.name}</a>`
+              )
+              .join("<br><br>");
+
+            const templateParams = {
             name,
-            paymentTerms,
-            num1Bedroom,
-            num2Bedroom,
-            clientType: clientTypeLabels[clientType] || clientType,
             time: new Date().toLocaleString(),
             message: `
-              <p><strong>Client type:</strong> ${
-                clientTypeLabels[clientType] || clientType
-              }</p>
+              <p><strong>Client type:</strong> ${clientTypeLabels[clientType] || clientType}</p>
               <p><strong>1BR units:</strong> ${num1Bedroom}</p>
               <p><strong>2BR units:</strong> ${num2Bedroom}</p>
               <p><strong>Payment terms:</strong> ${paymentTerms}</p>
-              <p><strong>Files:</strong><br>${fileLines}</p>
+              <p><strong>Files:</strong><br>${formattedFilesForEmail}</p>
             `
           };
 
-          await emailjs.send("service_u1n5d9t", "template_qu1s2lh", templateParams);
+          await emailjs.send("service_hehhqyt", "template_ohx8z4o", templateParams);
 
           Toast.show("Document set uploaded & emailed", "success");
 
@@ -1643,12 +2036,22 @@
     // AUTH + INITIAL LOAD
     // ============================================================
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (!user) {
         alert("You're not signed in. Redirecting to login…");
         window.location.href = "index.html";
         return;
       }
+      
+      // Initialize notifications
+      console.log("User authenticated, initializing notifications...");
+      await updateNotificationBadges();
+      setupNotificationListeners();
+      
+      // Set up periodic checks (every 30 seconds)
+      setInterval(async () => {
+        await updateNotificationBadges();
+      }, 30000);
       
       setActiveTabOnLoad();
       
