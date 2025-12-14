@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Project Manager Dashboard – Solano Hills</title>
-
   <link rel="stylesheet" href="PM-dasboard.css" />
 
   <!-- Chart.js for dashboard charts -->
@@ -25,7 +24,7 @@
     </div>
     <nav>
       <ul>
-        <li><a href="#" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
+        <li><a href="#" class="active" onclick="loadContent(event, 'dashboard')">Dashboard</a></li>
         <li><a href="#" onclick="loadContent(event, 'inquiries')">Inquiries</a></li>
         <li><a href="#" onclick="loadContent(event, 'document')">Document</a></li>
         <li><a href="LogIn.html">Logout</a></li>
@@ -40,11 +39,6 @@
       <p class="pm-dashboard-subtitle">High-level overview of inquiries, mortgage calculations, and client documents.</p>
     </div>
   </main>
-
-  <!-- Loading Overlay -->
-  <div id="loadingOverlay" class="loading-overlay hidden">
-    <div class="loading-spinner"></div>
-  </div>
 
   <!-- ======================== APP SCRIPT ======================== -->
   <script type="module">
@@ -83,40 +77,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    /* ==================== LOADING FUNCTIONS ==================== */
-    window.showLoading = function() {
-      const overlay = document.getElementById('loadingOverlay');
-      if (overlay) {
-        overlay.classList.remove('hidden');
-      }
-    };
-
-    window.hideLoading = function() {
-      const overlay = document.getElementById('loadingOverlay');
-      if (overlay) {
-        overlay.classList.add('hidden');
-      }
-    };
-
-    window.setButtonLoading = function(button, isLoading) {
-      if (!button) return;
-      
-      if (isLoading) {
-        button.disabled = true;
-        button.classList.add('button-loading');
-        const originalText = button.textContent;
-        button.setAttribute('data-original-text', originalText);
-        button.textContent = 'Loading...';
-      } else {
-        button.disabled = false;
-        button.classList.remove('button-loading');
-        const originalText = button.getAttribute('data-original-text');
-        if (originalText) {
-          button.textContent = originalText;
-        }
-      }
-    };
-
     const mainContent = document.getElementById("mainContent");
 
     // Used for drill-down from dashboard KPIs
@@ -151,12 +111,6 @@
 
     // ----------------- NAV / ROUTER -----------------
     window.loadContent = function (event, section) {
-      // Save active tab to localStorage
-      localStorage.setItem('pmActiveTab', section);
-      
-      // Show loading
-      showLoading();
-      
       if (event) event.preventDefault();
 
       // Active state on sidebar
@@ -165,10 +119,6 @@
       );
       if (event?.target?.tagName === "A") {
         event.target.classList.add("active");
-      } else {
-        // Add active class to the tab link
-        const tabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${section}"]`);
-        if (tabLink) tabLink.classList.add("active");
       }
 
       mainContent.innerHTML = "";
@@ -187,23 +137,6 @@
           renderDashboard();
       }
     };
-
-    // Function to set active tab on page load
-    function setActiveTabOnLoad() {
-      const savedTab = localStorage.getItem('pmActiveTab');
-      if (savedTab) {
-        // Remove active class from all links first
-        document.querySelectorAll(".sidebar nav ul li a").forEach(link => {
-          link.classList.remove("active");
-        });
-        
-        // Add active class to the saved tab link
-        const savedTabLink = document.querySelector(`.sidebar nav ul li a[onclick*="${savedTab}"]`);
-        if (savedTabLink) {
-          savedTabLink.classList.add("active");
-        }
-      }
-    }
 
     // ============================================================
     // DASHBOARD RENDER + LOGIC
@@ -284,9 +217,6 @@
       hookDashboardDrilldown();
       buildCalendar();
       loadDashboardData();
-      
-      // Hide loading after content is rendered
-      setTimeout(() => hideLoading(), 300);
     }
 
     function hookDashboardDrilldown() {
@@ -656,8 +586,7 @@
       `;
 
       setupInquiriesLogic();
-      // Hide loading after content is rendered
-      setTimeout(() => hideLoading(), 300);
+     
     }
 
     function setupInquiriesLogic() {
@@ -788,8 +717,10 @@
           return;
         }
 
-        // Show loading on button
-        setButtonLoading(sendReplyBtn, true);
+        const originalText = sendReplyBtn.textContent;
+        sendReplyBtn.textContent = "Sending…";
+        sendReplyBtn.disabled = true;
+        replyStatus.textContent = "";
 
         try {
           await addDoc(
@@ -821,7 +752,8 @@
           replyStatus.textContent = "✗ Failed to send reply.";
           replyStatus.style.color = "#f44336";
         } finally {
-          setButtonLoading(sendReplyBtn, false);
+          sendReplyBtn.textContent = originalText;
+          sendReplyBtn.disabled = false;
         }
       });
 
@@ -947,7 +879,8 @@
         }
       };
 
-      // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
+      // ======================= FIXED LOAD DATA =======================
+            // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
       async function loadData() {
         try {
           // Show loading indicator
@@ -1039,6 +972,7 @@
           for (const [, group] of emailGroups) {
             const groupDiv = document.createElement("div");
             groupDiv.className = "email-group";
+            // darker, matching your CSS
             groupDiv.style.cssText =
               "border: 1px solid #3a3329; padding: 16px 18px; margin-bottom: 18px; border-radius: 12px; background-color: #1c1813; box-shadow: 0 10px 24px rgba(0,0,0,0.4);";
 
@@ -1208,12 +1142,12 @@
 
                 <div class="form-field">
                   <label class="field-label" for="num1Bedroom"># of 1BR units</label>
-                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="0" />
                 </div>
 
                 <div class="form-field">
                   <label class="field-label" for="num2Bedroom"># of 2BR units</label>
-                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="" required/>
+                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="0" />
                 </div>
 
                 <div class="form-field full">
@@ -1279,7 +1213,7 @@
               <ul class="req-list">
                 <li>DTI Registration (for sole proprietors).</li>
                 <li>SEC Registration with Articles of Incorporation and By-laws (for corporations/partnerships).</li>
-                <li>Business / Mayor's Permit.</li>
+                <li>Business / Mayor’s Permit.</li>
                 <li>Income Tax Returns (BIR Form 1701 / 1702) with Audited Financial Statements.</li>
                 <li>Audited Financial Statements for the last 2–3 years.</li>
                 <li>Bank statements or passbook (3–12 months).</li>
@@ -1299,8 +1233,6 @@
       `;
 
       setupDocumentLogic();
-      // Hide loading after content is rendered
-      setTimeout(() => hideLoading(), 300);
     }
 
     function setupDocumentLogic() {
@@ -1331,7 +1263,7 @@
         business_owner: [
           "DTI Registration (for sole proprietors)",
           "SEC Registration with Articles & By-laws (for corporations/partnerships)",
-          "Business / Mayor's Permit",
+          "Business / Mayor’s Permit",
           "Income Tax Returns with Audited Financial Statements",
           "Audited Financial Statements (last 2–3 years)",
           "Bank statements or passbook (3–12 months)",
@@ -1650,19 +1582,7 @@
         window.location.href = "index.html";
         return;
       }
-      
-      setActiveTabOnLoad();
-      
-      // Check if there's a saved tab in localStorage
-      const savedTab = localStorage.getItem('pmActiveTab');
-      
-      // Load the saved tab if it exists, otherwise load dashboard
-      if (savedTab && 
-          ['dashboard', 'inquiries', 'document'].includes(savedTab)) {
-        loadContent(null, savedTab);
-      } else {
-        loadContent(null, "dashboard");
-      }
+      renderDashboard();
     });
   </script>
 </body>
