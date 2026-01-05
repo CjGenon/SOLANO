@@ -332,9 +332,6 @@
                 <label for="personnelFilter">Filter by Personnel</label>
                 <select id="personnelFilter">
                   <option value="all">All Personnel</option>
-                  <option value="John Doe">John Doe</option>
-                  <option value="Jane Smith">Jane Smith</option>
-                  <option value="Mike Johnson">Mike Johnson</option>
                   <option value="unassigned">Unassigned</option>
                 </select>
               </div>
@@ -380,11 +377,32 @@
         case "Unit Owner Account Creation":
           area.innerHTML = `
             <div class="admin-section-header">
-              <h2>Create New Unit Owner Account</h2>
-              <p>Create Solano accounts for unit owners and assign units.</p>
+              <h2>Account Creation</h2>
+              <p>Create Solano accounts for unit owners or maintenance crew.</p>
             </div>
 
-            <div class="list-card">
+            <!-- Account Type Selection -->
+            <div class="list-card" style="margin-bottom: 20px;">
+              <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; margin-bottom: 8px; display: block;">Account Type</label>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="accountType" value="tenant" checked onclick="toggleAccountType(this)">
+                    Unit Owner Account
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="accountType" value="maintenance" onclick="toggleAccountType(this)">
+                    Maintenance Crew Account
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Unit Owner Form (Initially Visible) -->
+            <div class="list-card" id="tenantFormContainer">
+              <h3 style="margin-top: 0;">Create New Unit Owner Account</h3>
+              <p style="color: var(--solano-text-muted); margin-bottom: 15px;">Create Solano accounts for unit owners and assign units.</p>
+              
               <form id="createTenantForm">
                 <div class="filter-group" style="margin-bottom:10px;">
                   <label for="tenantEmail">Unit Owner Solano Email</label>
@@ -433,16 +451,96 @@
                   </button>
                 </div>
               </form>
+            </div>
 
-              <div id="unitOwnersList" style="margin-top: 20px;">
-                <h3>Created Unit Owners</h3>
+            <!-- Maintenance Crew Form (Initially Hidden) -->
+            <div class="list-card" id="maintenanceFormContainer" style="display: none;">
+              <h3 style="margin-top: 0;">Create New Maintenance Crew Account</h3>
+              <p style="color: var(--solano-text-muted); margin-bottom: 15px;">Create accounts for maintenance personnel with specialized roles.</p>
+              
+              <form id="createMaintenanceForm">
+                <div class="filter-group" style="margin-bottom:10px;">
+                  <label for="maintenanceEmail">Maintenance Crew Email</label>
+                  <input type="email" id="maintenanceEmail" required />
+                </div>
+
+                <div class="filter-group" style="margin-bottom:10px;">
+                  <label for="maintenanceName">Full Name</label>
+                  <input type="text" id="maintenanceName" required placeholder="Enter full name (e.g., John Doe)" />
+                </div>
+
+                <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                  <div class="filter-group" style="flex:1; min-width:220px;">
+                    <label for="maintenancePassword">Temporary Password</label>
+                    <input
+                      type="text"
+                      id="maintenancePassword"
+                      required
+                      readonly
+                      style="background:#222;border-color:rgba(255,255,255,0.18);"
+                    />
+                  </div>
+                  <button type="button" id="generateMaintenancePasswordBtn" class="btn-primary">
+                    Generate Password
+                  </button>
+                </div>
+
+                <div class="filter-group" style="margin-bottom:10px;">
+                  <label for="maintenanceRole">Specialization / Role</label>
+                  <select id="maintenanceRole" required style="padding:8px; width:100%;">
+                    <option value="">-- Select Specialization --</option>
+                    <option value="Electrician">Electrician</option>
+                    <option value="Plumber">Plumber</option>
+                    <option value="Carpenter">Carpenter</option>
+                    <option value="HVAC / Aircon">HVAC / Aircon Technician</option>
+                    <option value="General Maintenance">General Maintenance</option>
+                    <option value="Painter">Painter</option>
+                    <option value="Landscaper">Landscaper</option>
+                    <option value="Supervisor">Maintenance Supervisor</option>
+                  </select>
+                </div>
+
+                <div class="filter-group" style="margin-bottom:15px;">
+                  <label for="maintenancePhone">Contact Number (Optional)</label>
+                  <input type="tel" id="maintenancePhone" placeholder="Enter contact number" />
+                </div>
+
+                <div>
+                  <button type="submit" class="btn-primary" style="background: #8d6c39;">
+                    Create Maintenance Account
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Combined User List -->
+            <div class="list-card" style="margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">Created Accounts</h3>
+                <div style="display: flex; gap: 10px;">
+                  <button id="showTenantsBtn" class="btn-secondary active" style="font-size: 12px; padding: 6px 12px;" onclick="toggleUserList('tenant')">
+                    Unit Owners
+                  </button>
+                  <button id="showMaintenanceBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="toggleUserList('maintenance')">
+                    Maintenance Crew
+                  </button>
+                </div>
+              </div>
+              
+              <div id="unitOwnersList" style="display: block;">
                 <ul id="unitOwnersUl" style="list-style-type:none; padding-left:0; max-height:300px; overflow-y:auto; border:1px solid #ccc; padding:10px; border-radius:6px;">
-                  <li>Loading...</li>
+                  <li>Loading unit owners...</li>
+                </ul>
+              </div>
+              
+              <div id="maintenanceCrewList" style="display: none;">
+                <ul id="maintenanceCrewUl" style="list-style-type:none; padding-left:0; max-height:300px; overflow-y:auto; border:1px solid #ccc; padding:10px; border-radius:6px;">
+                  <li>Loading maintenance crew...</li>
                 </ul>
               </div>
             </div>
           `;
-          initUnitOwnerCreation();
+          initAccountCreation();
           break;
 
         case "Feedback Received":
@@ -1120,7 +1218,7 @@ async function initAdminDashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        cutout: "40%",
+        cutout: "60%",
         animation: {
           animateRotate: true,
           animateScale: true,
@@ -1167,7 +1265,7 @@ async function initAdminDashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        cutout: "55%",
+        cutout: "40%",
         animation: {
           animateRotate: true,
           animateScale: true,
@@ -1461,1050 +1559,1169 @@ function renderAdminCalendar() {
     }
 
     // ======================== MAINTENANCE REQUESTS LOGIC ========================
-   // ======================== MAINTENANCE REQUESTS LOGIC ========================
-function initMaintenanceRequests() {
-  const maintenanceList = document.getElementById("maintenanceList");
-  const statusFilter = document.getElementById("statusFilter");
-  const personnelFilter = document.getElementById("personnelFilter");
-  const maintenanceSearch = document.getElementById("maintenanceSearch");
-  const sortBy = document.getElementById("sortBy");
-  const resetFilters = document.getElementById("resetFilters");
-  const maintenanceStats = document.getElementById("maintenanceStats");
-  const requestCount = document.getElementById("requestCount");
-  const pendingCountEl = document.getElementById("pendingCount");
-  const inProgressCountEl = document.getElementById("inProgressCount");
-  const completeCountEl = document.getElementById("completeCount");
+    function initMaintenanceRequests() {
+      const maintenanceList = document.getElementById("maintenanceList");
+      const statusFilter = document.getElementById("statusFilter");
+      const personnelFilter = document.getElementById("personnelFilter");
+      const maintenanceSearch = document.getElementById("maintenanceSearch");
+      const sortBy = document.getElementById("sortBy");
+      const resetFilters = document.getElementById("resetFilters");
+      const maintenanceStats = document.getElementById("maintenanceStats");
+      const requestCount = document.getElementById("requestCount");
+      const pendingCountEl = document.getElementById("pendingCount");
+      const inProgressCountEl = document.getElementById("inProgressCount");
+      const completeCountEl = document.getElementById("completeCount");
 
-  // ==== ADD: Red dot notification element for sidebar tab ====
-  let redDotNotification = null;
-  
-  // Find the Maintenance Requests tab in the sidebar
-  const maintenanceNavItem = document.querySelector('a[onclick*="Maintenance Requests"]');
-  if (maintenanceNavItem) {
-    // Check if red dot already exists
-    redDotNotification = maintenanceNavItem.querySelector('.notification-dot');
-    
-    if (!redDotNotification) {
-      // Create new red dot notification
-      redDotNotification = document.createElement('span');
-      redDotNotification.className = 'notification-dot';
-      redDotNotification.style.cssText = `
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 10px;
-        height: 10px;
-        background-color: #ff4757;
-        border-radius: 50%;
-        display: none;
-        animation: pulse 2s infinite;
-      `;
+      // ==== ADD: Red dot notification element for sidebar tab ====
+      let redDotNotification = null;
       
-      // Add pulse animation
-      if (!document.querySelector('#pulse-animation')) {
-        const style = document.createElement('style');
-        style.id = 'pulse-animation';
-        style.textContent = `
-          @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-      
-      maintenanceNavItem.style.position = 'relative';
-      maintenanceNavItem.appendChild(redDotNotification);
-    }
-  }
-
-  let allRequests = [];
-  let filteredRequests = [];
-  let personnelAssignments = new Map();
-  
-  // NEW: Add seen requests tracking
-  let seenRequestIds = new Set();
-  let lastVisitTime = localStorage.getItem('maintenanceLastVisit') || null;
-
-  // Load previously seen requests
-  const savedSeenRequests = localStorage.getItem('maintenanceSeenRequests');
-  if (savedSeenRequests) {
-    seenRequestIds = new Set(JSON.parse(savedSeenRequests));
-  }
-
-  // Update last visit time when loading the page
-  localStorage.setItem('maintenanceLastVisit', new Date().toISOString());
-
-  // Function to mark requests as seen
-  function markRequestsAsSeen(ids) {
-    ids.forEach(id => seenRequestIds.add(id));
-    localStorage.setItem('maintenanceSeenRequests', JSON.stringify(Array.from(seenRequestIds)));
-  }
-
-  // Function to check if request is new
-  function isRequestNew(request) {
-    // Check if request ID is in seen set
-    if (seenRequestIds.has(request.id)) return false;
-    
-    // If we have last visit time, check if request is newer
-    if (lastVisitTime && request.timestamp) {
-      const requestTime = request.timestamp?.toDate ? request.timestamp.toDate() : new Date(request.timestamp);
-      const lastVisit = new Date(lastVisitTime);
-      return requestTime > lastVisit;
-    }
-    
-    // Default: consider new if not seen before
-    return true;
-  }
-
-  // Function to update notification dot in sidebar
-  function updateNotificationDot() {
-    if (!redDotNotification) return;
-    
-    const newRequestsCount = allRequests.filter(request => 
-      isRequestNew(request) && request.status !== 'Complete'
-    ).length;
-    
-    if (newRequestsCount > 0) {
-      redDotNotification.style.display = 'block';
-      // Optional: Add count badge
-      if (!redDotNotification.dataset.badgeAdded && newRequestsCount > 1) {
-        const badge = document.createElement('span');
-        badge.className = 'notification-count';
-        badge.style.cssText = `
-          position: absolute;
-          top: -8px;
-          right: -8px;
-          min-width: 18px;
-          height: 18px;
-          background-color: #ff4757;
-          color: white;
-          border-radius: 9px;
-          font-size: 10px;
-          font-weight: bold;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 2px;
-          border: 2px solid #1a1a1a;
-        `;
-        badge.textContent = newRequestsCount > 99 ? '99+' : newRequestsCount;
-        redDotNotification.appendChild(badge);
-        redDotNotification.dataset.badgeAdded = true;
-      } else if (redDotNotification.dataset.badgeAdded && newRequestsCount <= 1) {
-        // Remove badge if only 1 new request
-        const badge = redDotNotification.querySelector('.notification-count');
-        if (badge) {
-          redDotNotification.removeChild(badge);
-          delete redDotNotification.dataset.badgeAdded;
-        }
-      }
-    } else {
-      redDotNotification.style.display = 'none';
-      if (redDotNotification.querySelector('.notification-count')) {
-        redDotNotification.removeChild(redDotNotification.querySelector('.notification-count'));
-        delete redDotNotification.dataset.badgeAdded;
-      }
-    }
-  }
-
-  // NEW: grouped personnel by specialization
-  const personnelGroups = [
-    {
-      role: "Electrician",
-      names: ["Carlos Reyes", "Miguel Santos"],
-    },
-    {
-      role: "Plumber",
-      names: ["Ana Dela Cruz", "Ramon Flores"],
-    },
-    {
-      role: "Carpenter",
-      names: ["Leo Hernandez", "Paolo Medina"],
-    },
-    {
-      role: "HVAC / Aircon",
-      names: ["Mike Johnson", "Erika Tan"],
-    },
-    {
-      role: "General Maintenance",
-      names: ["John Doe", "Jane Smith"],
-    },
-  ];
-
-  // Flat list if you ever need to iterate over all names
-  const allPersonnelNames = personnelGroups.flatMap((g) => g.names);
-
-  const drill = window.adminDashboardDrilldown || {};
-  if (drill.maintenanceStatus) {
-    statusFilter.value = drill.maintenanceStatus;
-  }
-  window.adminDashboardDrilldown = null;
-
-  function formatDateTimeAMPM(date) {
-    if (!date) return "N/A";
-    const d = date.toDate ? date.toDate() : date;
-    let hours = d.getHours();
-    const minutes = d.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-    const day = d.getDate().toString().padStart(2, "0");
-    const year = d.getFullYear();
-    return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-  }
-
-  // ===== MAINTENANCE MESSAGES POPUP BINDINGS =====
-  const chatPanel = document.getElementById("maintenanceMessagesPanel");
-  const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
-  const chatMessagesContainer = document.getElementById("maintenanceMessagesContainer");
-  const chatReplyTextarea = document.getElementById("maintenanceReplyMessage");
-  const chatReplyStatus = document.getElementById("maintenanceReplyStatus");
-  const chatSendBtn = document.getElementById("maintenanceSendReplyBtn");
-  const chatClearBtn = document.getElementById("maintenanceClearReplyBtn");
-  const chatCloseBtn = document.getElementById("closeMaintenanceMessagesBtn");
-  const chatQuickReplyBtns = document.querySelectorAll(".maintenanceQuickReplyBtn");
-
-  if (chatPanel && !chatPanel.dataset.bound) {
-    chatPanel.dataset.bound = "true";
-
-    chatCloseBtn.addEventListener("click", () => {
-      chatPanel.style.display = "none";
-      chatReplyTextarea.value = "";
-      chatReplyStatus.textContent = "";
-    });
-
-    chatPanel.addEventListener("click", (e) => {
-      if (e.target === chatPanel) {
-        chatPanel.style.display = "none";
-        chatReplyTextarea.value = "";
-        chatReplyStatus.textContent = "";
-      }
-    });
-
-    chatClearBtn.addEventListener("click", () => {
-      chatReplyTextarea.value = "";
-      chatReplyStatus.textContent = "";
-    });
-
-    chatQuickReplyBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const template = btn.dataset.template;
-        let msg = "";
-        switch (template) {
-          case "on_the_way":
-            msg = "Our maintenance team is on the way.";
-            break;
-          case "technician_assigned":
-            msg = "A technician has been assigned and will be there soon.";
-            break;
-          case "scheduled":
-            msg = "We have scheduled your maintenance as per your requested date and time.";
-            break;
-          case "resolved":
-            msg = "Thank you for your patience. This maintenance concern has been resolved.";
-            break;
-        }
-        chatReplyTextarea.value = msg;
-        chatReplyTextarea.focus();
-      });
-    });
-
-    chatSendBtn.addEventListener("click", async () => {
-      const msg = chatReplyTextarea.value.trim();
-      if (!msg) {
-        showPopup("Response message cannot be empty.");
-        return;
-      }
-
-      const requestId = chatPanel.dataset.requestId;
-      if (!requestId) return;
-
-      try {
-        setButtonLoading(chatSendBtn, true);
-
-        const requestDocRef = db.collection("maintenanceRequests").doc(requestId);
-        await requestDocRef.collection("responses").add({
-          sender: "admin",
-          adminEmail: auth.currentUser ? auth.currentUser.email : null,
-          message: msg,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-
-        await requestDocRef.update({
-          responseTime: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-
-        chatReplyTextarea.value = "";
-        await loadMaintenanceChatMessages(requestId);
-
-        chatReplyStatus.textContent = "✓ Reply sent successfully.";
-        chatReplyStatus.style.color = "#4caf50";
-      } catch (error) {
-        console.error(error);
-        chatReplyStatus.textContent = "✗ Failed to send reply.";
-        chatReplyStatus.style.color = "#f44336";
-        showPopup("Failed to send response: " + error.message);
-      } finally {
-        setButtonLoading(chatSendBtn, false);
-      }
-    });
-  }
-
-  window.openMaintenanceChat = async function (requestId) {
-    if (!chatPanel) return;
-
-    try {
-      chatMessagesContainer.innerHTML =
-        "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading conversation…</div>";
-
-      const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
-      if (!docSnap.exists) {
-        showPopup("Maintenance request not found.");
-        return;
-      }
-      const data = docSnap.data();
-
-      chatTitleEl.textContent = `Maintenance – ${data.unitNumber || "Unknown unit"}`;
-      chatPanel.dataset.requestId = requestId;
-      chatPanel.style.display = "flex";
-
-      await loadMaintenanceChatMessages(requestId, data);
-    } catch (error) {
-      console.error(error);
-      showPopup("Failed to load conversation: " + error.message);
-    }
-  };
-
-  async function loadMaintenanceChatMessages(requestId, requestData) {
-    const container = chatMessagesContainer;
-    container.innerHTML = "";
-
-    let data = requestData;
-    if (!data) {
-      const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
-      data = docSnap.data();
-    }
-
-    const header = document.createElement("div");
-    header.className = "message-bubble client";
-    header.innerHTML = `
-      <div class="message-header">
-        <div class="message-sender">${data.tenantEmail || "Unit Owner"}</div>
-        <div class="message-time">${formatDateTimeAMPM(data.timestamp)}</div>
-      </div>
-      <div style="font-size:13px;">
-        <strong>Unit:</strong> ${data.unitNumber || "N/A"}<br/>
-        <strong>Issue:</strong> ${data.problem || "N/A"}<br/>
-        <strong>Status:</strong> ${data.status || "Pending"}<br/>
-        <strong>Preferred visit:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}<br/>
-        ${data.maintenanceName ? `<strong>Personnel:</strong> ${data.maintenanceName}<br/>` : ""}
-      </div>
-    `;
-    container.appendChild(header);
-
-    const respSnap = await db
-      .collection("maintenanceRequests")
-      .doc(requestId)
-      .collection("responses")
-      .orderBy("timestamp", "asc")
-      .get();
-
-    if (respSnap.empty) {
-      const empty = document.createElement("div");
-      empty.style.cssText =
-        "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
-      empty.textContent =
-        "No chat history yet. Use the reply form below to send the first message.";
-      container.appendChild(empty);
-    } else {
-      respSnap.forEach((doc) => {
-        const msg = doc.data();
-        const isAdmin = msg.sender === "admin" || !!msg.adminEmail;
-        const bubble = document.createElement("div");
-        bubble.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
-
-        const ts = msg.timestamp?.toDate
-          ? msg.timestamp.toDate()
-          : null;
-
-        bubble.innerHTML = `
-          <div class="message-header">
-            <div class="message-sender">${
-              isAdmin
-                ? (msg.adminEmail || "Admin")
-                : (data.tenantEmail || "Unit Owner")
-            }</div>
-            <div class="message-time">${
-              ts ? formatDateTimeAMPM(ts) : "N/A"
-            }</div>
-          </div>
-          <div class="message-content" style="white-space:pre-wrap;">${
-            msg.message || msg.content || ""
-          }</div>
-        `;
-        container.appendChild(bubble);
-      });
-    }
-
-    setTimeout(() => {
-      container.scrollTop = container.scrollHeight;
-    }, 100);
-  }
-
-  function updatePersonnelAssignments() {
-    personnelAssignments.clear();
-    allRequests.forEach(request => {
-      if (request.maintenanceName &&
-        request.maintenanceName.trim() !== "" &&
-        request.status === "In Progress") {
-        personnelAssignments.set(request.maintenanceName, request.id);
-      }
-    });
-  }
-
-  function isPersonnelAvailable(personnelName) {
-    if (!personnelAssignments.has(personnelName)) return true;
-
-    const assignedRequestId = personnelAssignments.get(personnelName);
-    const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
-
-    return !(assignedRequest && assignedRequest.status === "In Progress");
-  }
-
-  function getPersonnelStatus(personnelName) {
-    if (!personnelAssignments.has(personnelName)) {
-      return { available: true, status: "Available", workingOn: null };
-    }
-
-    const assignedRequestId = personnelAssignments.get(personnelName);
-    const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
-
-    if (!assignedRequest || assignedRequest.status !== "In Progress") {
-      personnelAssignments.delete(personnelName);
-      return { available: true, status: "Available", workingOn: null };
-    }
-
-    return {
-      available: false,
-      status: "Currently Working",
-      workingOn: assignedRequest.problem || "a task",
-      unitNumber: assignedRequest.unitNumber || "Unknown unit"
-    };
-  }
-
-  function applyFiltersAndSort() {
-    const statusValue = statusFilter.value;
-    const personnelValue = personnelFilter.value;
-    const searchValue = maintenanceSearch.value.toLowerCase();
-    const sortValue = sortBy.value;
-
-    filteredRequests = [...allRequests];
-
-    if (statusValue !== "all") {
-      filteredRequests = filteredRequests.filter(
-        (r) => r.status === statusValue
-      );
-    }
-
-    if (personnelValue !== "all") {
-      if (personnelValue === "unassigned") {
-        filteredRequests = filteredRequests.filter(
-          (r) => !r.maintenanceName || !r.maintenanceName.trim()
-        );
-      } else {
-        filteredRequests = filteredRequests.filter(
-          (r) => r.maintenanceName === personnelValue
-        );
-      }
-    }
-
-    if (searchValue) {
-      filteredRequests = filteredRequests.filter((r) => {
-        const emailMatch = r.tenantEmail && r.tenantEmail.toLowerCase().includes(searchValue);
-        const unitMatch = r.unitNumber && r.unitNumber.toLowerCase().includes(searchValue);
-        const problemMatch = r.problem && r.problem.toLowerCase().includes(searchValue);
-        const commentMatch = r.comment && r.comment.toLowerCase().includes(searchValue);
-        return emailMatch || unitMatch || problemMatch || commentMatch;
-      });
-    }
-
-    filteredRequests.sort((a, b) => {
-      const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
-      const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
-      switch (sortValue) {
-        case "date-desc": return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
-        case "date-asc": return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-        case "unit-asc": return (a.unitNumber || "").localeCompare(b.unitNumber || "");
-        case "unit-desc": return (b.unitNumber || "").localeCompare(a.unitNumber || "");
-        case "email-asc": return (a.tenantEmail || "").localeCompare(b.tenantEmail || "");
-        case "email-desc": return (b.tenantEmail || "").localeCompare(a.tenantEmail || "");
-        default: return 0;
-      }
-    });
-
-    renderMaintenanceRequests();
-    updateNotificationDot();
-  }
-
-  function renderMaintenanceRequests() {
-    if (!filteredRequests.length) {
-      maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
-      maintenanceStats.style.display = "none";
-      updateNotificationDot();
-      return;
-    }
-
-    maintenanceList.innerHTML = "";
-    updatePersonnelAssignments();
-
-    let pending = 0;
-    let inProgress = 0;
-    let complete = 0;
-    let newRequestsCount = 0;
-
-    // Collect new request IDs to mark as seen
-    const newRequestIds = [];
-
-    filteredRequests.forEach((request) => {
-      const data = request;
-      const id = data.id;
-
-      // Check if request is new
-      const isNew = isRequestNew(data) && data.status !== 'Complete';
-      if (isNew) {
-        newRequestsCount++;
-        newRequestIds.push(id);
-      }
-
-      // Auto-switch Pending + has personnel -> In Progress
-      if (data.maintenanceName && data.status === "Pending") {
-        db.collection("maintenanceRequests").doc(id).update({
-          status: "In Progress",
-          startTime: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        data.status = "In Progress";
-      }
-
-      if (data.status === "Pending") pending++;
-      if (data.status === "In Progress") inProgress++;
-      if (data.status === "Complete") complete++;
-
-      const card = document.createElement("div");
-      card.className = "maintenance-card";
-      card.dataset.requestId = id;
-
-      let statusColor = "#f39c12";
-      if (data.status === "In Progress") statusColor = "#3498db";
-      if (data.status === "Complete") statusColor = "#27ae60";
-
-      card.style.borderLeft = `4px solid ${statusColor}`;
-
-      // ==== ADD: "NEW" tag for new requests ====
-      const newTagHTML = isNew ? `
-        <div class="new-request-tag" style="
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          background-color: #ff4757;
-          color: white;
-          padding: 4px 8px;
-          border-radius: 12px;
-          font-size: 11px;
-          font-weight: bold;
-          animation: fadeInOut 2s infinite;
-          z-index: 10;
-        ">NEW</div>
-      ` : '';
-
-      // Add fade animation for NEW tag
-      if (!document.querySelector('#fade-animation')) {
-        const fadeStyle = document.createElement('style');
-        fadeStyle.id = 'fade-animation';
-        fadeStyle.textContent = `
-          @keyframes fadeInOut {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-          }
-        `;
-        document.head.appendChild(fadeStyle);
-      }
-
-      // ==== ADD: Highlight border for new requests ====
-      if (isNew) {
-        card.style.boxShadow = '0 0 0 2px rgba(255, 71, 87, 0.3)';
-        card.style.animation = 'pulseBorder 2s infinite';
+      // Find the Maintenance Requests tab in the sidebar
+      const maintenanceNavItem = document.querySelector('a[onclick*="Maintenance Requests"]');
+      if (maintenanceNavItem) {
+        // Check if red dot already exists
+        redDotNotification = maintenanceNavItem.querySelector('.notification-dot');
         
-        // Add pulse border animation
-        if (!document.querySelector('#pulse-border-animation')) {
-          const borderStyle = document.createElement('style');
-          borderStyle.id = 'pulse-border-animation';
-          borderStyle.textContent = `
-            @keyframes pulseBorder {
-              0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
-              70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
-            }
+        if (!redDotNotification) {
+          // Create new red dot notification
+          redDotNotification = document.createElement('span');
+          redDotNotification.className = 'notification-dot';
+          redDotNotification.style.cssText = `
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            background-color: #ff4757;
+            border-radius: 50%;
+            display: none;
+            animation: pulse 2s infinite;
           `;
-          document.head.appendChild(borderStyle);
+          
+          // Add pulse animation
+          if (!document.querySelector('#pulse-animation')) {
+            const style = document.createElement('style');
+            style.id = 'pulse-animation';
+            style.textContent = `
+              @keyframes pulse {
+                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+                70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+          
+          maintenanceNavItem.style.position = 'relative';
+          maintenanceNavItem.appendChild(redDotNotification);
         }
       }
 
-      const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
-        ? `
-            <div style="margin-top:6px;">
-                <strong>Attachments:</strong><br/>
-                <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                    <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                    ${data.imageUrls.length > 1 ? `
-                      <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                      <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
-                    ` : ""}
-                </div>
-            </div>`
-        : "";
+      let allRequests = [];
+      let filteredRequests = [];
+      let personnelAssignments = new Map();
+      let maintenanceCrew = []; // Array to store maintenance crew from database
+      let personnelGroups = []; // Array to store personnel grouped by specialization
+      
+      // NEW: Add seen requests tracking
+      let seenRequestIds = new Set();
+      let lastVisitTime = localStorage.getItem('maintenanceLastVisit') || null;
 
-      card.innerHTML = `
-            <div style="position: relative;">
-                ${newTagHTML}
-                <h3>${data.problem || "Unknown Issue"}</h3>
-                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:220px;">
-                        <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                        <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
-                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
-                        <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
-                        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
-                        <p><strong>Maintenance Personnel:</strong> <span style="color:#b08d35; font-weight:700;">${data.maintenanceName || "Not assigned"}</span></p>
-                        <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
-                        ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
-                        ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
-                    </div>
-                    <div style="min-width:220px;">${attachmentsHTML}</div>
-                </div>
-            </div>
-      `;
+      // Load previously seen requests
+      const savedSeenRequests = localStorage.getItem('maintenanceSeenRequests');
+      if (savedSeenRequests) {
+        seenRequestIds = new Set(JSON.parse(savedSeenRequests));
+      }
 
-      // ==== ADD: Click handler to mark as seen ====
-      card.addEventListener('click', (e) => {
-        // Don't mark as seen if clicking on interactive elements
-        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || 
-            e.target.tagName === 'OPTION' || e.target.tagName === 'IMG' ||
-            e.target.closest('button') || e.target.closest('select')) {
-          return;
+      // Update last visit time when loading the page
+      localStorage.setItem('maintenanceLastVisit', new Date().toISOString());
+
+      // Function to mark requests as seen
+      function markRequestsAsSeen(ids) {
+        ids.forEach(id => seenRequestIds.add(id));
+        localStorage.setItem('maintenanceSeenRequests', JSON.stringify(Array.from(seenRequestIds)));
+      }
+
+      // Function to check if request is new
+      function isRequestNew(request) {
+        // Check if request ID is in seen set
+        if (seenRequestIds.has(request.id)) return false;
+        
+        // If we have last visit time, check if request is newer
+        if (lastVisitTime && request.timestamp) {
+          const requestTime = request.timestamp?.toDate ? request.timestamp.toDate() : new Date(request.timestamp);
+          const lastVisit = new Date(lastVisitTime);
+          return requestTime > lastVisit;
         }
         
-        if (isNew) {
-          markRequestsAsSeen([id]);
-          // Remove visual indicators
-          card.style.boxShadow = '';
-          card.style.animation = '';
-          const newTag = card.querySelector('.new-request-tag');
-          if (newTag) newTag.remove();
-          updateNotificationDot();
-        }
-      });
-
-      const actionsDiv = document.createElement("div");
-      actionsDiv.className = "maintenance-card-actions";
-
-      // ==== ASSIGNMENT SECTION ====
-      const assignmentSection = document.createElement("div");
-      assignmentSection.style.marginBottom = "10px";
-      assignmentSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Assignment:</strong>`;
-
-      const assignmentContainer = document.createElement("div");
-      assignmentContainer.style.display = "flex";
-      assignmentContainer.style.gap = "10px";
-      assignmentContainer.style.alignItems = "center";
-      assignmentContainer.style.marginTop = "5px";
-
-      const personnelSelect = document.createElement("select");
-      personnelSelect.style.minWidth = "220px";
-
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = data.maintenanceName
-        ? `Assigned: ${data.maintenanceName}`
-        : "Assign personnel…";
-      personnelSelect.appendChild(emptyOption);
-
-      personnelGroups.forEach((group) => {
-        const optgroup = document.createElement("optgroup");
-        optgroup.label = group.role;
-
-        group.names.forEach((name) => {
-          const opt = document.createElement("option");
-          opt.value = name;
-
-          const personnelStatus = getPersonnelStatus(name);
-
-          if (data.maintenanceName === name) {
-            opt.selected = true;
-            opt.textContent = `${name} ✓ (Assigned)`;
-            opt.style.color = "#27ae60";
-          } else if (!personnelStatus.available) {
-            opt.disabled = true;
-            opt.textContent = `${name} ✗ (Working on ${personnelStatus.unitNumber})`;
-            opt.style.color = "#e74c3c";
-            opt.title = `Currently working on: ${personnelStatus.workingOn}`;
-          } else {
-            opt.textContent = `${name} ✓ (Available)`;
-            opt.style.color = "#27ae60";
-          }
-
-          optgroup.appendChild(opt);
-        });
-
-        personnelSelect.appendChild(optgroup);
-      });
-
-      if (data.status === "In Progress" || data.status === "Complete") {
-        personnelSelect.disabled = true;
-        personnelSelect.title = data.status === "In Progress"
-          ? "Cannot change personnel while work is in progress"
-          : "Request is already completed";
+        // Default: consider new if not seen before
+        return true;
       }
 
-      assignmentContainer.appendChild(personnelSelect);
+      // Function to update notification dot in sidebar
+      function updateNotificationDot() {
+        if (!redDotNotification) return;
+        
+        const newRequestsCount = allRequests.filter(request => 
+          isRequestNew(request) && request.status !== 'Complete'
+        ).length;
+        
+        if (newRequestsCount > 0) {
+          redDotNotification.style.display = 'block';
+          // Optional: Add count badge
+          if (!redDotNotification.dataset.badgeAdded && newRequestsCount > 1) {
+            const badge = document.createElement('span');
+            badge.className = 'notification-count';
+            badge.style.cssText = `
+              position: absolute;
+              top: -8px;
+              right: -8px;
+              min-width: 18px;
+              height: 18px;
+              background-color: #ff4757;
+              color: white;
+              border-radius: 9px;
+              font-size: 10px;
+              font-weight: bold;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 0 2px;
+              border: 2px solid #1a1a1a;
+            `;
+            badge.textContent = newRequestsCount > 99 ? '99+' : newRequestsCount;
+            redDotNotification.appendChild(badge);
+            redDotNotification.dataset.badgeAdded = true;
+          } else if (redDotNotification.dataset.badgeAdded && newRequestsCount <= 1) {
+            // Remove badge if only 1 new request
+            const badge = redDotNotification.querySelector('.notification-count');
+            if (badge) {
+              redDotNotification.removeChild(badge);
+              delete redDotNotification.dataset.badgeAdded;
+            }
+          }
+        } else {
+          redDotNotification.style.display = 'none';
+          if (redDotNotification.querySelector('.notification-count')) {
+            redDotNotification.removeChild(redDotNotification.querySelector('.notification-count'));
+            delete redDotNotification.dataset.badgeAdded;
+          }
+        }
+      }
 
-      // Only show "Assign" button when there is NO personnel yet and request is not complete.
-      if (!data.maintenanceName && data.status !== "Complete") {
-        const assignBtn = document.createElement("button");
-        assignBtn.textContent = "Assign";
-        assignBtn.className = "btn-primary";
-        assignBtn.style.padding = "6px 12px";
-        assignBtn.style.fontSize = "13px";
-        assignBtn.style.background = "#8d6c39";
+      // Function to load maintenance crew from database
+      async function loadMaintenanceCrew() {
+        try {
+          const snapshot = await db.collection("users")
+            .where("role", "==", "maintenance")
+            .get();
+          
+          maintenanceCrew = [];
+          personnelGroups = [];
+          
+          if (!snapshot.empty) {
+            snapshot.forEach(doc => {
+              const data = doc.data();
+              maintenanceCrew.push({
+                id: doc.id,
+                name: data.name || data.email.split('@')[0],
+                email: data.email,
+                specialization: data.specialization || "General Maintenance",
+                phone: data.phone || ""
+              });
+            });
+            
+            // Group by specialization
+            const groupedByRole = {};
+            maintenanceCrew.forEach(person => {
+              if (!groupedByRole[person.specialization]) {
+                groupedByRole[person.specialization] = [];
+              }
+              groupedByRole[person.specialization].push(person.name);
+            });
+            
+            // Convert to personnelGroups format
+            Object.entries(groupedByRole).forEach(([role, names]) => {
+              personnelGroups.push({
+                role: role,
+                names: names
+              });
+            });
+            
+            // Update personnel filter dropdown
+            updatePersonnelFilter();
+          } else {
+            // If no maintenance crew found, show default options
+            personnelGroups = [
+              {
+                role: "General Maintenance",
+                names: ["No crew available"]
+              }
+            ];
+            updatePersonnelFilter();
+          }
+        } catch (error) {
+          console.error("Error loading maintenance crew:", error);
+          // Fallback to default options
+          personnelGroups = [
+            {
+              role: "General Maintenance",
+              names: ["Error loading crew"]
+            }
+          ];
+          updatePersonnelFilter();
+        }
+      }
 
-        assignmentContainer.appendChild(assignBtn);
+      // Function to update personnel filter dropdown
+      function updatePersonnelFilter() {
+        if (!personnelFilter) return;
+        
+        // Store current value
+        const currentValue = personnelFilter.value;
+        
+        // Clear existing options except the first one
+        personnelFilter.innerHTML = '<option value="all">All Personnel</option>';
+        
+        // Add unassigned option
+        const unassignedOption = document.createElement('option');
+        unassignedOption.value = "unassigned";
+        unassignedOption.textContent = "Unassigned";
+        personnelFilter.appendChild(unassignedOption);
+        
+        // Add all maintenance crew names as options
+        maintenanceCrew.forEach(person => {
+          const option = document.createElement('option');
+          option.value = person.name;
+          option.textContent = `${person.name} (${person.specialization})`;
+          personnelFilter.appendChild(option);
+        });
+        
+        // Restore previous selection if possible
+        if (currentValue && Array.from(personnelFilter.options).some(opt => opt.value === currentValue)) {
+          personnelFilter.value = currentValue;
+        }
+      }
 
-        assignBtn.addEventListener("click", async () => {
-          const selectedPersonnel = personnelSelect.value;
+      // Flat list of all personnel names
+      const allPersonnelNames = maintenanceCrew.flatMap(person => person.name);
 
-          if (!selectedPersonnel) {
-            showPopup("Please select a personnel to assign.");
+      const drill = window.adminDashboardDrilldown || {};
+      if (drill.maintenanceStatus) {
+        statusFilter.value = drill.maintenanceStatus;
+      }
+      window.adminDashboardDrilldown = null;
+
+      function formatDateTimeAMPM(date) {
+        if (!date) return "N/A";
+        const d = date.toDate ? date.toDate() : date;
+        let hours = d.getHours();
+        const minutes = d.getMinutes().toString().padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        const month = (d.getMonth() + 1).toString().padStart(2, "0");
+        const day = d.getDate().toString().padStart(2, "0");
+        const year = d.getFullYear();
+        return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+      }
+
+      // ===== MAINTENANCE MESSAGES POPUP BINDINGS =====
+      const chatPanel = document.getElementById("maintenanceMessagesPanel");
+      const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
+      const chatMessagesContainer = document.getElementById("maintenanceMessagesContainer");
+      const chatReplyTextarea = document.getElementById("maintenanceReplyMessage");
+      const chatReplyStatus = document.getElementById("maintenanceReplyStatus");
+      const chatSendBtn = document.getElementById("maintenanceSendReplyBtn");
+      const chatClearBtn = document.getElementById("maintenanceClearReplyBtn");
+      const chatCloseBtn = document.getElementById("closeMaintenanceMessagesBtn");
+      const chatQuickReplyBtns = document.querySelectorAll(".maintenanceQuickReplyBtn");
+
+      if (chatPanel && !chatPanel.dataset.bound) {
+        chatPanel.dataset.bound = "true";
+
+        chatCloseBtn.addEventListener("click", () => {
+          chatPanel.style.display = "none";
+          chatReplyTextarea.value = "";
+          chatReplyStatus.textContent = "";
+        });
+
+        chatPanel.addEventListener("click", (e) => {
+          if (e.target === chatPanel) {
+            chatPanel.style.display = "none";
+            chatReplyTextarea.value = "";
+            chatReplyStatus.textContent = "";
+          }
+        });
+
+        chatClearBtn.addEventListener("click", () => {
+          chatReplyTextarea.value = "";
+          chatReplyStatus.textContent = "";
+        });
+
+        chatQuickReplyBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const template = btn.dataset.template;
+            let msg = "";
+            switch (template) {
+              case "on_the_way":
+                msg = "Our maintenance team is on the way.";
+                break;
+              case "technician_assigned":
+                msg = "A technician has been assigned and will be there soon.";
+                break;
+              case "scheduled":
+                msg = "We have scheduled your maintenance as per your requested date and time.";
+                break;
+              case "resolved":
+                msg = "Thank you for your patience. This maintenance concern has been resolved.";
+                break;
+            }
+            chatReplyTextarea.value = msg;
+            chatReplyTextarea.focus();
+          });
+        });
+
+        chatSendBtn.addEventListener("click", async () => {
+          const msg = chatReplyTextarea.value.trim();
+          if (!msg) {
+            showPopup("Response message cannot be empty.");
             return;
           }
 
-          const personnelStatus = getPersonnelStatus(selectedPersonnel);
-          if (!personnelStatus.available) {
-            showPopup(
-              `Cannot assign ${selectedPersonnel}. They are currently working on ${personnelStatus.unitNumber}.`
-            );
-            return;
-          }
+          const requestId = chatPanel.dataset.requestId;
+          if (!requestId) return;
 
           try {
-            setButtonLoading(assignBtn, true);
+            setButtonLoading(chatSendBtn, true);
 
-            const updateData = {
-              maintenanceName: selectedPersonnel,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            };
+            const requestDocRef = db.collection("maintenanceRequests").doc(requestId);
+            await requestDocRef.collection("responses").add({
+              sender: "admin",
+              adminEmail: auth.currentUser ? auth.currentUser.email : null,
+              message: msg,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            });
 
-            personnelAssignments.set(selectedPersonnel, id);
+            await requestDocRef.update({
+              responseTime: firebase.firestore.FieldValue.serverTimestamp(),
+            });
 
-            await db.collection("maintenanceRequests").doc(id).update(updateData);
+            chatReplyTextarea.value = "";
+            await loadMaintenanceChatMessages(requestId);
 
-            showPopup(
-              `Personnel assigned successfully! ${selectedPersonnel} will start working on this request.`
-            );
-
-            setTimeout(() => {
-              applyFiltersAndSort();
-            }, 500);
+            chatReplyStatus.textContent = "✓ Reply sent successfully.";
+            chatReplyStatus.style.color = "#4caf50";
           } catch (error) {
-            showPopup("Error assigning personnel: " + error.message);
+            console.error(error);
+            chatReplyStatus.textContent = "✗ Failed to send reply.";
+            chatReplyStatus.style.color = "#f44336";
+            showPopup("Failed to send response: " + error.message);
           } finally {
-            setButtonLoading(assignBtn, false);
+            setButtonLoading(chatSendBtn, false);
           }
         });
       }
 
-      assignmentSection.appendChild(assignmentContainer);
-      actionsDiv.appendChild(assignmentSection);
+      window.openMaintenanceChat = async function (requestId) {
+        if (!chatPanel) return;
 
-      // ==== COMPLETE WORK SECTION ====
-      if (data.status === "In Progress") {
-        const completeSection = document.createElement("div");
-        completeSection.style.marginBottom = "10px";
-        completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
+        try {
+          chatMessagesContainer.innerHTML =
+            "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading conversation…</div>";
 
-        const completeBtn = document.createElement("button");
-        completeBtn.textContent = "Mark as Complete";
-        completeBtn.className = "btn-primary";
-        completeBtn.style.padding = "8px 16px";
-        completeBtn.style.fontSize = "14px";
-        completeBtn.style.background = "#27ae60";
-        completeBtn.style.color = "white";
-        completeBtn.style.border = "none";
-        completeBtn.style.borderRadius = "6px";
-        completeBtn.style.cursor = "pointer";
-        completeBtn.style.transition = "background-color 0.3s";
-        completeBtn.style.marginTop = "5px";
-
-        completeBtn.addEventListener("mouseenter", () => {
-          completeBtn.style.background = "#219653";
-        });
-
-        completeBtn.addEventListener("mouseleave", () => {
-          completeBtn.style.background = "#27ae60";
-        });
-
-        completeBtn.addEventListener("click", async () => {
-          if (confirm("Are you sure you want to mark this maintenance request as complete?")) {
-            try {
-              setButtonLoading(completeBtn, true);
-
-              await db.collection("maintenanceRequests").doc(id).update({
-                status: "Complete",
-                completionTime: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
-
-              if (data.maintenanceName) {
-                personnelAssignments.delete(data.maintenanceName);
-              }
-
-              showPopup("Maintenance request marked as complete! Personnel is now available.");
-
-              setTimeout(() => {
-                applyFiltersAndSort();
-              }, 500);
-
-            } catch (error) {
-              showPopup("Error marking as complete: " + error.message);
-            } finally {
-              setButtonLoading(completeBtn, false);
-            }
+          const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+          if (!docSnap.exists) {
+            showPopup("Maintenance request not found.");
+            return;
           }
-        });
+          const data = docSnap.data();
 
-        completeSection.appendChild(completeBtn);
-        actionsDiv.appendChild(completeSection);
-      }
+          chatTitleEl.textContent = `Maintenance – ${data.unitNumber || "Unknown unit"}`;
+          chatPanel.dataset.requestId = requestId;
+          chatPanel.style.display = "flex";
 
-      // ==== COMMUNICATION SECTION ====
-      const respondSection = document.createElement("div");
-      respondSection.style.marginTop = "10px";
-      respondSection.innerHTML =
-        `<strong style="color: #b3b3b3; font-size: 14px;">Communication:</strong>`;
+          await loadMaintenanceChatMessages(requestId, data);
+        } catch (error) {
+          console.error(error);
+          showPopup("Failed to load conversation: " + error.message);
+        }
+      };
 
-      const openChatBtn = document.createElement("button");
-      openChatBtn.textContent = "View Conversation";
-      openChatBtn.className = "btn-primary";
-      openChatBtn.style.background = "#4a90e2";
-      openChatBtn.style.padding = "6px 12px";
-      openChatBtn.style.fontSize = "13px";
-      openChatBtn.style.marginTop = "5px";
+      async function loadMaintenanceChatMessages(requestId, requestData) {
+        const container = chatMessagesContainer;
+        container.innerHTML = "";
 
-      openChatBtn.addEventListener("click", () => {
-        openMaintenanceChat(id);
-      });
-
-      respondSection.appendChild(openChatBtn);
-      actionsDiv.appendChild(respondSection);
-
-      // ==== DELETE SECTION ====
-      const deleteBtn = document.createElement("button");
-      deleteBtn.textContent = "Delete Request";
-      deleteBtn.className = "btn-danger";
-      deleteBtn.style.marginTop = "10px";
-      deleteBtn.style.padding = "6px 12px";
-      deleteBtn.style.fontSize = "13px";
-
-      if (data.status === "In Progress") {
-        deleteBtn.disabled = true;
-        deleteBtn.style.backgroundColor = "#777";
-        deleteBtn.style.cursor = "not-allowed";
-        deleteBtn.title = "Cannot delete request while work is in progress";
-      }
-
-      deleteBtn.addEventListener("click", () => {
-        if (data.status === "In Progress") {
-          showPopup("Cannot delete request while work is in progress.");
-          return;
+        let data = requestData;
+        if (!data) {
+          const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+          data = docSnap.data();
         }
 
-        showPopup(`
-                <strong>Are you sure?</strong><br>
-                This maintenance request will be permanently deleted.<br><br>
-                <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-                    Delete
-                </button>
-                <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-                    Cancel
-                </button>
-            `);
+        const header = document.createElement("div");
+        header.className = "message-bubble client";
+        header.innerHTML = `
+          <div class="message-header">
+            <div class="message-sender">${data.tenantEmail || "Unit Owner"}</div>
+            <div class="message-time">${formatDateTimeAMPM(data.timestamp)}</div>
+          </div>
+          <div style="font-size:13px;">
+            <strong>Unit:</strong> ${data.unitNumber || "N/A"}<br/>
+            <strong>Issue:</strong> ${data.problem || "N/A"}<br/>
+            <strong>Status:</strong> ${data.status || "Pending"}<br/>
+            <strong>Preferred visit:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}<br/>
+            ${data.maintenanceName ? `<strong>Personnel:</strong> ${data.maintenanceName}<br/>` : ""}
+          </div>
+        `;
+        container.appendChild(header);
+
+        const respSnap = await db
+          .collection("maintenanceRequests")
+          .doc(requestId)
+          .collection("responses")
+          .orderBy("timestamp", "asc")
+          .get();
+
+        if (respSnap.empty) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
+          empty.textContent =
+            "No chat history yet. Use the reply form below to send the first message.";
+          container.appendChild(empty);
+        } else {
+          respSnap.forEach((doc) => {
+            const msg = doc.data();
+            const isAdmin = msg.sender === "admin" || !!msg.adminEmail;
+            const bubble = document.createElement("div");
+            bubble.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
+
+            const ts = msg.timestamp?.toDate
+              ? msg.timestamp.toDate()
+              : null;
+
+            bubble.innerHTML = `
+              <div class="message-header">
+                <div class="message-sender">${
+                  isAdmin
+                    ? (msg.adminEmail || "Admin")
+                    : (data.tenantEmail || "Unit Owner")
+                }</div>
+                <div class="message-time">${
+                  ts ? formatDateTimeAMPM(ts) : "N/A"
+                }</div>
+              </div>
+              <div class="message-content" style="white-space:pre-wrap;">${
+                msg.message || msg.content || ""
+              }</div>
+            `;
+            container.appendChild(bubble);
+          });
+        }
 
         setTimeout(() => {
-          const confirmBtn = document.getElementById("confirmDeleteBtn");
-          if (!confirmBtn) return;
-          confirmBtn.addEventListener("click", async () => {
-            try {
-              setButtonLoading(confirmBtn, true);
+          container.scrollTop = container.scrollHeight;
+        }, 100);
+      }
 
-              if (data.maintenanceName) {
-                personnelAssignments.delete(data.maintenanceName);
-              }
-
-              await db.collection("maintenanceRequests").doc(id).delete();
-              closePopup();
-              showPopup("Maintenance request deleted.");
-
-              setTimeout(() => {
-                applyFiltersAndSort();
-              }, 500);
-
-            } catch (error) {
-              closePopup();
-              showPopup("Failed to delete: " + error.message);
-            }
-          });
-        }, 50);
-      });
-
-      actionsDiv.appendChild(deleteBtn);
-
-      card.appendChild(actionsDiv);
-
-      maintenanceList.appendChild(card);
-
-      if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
-        let currentIndex = 0;
-        const imgEl = card.querySelector(`#img-${id}`);
-        const prevBtn = card.querySelector(".prev-btn");
-        const nextBtn = card.querySelector(".next-btn");
-
-        prevBtn.addEventListener("click", () => {
-          currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
-          imgEl.src = data.imageUrls[currentIndex];
-        });
-
-        nextBtn.addEventListener("click", () => {
-          currentIndex = (currentIndex + 1) % data.imageUrls.length;
-          imgEl.src = data.imageUrls[currentIndex];
+      function updatePersonnelAssignments() {
+        personnelAssignments.clear();
+        allRequests.forEach(request => {
+          if (request.maintenanceName &&
+            request.maintenanceName.trim() !== "" &&
+            request.status === "In Progress") {
+            personnelAssignments.set(request.maintenanceName, request.id);
+          }
         });
       }
-    });
 
-    // Mark all visible new requests as seen after a delay
-    if (newRequestIds.length > 0) {
-      setTimeout(() => {
-        markRequestsAsSeen(newRequestIds);
+      function isPersonnelAvailable(personnelName) {
+        if (!personnelAssignments.has(personnelName)) return true;
+
+        const assignedRequestId = personnelAssignments.get(personnelName);
+        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+
+        return !(assignedRequest && assignedRequest.status === "In Progress");
+      }
+
+      function getPersonnelStatus(personnelName) {
+        if (!personnelAssignments.has(personnelName)) {
+          return { available: true, status: "Available", workingOn: null };
+        }
+
+        const assignedRequestId = personnelAssignments.get(personnelName);
+        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+
+        if (!assignedRequest || assignedRequest.status !== "In Progress") {
+          personnelAssignments.delete(personnelName);
+          return { available: true, status: "Available", workingOn: null };
+        }
+
+        return {
+          available: false,
+          status: "Currently Working",
+          workingOn: assignedRequest.problem || "a task",
+          unitNumber: assignedRequest.unitNumber || "Unknown unit"
+        };
+      }
+
+      function applyFiltersAndSort() {
+        const statusValue = statusFilter.value;
+        const personnelValue = personnelFilter.value;
+        const searchValue = maintenanceSearch.value.toLowerCase();
+        const sortValue = sortBy.value;
+
+        filteredRequests = [...allRequests];
+
+        if (statusValue !== "all") {
+          filteredRequests = filteredRequests.filter(
+            (r) => r.status === statusValue
+          );
+        }
+
+        if (personnelValue !== "all") {
+          if (personnelValue === "unassigned") {
+            filteredRequests = filteredRequests.filter(
+              (r) => !r.maintenanceName || !r.maintenanceName.trim()
+            );
+          } else {
+            filteredRequests = filteredRequests.filter(
+              (r) => r.maintenanceName === personnelValue
+            );
+          }
+        }
+
+        if (searchValue) {
+          filteredRequests = filteredRequests.filter((r) => {
+            const emailMatch = r.tenantEmail && r.tenantEmail.toLowerCase().includes(searchValue);
+            const unitMatch = r.unitNumber && r.unitNumber.toLowerCase().includes(searchValue);
+            const problemMatch = r.problem && r.problem.toLowerCase().includes(searchValue);
+            const commentMatch = r.comment && r.comment.toLowerCase().includes(searchValue);
+            return emailMatch || unitMatch || problemMatch || commentMatch;
+          });
+        }
+
+        filteredRequests.sort((a, b) => {
+          const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+          const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+          switch (sortValue) {
+            case "date-desc": return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+            case "date-asc": return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+            case "unit-asc": return (a.unitNumber || "").localeCompare(b.unitNumber || "");
+            case "unit-desc": return (b.unitNumber || "").localeCompare(a.unitNumber || "");
+            case "email-asc": return (a.tenantEmail || "").localeCompare(b.tenantEmail || "");
+            case "email-desc": return (b.tenantEmail || "").localeCompare(a.tenantEmail || "");
+            default: return 0;
+          }
+        });
+
+        renderMaintenanceRequests();
         updateNotificationDot();
-      }, 3000);
-    }
+      }
 
-    // Update statistics
-    requestCount.textContent = filteredRequests.length;
-    pendingCountEl.textContent = pending;
-    if (inProgressCountEl) {
-      inProgressCountEl.textContent = inProgress;
-    }
-    completeCountEl.textContent = complete;
-    
-    // Add new requests count to stats
-    let newCountEl = document.getElementById('newCount');
-    if (!newCountEl) {
-      newCountEl = document.createElement('span');
-      newCountEl.id = 'newCount';
-      newCountEl.style.color = '#ff4757';
-      newCountEl.style.marginLeft = '10px';
-      newCountEl.style.fontWeight = 'bold';
-      maintenanceStats.appendChild(newCountEl);
-    }
-    
-    if (newRequestsCount > 0) {
-      newCountEl.textContent = `(${newRequestsCount} new)`;
-    } else {
-      newCountEl.textContent = '';
-    }
-
-    maintenanceStats.style.display = "block";
-    updateNotificationDot();
-  }
-
-  // ==== ADD: Also update notification dot when loading from other tabs ====
-  // Listen for maintenance requests in real-time
-  db.collection("maintenanceRequests")
-    .orderBy("timestamp", "desc")
-    .onSnapshot(
-      (snapshot) => {
-        if (snapshot.empty) {
-          allRequests = [];
-          filteredRequests = [];
-          maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
+      function renderMaintenanceRequests() {
+        if (!filteredRequests.length) {
+          maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
           maintenanceStats.style.display = "none";
           updateNotificationDot();
           return;
         }
 
-        allRequests = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
+        maintenanceList.innerHTML = "";
+        updatePersonnelAssignments();
 
-        // Always update notification dot when data changes
-        updateNotificationDot();
-        
-        // Only apply filters and sort if we're on the maintenance page
-        if (document.getElementById("maintenanceList")) {
-          applyFiltersAndSort();
+        let pending = 0;
+        let inProgress = 0;
+        let complete = 0;
+        let newRequestsCount = 0;
+
+        // Collect new request IDs to mark as seen
+        const newRequestIds = [];
+
+        filteredRequests.forEach((request) => {
+          const data = request;
+          const id = data.id;
+
+          // Check if request is new
+          const isNew = isRequestNew(data) && data.status !== 'Complete';
+          if (isNew) {
+            newRequestsCount++;
+            newRequestIds.push(id);
+          }
+
+          // Auto-switch Pending + has personnel -> In Progress
+          if (data.maintenanceName && data.status === "Pending") {
+            db.collection("maintenanceRequests").doc(id).update({
+              status: "In Progress",
+              startTime: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            data.status = "In Progress";
+          }
+
+          if (data.status === "Pending") pending++;
+          if (data.status === "In Progress") inProgress++;
+          if (data.status === "Complete") complete++;
+
+          const card = document.createElement("div");
+          card.className = "maintenance-card";
+          card.dataset.requestId = id;
+
+          let statusColor = "#f39c12";
+          if (data.status === "In Progress") statusColor = "#3498db";
+          if (data.status === "Complete") statusColor = "#27ae60";
+
+          card.style.borderLeft = `4px solid ${statusColor}`;
+
+          // ==== ADD: "NEW" tag for new requests ====
+          const newTagHTML = isNew ? `
+            <div class="new-request-tag" style="
+              position: absolute;
+              top: 10px;
+              right: 10px;
+              background-color: #ff4757;
+              color: white;
+              padding: 4px 8px;
+              border-radius: 12px;
+              font-size: 11px;
+              font-weight: bold;
+              animation: fadeInOut 2s infinite;
+              z-index: 10;
+            ">NEW</div>
+          ` : '';
+
+          // Add fade animation for NEW tag
+          if (!document.querySelector('#fade-animation')) {
+            const fadeStyle = document.createElement('style');
+            fadeStyle.id = 'fade-animation';
+            fadeStyle.textContent = `
+              @keyframes fadeInOut {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+              }
+            `;
+            document.head.appendChild(fadeStyle);
+          }
+
+          // ==== ADD: Highlight border for new requests ====
+          if (isNew) {
+            card.style.boxShadow = '0 0 0 2px rgba(255, 71, 87, 0.3)';
+            card.style.animation = 'pulseBorder 2s infinite';
+            
+            // Add pulse border animation
+            if (!document.querySelector('#pulse-border-animation')) {
+              const borderStyle = document.createElement('style');
+              borderStyle.id = 'pulse-border-animation';
+              borderStyle.textContent = `
+                @keyframes pulseBorder {
+                  0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+                  70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+                  100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+                }
+              `;
+              document.head.appendChild(borderStyle);
+            }
+          }
+
+          const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+            ? `
+                <div style="margin-top:6px;">
+                    <strong>Attachments:</strong><br/>
+                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                        <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                        ${data.imageUrls.length > 1 ? `
+                          <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                          <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
+                        ` : ""}
+                    </div>
+                </div>`
+            : "";
+
+          card.innerHTML = `
+                <div style="position: relative;">
+                    ${newTagHTML}
+                    <h3>${data.problem || "Unknown Issue"}</h3>
+                    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:220px;">
+                            <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                            <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
+                            <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
+                            <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
+                            <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
+                            <p><strong>Maintenance Personnel:</strong> <span style="color:#b08d35; font-weight:700;">${data.maintenanceName || "Not assigned"}</span></p>
+                            <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+                            ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
+                            ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
+                        </div>
+                        <div style="min-width:220px;">${attachmentsHTML}</div>
+                    </div>
+                </div>
+          `;
+
+          // ==== ADD: Click handler to mark as seen ====
+          card.addEventListener('click', (e) => {
+            // Don't mark as seen if clicking on interactive elements
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || 
+                e.target.tagName === 'OPTION' || e.target.tagName === 'IMG' ||
+                e.target.closest('button') || e.target.closest('select')) {
+              return;
+            }
+            
+            if (isNew) {
+              markRequestsAsSeen([id]);
+              // Remove visual indicators
+              card.style.boxShadow = '';
+              card.style.animation = '';
+              const newTag = card.querySelector('.new-request-tag');
+              if (newTag) newTag.remove();
+              updateNotificationDot();
+            }
+          });
+
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "maintenance-card-actions";
+
+          // ==== ASSIGNMENT SECTION ====
+          const assignmentSection = document.createElement("div");
+          assignmentSection.style.marginBottom = "10px";
+          assignmentSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Assignment:</strong>`;
+
+          const assignmentContainer = document.createElement("div");
+          assignmentContainer.style.display = "flex";
+          assignmentContainer.style.gap = "10px";
+          assignmentContainer.style.alignItems = "center";
+          assignmentContainer.style.marginTop = "5px";
+
+          const personnelSelect = document.createElement("select");
+          personnelSelect.style.minWidth = "220px";
+
+          const emptyOption = document.createElement("option");
+          emptyOption.value = "";
+          emptyOption.textContent = data.maintenanceName
+            ? `Assigned: ${data.maintenanceName}`
+            : "Assign personnel…";
+          personnelSelect.appendChild(emptyOption);
+
+          // Populate dropdown with real maintenance crew
+          if (personnelGroups.length > 0) {
+            personnelGroups.forEach((group) => {
+              const optgroup = document.createElement("optgroup");
+              optgroup.label = group.role;
+
+              group.names.forEach((name) => {
+                const opt = document.createElement("option");
+                opt.value = name;
+
+                const personnelStatus = getPersonnelStatus(name);
+
+                if (data.maintenanceName === name) {
+                  opt.selected = true;
+                  opt.textContent = `${name} ✓ (Assigned)`;
+                  opt.style.color = "#27ae60";
+                } else if (!personnelStatus.available) {
+                  opt.disabled = true;
+                  opt.textContent = `${name} ✗ (Working on ${personnelStatus.unitNumber})`;
+                  opt.style.color = "#e74c3c";
+                  opt.title = `Currently working on: ${personnelStatus.workingOn}`;
+                } else {
+                  opt.textContent = `${name} ✓ (Available)`;
+                  opt.style.color = "#27ae60";
+                }
+
+                optgroup.appendChild(opt);
+              });
+
+              personnelSelect.appendChild(optgroup);
+            });
+          } else {
+            // Fallback if no maintenance crew is loaded
+            const noCrewOption = document.createElement("option");
+            noCrewOption.value = "";
+            noCrewOption.textContent = "No maintenance crew available";
+            noCrewOption.disabled = true;
+            personnelSelect.appendChild(noCrewOption);
+          }
+
+          if (data.status === "In Progress" || data.status === "Complete") {
+            personnelSelect.disabled = true;
+            personnelSelect.title = data.status === "In Progress"
+              ? "Cannot change personnel while work is in progress"
+              : "Request is already completed";
+          }
+
+          assignmentContainer.appendChild(personnelSelect);
+
+          // Only show "Assign" button when there is NO personnel yet and request is not complete.
+          if (!data.maintenanceName && data.status !== "Complete") {
+            const assignBtn = document.createElement("button");
+            assignBtn.textContent = "Assign";
+            assignBtn.className = "btn-primary";
+            assignBtn.style.padding = "6px 12px";
+            assignBtn.style.fontSize = "13px";
+            assignBtn.style.background = "#8d6c39";
+
+            assignmentContainer.appendChild(assignBtn);
+
+            assignBtn.addEventListener("click", async () => {
+              const selectedPersonnel = personnelSelect.value;
+
+              if (!selectedPersonnel) {
+                showPopup("Please select a personnel to assign.");
+                return;
+              }
+
+              const personnelStatus = getPersonnelStatus(selectedPersonnel);
+              if (!personnelStatus.available) {
+                showPopup(
+                  `Cannot assign ${selectedPersonnel}. They are currently working on ${personnelStatus.unitNumber}.`
+                );
+                return;
+              }
+
+              try {
+                setButtonLoading(assignBtn, true);
+
+                const updateData = {
+                  maintenanceName: selectedPersonnel,
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                };
+
+                personnelAssignments.set(selectedPersonnel, id);
+
+                await db.collection("maintenanceRequests").doc(id).update(updateData);
+
+                showPopup(
+                  `Personnel assigned successfully! ${selectedPersonnel} will start working on this request.`
+                );
+
+                setTimeout(() => {
+                  applyFiltersAndSort();
+                }, 500);
+              } catch (error) {
+                showPopup("Error assigning personnel: " + error.message);
+              } finally {
+                setButtonLoading(assignBtn, false);
+              }
+            });
+          }
+
+          assignmentSection.appendChild(assignmentContainer);
+          actionsDiv.appendChild(assignmentSection);
+
+          // ==== COMPLETE WORK SECTION ====
+          if (data.status === "In Progress") {
+            const completeSection = document.createElement("div");
+            completeSection.style.marginBottom = "10px";
+            completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
+
+            const completeBtn = document.createElement("button");
+            completeBtn.textContent = "Mark as Complete";
+            completeBtn.className = "btn-primary";
+            completeBtn.style.padding = "8px 16px";
+            completeBtn.style.fontSize = "14px";
+            completeBtn.style.background = "#27ae60";
+            completeBtn.style.color = "white";
+            completeBtn.style.border = "none";
+            completeBtn.style.borderRadius = "6px";
+            completeBtn.style.cursor = "pointer";
+            completeBtn.style.transition = "background-color 0.3s";
+            completeBtn.style.marginTop = "5px";
+
+            completeBtn.addEventListener("mouseenter", () => {
+              completeBtn.style.background = "#219653";
+            });
+
+            completeBtn.addEventListener("mouseleave", () => {
+              completeBtn.style.background = "#27ae60";
+            });
+
+            completeBtn.addEventListener("click", async () => {
+              if (confirm("Are you sure you want to mark this maintenance request as complete?")) {
+                try {
+                  setButtonLoading(completeBtn, true);
+
+                  await db.collection("maintenanceRequests").doc(id).update({
+                    status: "Complete",
+                    completionTime: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+
+                  if (data.maintenanceName) {
+                    personnelAssignments.delete(data.maintenanceName);
+                  }
+
+                  showPopup("Maintenance request marked as complete! Personnel is now available.");
+
+                  setTimeout(() => {
+                    applyFiltersAndSort();
+                  }, 500);
+
+                } catch (error) {
+                  showPopup("Error marking as complete: " + error.message);
+                } finally {
+                  setButtonLoading(completeBtn, false);
+                }
+              }
+            });
+
+            completeSection.appendChild(completeBtn);
+            actionsDiv.appendChild(completeSection);
+          }
+
+          // ==== COMMUNICATION SECTION ====
+          const respondSection = document.createElement("div");
+          respondSection.style.marginTop = "10px";
+          respondSection.innerHTML =
+            `<strong style="color: #b3b3b3; font-size: 14px;">Communication:</strong>`;
+
+          const openChatBtn = document.createElement("button");
+          openChatBtn.textContent = "View Conversation";
+          openChatBtn.className = "btn-primary";
+          openChatBtn.style.background = "#4a90e2";
+          openChatBtn.style.padding = "6px 12px";
+          openChatBtn.style.fontSize = "13px";
+          openChatBtn.style.marginTop = "5px";
+
+          openChatBtn.addEventListener("click", () => {
+            openMaintenanceChat(id);
+          });
+
+          respondSection.appendChild(openChatBtn);
+          actionsDiv.appendChild(respondSection);
+
+          // ==== DELETE SECTION ====
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete Request";
+          deleteBtn.className = "btn-danger";
+          deleteBtn.style.marginTop = "10px";
+          deleteBtn.style.padding = "6px 12px";
+          deleteBtn.style.fontSize = "13px";
+
+          if (data.status === "In Progress") {
+            deleteBtn.disabled = true;
+            deleteBtn.style.backgroundColor = "#777";
+            deleteBtn.style.cursor = "not-allowed";
+            deleteBtn.title = "Cannot delete request while work is in progress";
+          }
+
+          deleteBtn.addEventListener("click", () => {
+            if (data.status === "In Progress") {
+              showPopup("Cannot delete request while work is in progress.");
+              return;
+            }
+
+            showPopup(`
+                    <strong>Are you sure?</strong><br>
+                    This maintenance request will be permanently deleted.<br><br>
+                    <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+                        Delete
+                    </button>
+                    <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+                        Cancel
+                    </button>
+                `);
+
+            setTimeout(() => {
+              const confirmBtn = document.getElementById("confirmDeleteBtn");
+              if (!confirmBtn) return;
+              confirmBtn.addEventListener("click", async () => {
+                try {
+                  setButtonLoading(confirmBtn, true);
+
+                  if (data.maintenanceName) {
+                    personnelAssignments.delete(data.maintenanceName);
+                  }
+
+                  await db.collection("maintenanceRequests").doc(id).delete();
+                  closePopup();
+                  showPopup("Maintenance request deleted.");
+
+                  setTimeout(() => {
+                    applyFiltersAndSort();
+                  }, 500);
+
+                } catch (error) {
+                  closePopup();
+                  showPopup("Failed to delete: " + error.message);
+                }
+              });
+            }, 50);
+          });
+
+          actionsDiv.appendChild(deleteBtn);
+
+          card.appendChild(actionsDiv);
+
+          maintenanceList.appendChild(card);
+
+          if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
+            let currentIndex = 0;
+            const imgEl = card.querySelector(`#img-${id}`);
+            const prevBtn = card.querySelector(".prev-btn");
+            const nextBtn = card.querySelector(".next-btn");
+
+            prevBtn.addEventListener("click", () => {
+              currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+
+            nextBtn.addEventListener("click", () => {
+              currentIndex = (currentIndex + 1) % data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+          }
+        });
+
+        // Mark all visible new requests as seen after a delay
+        if (newRequestIds.length > 0) {
+          setTimeout(() => {
+            markRequestsAsSeen(newRequestIds);
+            updateNotificationDot();
+          }, 3000);
         }
-      },
-      (error) => {
-        maintenanceList.innerHTML =
-          `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-        maintenanceStats.style.display = "none";
-      }
-    );
 
-  statusFilter.addEventListener("change", applyFiltersAndSort);
-  personnelFilter.addEventListener("change", applyFiltersAndSort);
-  maintenanceSearch.addEventListener("input", applyFiltersAndSort);
-  sortBy.addEventListener("change", applyFiltersAndSort);
-  resetFilters.addEventListener("click", () => {
-    statusFilter.value = "all";
-    personnelFilter.value = "all";
-    maintenanceSearch.value = "";
-    sortBy.value = "date-desc";
-    applyFiltersAndSort();
-  });
+        // Update statistics
+        requestCount.textContent = filteredRequests.length;
+        pendingCountEl.textContent = pending;
+        if (inProgressCountEl) {
+          inProgressCountEl.textContent = inProgress;
+        }
+        completeCountEl.textContent = complete;
+        
+        // Add new requests count to stats
+        let newCountEl = document.getElementById('newCount');
+        if (!newCountEl) {
+          newCountEl = document.createElement('span');
+          newCountEl.id = 'newCount';
+          newCountEl.style.color = '#ff4757';
+          newCountEl.style.marginLeft = '10px';
+          newCountEl.style.fontWeight = 'bold';
+          maintenanceStats.appendChild(newCountEl);
+        }
+        
+        if (newRequestsCount > 0) {
+          newCountEl.textContent = `(${newRequestsCount} new)`;
+        } else {
+          newCountEl.textContent = '';
+        }
 
-  // ==== ADD: Clear notification when clicking on the maintenance tab ====
-  if (maintenanceNavItem) {
-    maintenanceNavItem.addEventListener('click', function() {
-      // When user clicks on maintenance tab, mark all requests as seen
-      const allNewRequestIds = allRequests
-        .filter(request => isRequestNew(request) && request.status !== 'Complete')
-        .map(request => request.id);
-      
-      if (allNewRequestIds.length > 0) {
-        markRequestsAsSeen(allNewRequestIds);
+        maintenanceStats.style.display = "block";
         updateNotificationDot();
       }
-    });
-  }
 
-}
-    // ======================== UNIT OWNER CREATION LOGIC ========================
-    function initUnitOwnerCreation() {
+      // Load maintenance crew first
+      loadMaintenanceCrew().then(() => {
+        // Then load maintenance requests
+        db.collection("maintenanceRequests")
+          .orderBy("timestamp", "desc")
+          .onSnapshot(
+            (snapshot) => {
+              if (snapshot.empty) {
+                allRequests = [];
+                filteredRequests = [];
+                maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
+                maintenanceStats.style.display = "none";
+                updateNotificationDot();
+                return;
+              }
+
+              allRequests = snapshot.docs.map((docSnap) => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+              }));
+
+              // Always update notification dot when data changes
+              updateNotificationDot();
+              
+              // Only apply filters and sort if we're on the maintenance page
+              if (document.getElementById("maintenanceList")) {
+                applyFiltersAndSort();
+              }
+            },
+            (error) => {
+              maintenanceList.innerHTML =
+                `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+              maintenanceStats.style.display = "none";
+            }
+          );
+      });
+
+      statusFilter.addEventListener("change", applyFiltersAndSort);
+      personnelFilter.addEventListener("change", applyFiltersAndSort);
+      maintenanceSearch.addEventListener("input", applyFiltersAndSort);
+      sortBy.addEventListener("change", applyFiltersAndSort);
+      resetFilters.addEventListener("click", () => {
+        statusFilter.value = "all";
+        personnelFilter.value = "all";
+        maintenanceSearch.value = "";
+        sortBy.value = "date-desc";
+        applyFiltersAndSort();
+      });
+
+      // ==== ADD: Clear notification when clicking on the maintenance tab ====
+      if (maintenanceNavItem) {
+        maintenanceNavItem.addEventListener('click', function() {
+          // When user clicks on maintenance tab, mark all requests as seen
+          const allNewRequestIds = allRequests
+            .filter(request => isRequestNew(request) && request.status !== 'Complete')
+            .map(request => request.id);
+          
+          if (allNewRequestIds.length > 0) {
+            markRequestsAsSeen(allNewRequestIds);
+            updateNotificationDot();
+          }
+        });
+      }
+    }
+    
+     // ======================== ACCOUNT CREATION LOGIC (UPDATED) ========================
+    function initAccountCreation() {
       const adminEmail = "adminaccount@solano.com";
       const adminPassword = "qwerty";
 
-      async function sendAccountEmail(recipient, email, password, units) {
+      // Function to toggle between account types
+      window.toggleAccountType = function(radio) {
+        const isTenant = radio.value === 'tenant';
+        document.getElementById('tenantFormContainer').style.display = isTenant ? 'block' : 'none';
+        document.getElementById('maintenanceFormContainer').style.display = isTenant ? 'none' : 'block';
+      };
+
+      // Function to toggle user list view
+      window.toggleUserList = function(type) {
+        const isTenant = type === 'tenant';
+        document.getElementById('unitOwnersList').style.display = isTenant ? 'block' : 'none';
+        document.getElementById('maintenanceCrewList').style.display = isTenant ? 'none' : 'block';
+        
+        document.getElementById('showTenantsBtn').classList.toggle('active', isTenant);
+        document.getElementById('showMaintenanceBtn').classList.toggle('active', !isTenant);
+        
+        // Load appropriate list if not loaded
+        if (isTenant) {
+          loadAndDisplayUnitOwners();
+        } else {
+          loadAndDisplayMaintenanceCrew();
+        }
+      };
+
+      async function sendAccountEmail(recipient, email, password, additionalData = {}) {
         try {
-          await emailjs.send("service_izx63bb", "template_p7zetfj", {
+          const templateParams = {
             to_email: recipient,
             tenant_email: email,
             tenant_password: password,
-            unit_numbers: units.join(", "),
             login_link: "https://cjgenon.github.io/SOLANO/LogIn.html"
-          });
+          };
+
+          // Add unit-specific data for tenants
+          if (additionalData.units) {
+            templateParams.unit_numbers = additionalData.units.join(", ");
+          }
+          
+          // Add maintenance-specific data
+          if (additionalData.role) {
+            templateParams.role = additionalData.role;
+            templateParams.name = additionalData.name || '';
+          }
+
+          await emailjs.send("service_izx63bb", "template_p7zetfj", templateParams);
           console.log("Email sent successfully");
         } catch (error) {
           console.error("EmailJS Error:", error);
@@ -2601,613 +2818,732 @@ function initMaintenanceRequests() {
         }
       }
 
-async function loadAndDisplayUnitOwners() {
-  const ul = document.getElementById("unitOwnersUl");
-  ul.innerHTML = "<li style='padding: 20px; text-align: center; color: #D4A76A; background: #3E2723;'>Loading unit owners...</li>";
-  
-  // Rich brown color palette - DARK THEME
-  const colors = {
-    darkBg: '#2C1810',            // Deep chocolate background
-    mediumBg: '#3E2723',          // Dark brown
-    lightBg: '#4A342E',           // Medium brown
-    accentBg: '#5D4037',          // Lighter brown for accents
-    goldAccent: '#D4A76A',        // Warm gold accent
-    bronze: '#8B7355',            // Rich bronze
-    taupe: '#A1887F',             // Warm taupe
-    lightTaupe: '#BCAAA4',        // Light taupe
-    cream: '#D7CCC8',             // Cream for subtle highlights
-    textWhite: '#FFFFFF',         // Pure white text
-    textLight: '#F5F5F5',         // Light text
-    textMuted: '#E0E0E0',         // Muted white text
-    borderDark: '#2C1810',        // Dark border
-    borderMedium: '#4A342E',      // Medium border
-    borderLight: '#5D4037',       // Light border
-    success: '#9CCC65',           // Light olive green (complementary)
-    error: '#EF5350',             // Lighter red for errors
-  };
-  
-  // Formal container styling with DARK rich brown palette
-  ul.style.cssText = `
-    list-style-type: none;
-    padding-left: 0;
-    max-height: 400px;
-    overflow-y: auto;
-    border: 2px solid ${colors.borderLight};
-    padding: 0;
-    border-radius: 8px;
-    background: ${colors.darkBg};
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  `;
-  
-  try {
-    const snapshot = await db.collection("users").where("role", "==", "tenant").get();
-    if (snapshot.empty) {
-      ul.innerHTML = `
-        <li style="
-          padding: 30px 20px; 
-          text-align: center; 
-          color: ${colors.textMuted}; 
-          border-bottom: 1px solid ${colors.borderMedium}; 
-          background: ${colors.mediumBg};
-        ">
-          <div style="margin-bottom: 8px; font-weight: 500; color: ${colors.textWhite};">No unit owners found</div>
-          <div style="font-size: 13px; color: ${colors.lightTaupe};">Create your first unit owner account above</div>
-        </li>
-      `;
-      return;
-    }
-
-    ul.innerHTML = "";
-    
-    // Add header for the list with DARK rich brown styling
-    const headerLi = document.createElement("li");
-    headerLi.style.cssText = `
-      padding: 16px 20px;
-      background: linear-gradient(135deg, ${colors.darkBg} 0%, ${colors.mediumBg} 100%);
-      border-bottom: 3px solid ${colors.goldAccent};
-      font-weight: 600;
-      color: ${colors.textWhite};
-      font-size: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      letter-spacing: 0.3px;
-    `;
-    headerLi.innerHTML = `
-      <span style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 16px; color: ${colors.goldAccent};">👤</span>
-        <span>Unit Owners (${snapshot.size})</span>
-      </span>
-      <span style="
-        font-weight: normal; 
-        color: ${colors.textMuted}; 
-        font-size: 13px; 
-        background: ${colors.accentBg}; 
-        padding: 4px 10px; 
-        border-radius: 12px;
-        border: 1px solid ${colors.borderLight};
-      ">
-        Click to view details
-      </span>
-    `;
-    ul.appendChild(headerLi);
-
-    snapshot.forEach((doc, index) => {
-      const data = doc.data();
-      const email = data.email || "No email";
-      const unitNumbers = data.unitNumbers || [];
-
-      const li = document.createElement("li");
-      li.style.cssText = `
-        padding: 18px 20px;
-        border-bottom: 1px solid ${colors.borderMedium};
-        background: ${index % 2 === 0 ? colors.mediumBg : colors.lightBg};
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-      `;
-      
-      // Add hover effect with gold accent
-      li.onmouseenter = () => {
-        li.style.background = `linear-gradient(90deg, ${colors.accentBg} 0%, ${colors.lightBg} 100%)`;
-        li.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
-        li.style.transform = 'translateY(-1px)';
-        li.style.borderLeft = `3px solid ${colors.goldAccent}`;
-      };
-      li.onmouseleave = () => {
-        li.style.background = index % 2 === 0 ? colors.mediumBg : colors.lightBg;
-        li.style.boxShadow = 'none';
-        li.style.transform = 'translateY(0)';
-        li.style.borderLeft = 'none';
-      };
-
-      // Email section
-      const emailSection = document.createElement("div");
-      emailSection.style.cssText = `
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
-      `;
-      
-      // Create status indicator with gold accent
-      const statusIndicator = document.createElement("span");
-      statusIndicator.style.cssText = `
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        background: ${colors.goldAccent};
-        border-radius: 50%;
-        margin-right: 12px;
-        flex-shrink: 0;
-        box-shadow: 0 0 0 2px ${colors.mediumBg}, 0 0 0 4px ${colors.bronze};
-      `;
-      
-      emailSection.appendChild(statusIndicator);
-      
-      const emailText = document.createElement("span");
-      emailText.style.cssText = `
-        font-weight: 600;
-        color: ${colors.textWhite};
-        font-size: 14px;
-        flex: 1;
-        letter-spacing: 0.2px;
-      `;
-      emailText.textContent = email;
-      emailSection.appendChild(emailText);
-      
-      // Unit count badge with brown styling
-      const unitCountBadge = document.createElement("span");
-      unitCountBadge.style.cssText = `
-        background: ${colors.accentBg};
-        color: ${colors.textWhite};
-        padding: 4px 12px;
-        border-radius: 16px;
-        font-size: 12px;
-        font-weight: 600;
-        margin-left: 10px;
-        border: 1px solid ${colors.borderLight};
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      `;
-      unitCountBadge.textContent = `${unitNumbers.length} unit${unitNumbers.length !== 1 ? 's' : ''}`;
-      emailSection.appendChild(unitCountBadge);
-      
-      li.appendChild(emailSection);
-
-      // Units section - shows on click/hover
-      if (unitNumbers.length > 0) {
-        const unitsContainer = document.createElement("div");
-        unitsContainer.style.cssText = `
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 2px dashed ${colors.borderLight};
-          display: none;
+      async function loadAndDisplayUnitOwners() {
+        const ul = document.getElementById("unitOwnersUl");
+        ul.innerHTML = "<li style='padding: 20px; text-align: center; color: #D4A76A; background: #3E2723;'>Loading unit owners...</li>";
+        
+        const colors = {
+          darkBg: '#2C1810',
+          mediumBg: '#3E2723',
+          lightBg: '#4A342E',
+          accentBg: '#5D4037',
+          goldAccent: '#D4A76A',
+          borderLight: '#5D4037',
+          textWhite: '#FFFFFF',
+          textMuted: '#E0E0E0',
+          success: '#9CCC65',
+          error: '#EF5350',
+        };
+        
+        ul.style.cssText = `
+          list-style-type: none;
+          padding-left: 0;
+          max-height: 300px;
+          overflow-y: auto;
+          border: 2px solid ${colors.borderLight};
+          padding: 0;
+          border-radius: 8px;
+          background: ${colors.darkBg};
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         `;
         
-        const unitsTitle = document.createElement("div");
-        unitsTitle.style.cssText = `
-          font-size: 12px;
-          color: ${colors.textMuted};
-          font-weight: 600;
-          margin-bottom: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.8px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        `;
-        unitsTitle.innerHTML = `
-          <span style="font-size: 14px; color: ${colors.goldAccent};">🏢</span>
-          <span>Assigned Units</span>
-        `;
-        unitsContainer.appendChild(unitsTitle);
-        
-        const unitsList = document.createElement("div");
-        unitsList.style.cssText = `
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-        `;
-        
-        unitNumbers.forEach(unitStr => {
-          const numPart = parseInt(unitStr.split("-")[1], 10);
-          const unitInfo = units.find(u => u.num === numPart);
-          const unitType = unitStr.split("-")[0];
+        try {
+          const snapshot = await db.collection("users").where("role", "==", "tenant").get();
+          if (snapshot.empty) {
+            ul.innerHTML = `
+              <li style="padding: 30px 20px; text-align: center; color: ${colors.textMuted}; border-bottom: 1px solid ${colors.borderLight}; background: ${colors.mediumBg};">
+                <div style="margin-bottom: 8px; font-weight: 500; color: ${colors.textWhite};">No unit owners found</div>
+                <div style="font-size: 13px; color: ${colors.textMuted};">Create your first unit owner account above</div>
+              </li>
+            `;
+            return;
+          }
+
+          ul.innerHTML = "";
           
-          const unitBadge = document.createElement("div");
-          const is1B = unitType === '1B';
-          unitBadge.style.cssText = `
-            background: ${is1B ? 
-              `linear-gradient(135deg, ${colors.accentBg} 0%, ${colors.mediumBg} 100%)` : 
-              `linear-gradient(135deg, ${colors.accentBg} 0%, ${colors.lightBg} 100%)`};
-            border: 1px solid ${is1B ? colors.success + '40' : colors.goldAccent + '40'};
-            border-left: 4px solid ${is1B ? colors.success : colors.goldAccent};
-            border-radius: 6px;
-            padding: 8px 12px;
+          // Add header
+          const headerLi = document.createElement("li");
+          headerLi.style.cssText = `
+            padding: 16px 20px;
+            background: linear-gradient(135deg, ${colors.darkBg} 0%, ${colors.mediumBg} 100%);
+            border-bottom: 3px solid ${colors.goldAccent};
+            font-weight: 600;
+            color: ${colors.textWhite};
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          `;
+          headerLi.innerHTML = `
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px; color: ${colors.goldAccent};">👤</span>
+              <span>Unit Owners (${snapshot.size})</span>
+            </span>
+          `;
+          ul.appendChild(headerLi);
+
+          snapshot.forEach((doc, index) => {
+            const data = doc.data();
+            const email = data.email || "No email";
+            const unitNumbers = data.unitNumbers || [];
+
+            const li = document.createElement("li");
+            li.style.cssText = `
+              padding: 15px 20px;
+              border-bottom: 1px solid ${colors.borderLight};
+              background: ${index % 2 === 0 ? colors.mediumBg : colors.lightBg};
+              cursor: pointer;
+              transition: all 0.3s;
+            `;
+            
+            li.onmouseenter = () => {
+              li.style.background = colors.accentBg;
+            };
+            li.onmouseleave = () => {
+              li.style.background = index % 2 === 0 ? colors.mediumBg : colors.lightBg;
+            };
+
+            // Email section
+            const emailSection = document.createElement("div");
+            emailSection.style.cssText = `
+              display: flex;
+              align-items: center;
+              margin-bottom: 8px;
+            `;
+            
+            const statusIndicator = document.createElement("span");
+            statusIndicator.style.cssText = `
+              display: inline-block;
+              width: 10px;
+              height: 10px;
+              background: ${colors.goldAccent};
+              border-radius: 50%;
+              margin-right: 10px;
+              flex-shrink: 0;
+            `;
+            
+            emailSection.appendChild(statusIndicator);
+            
+            const emailText = document.createElement("span");
+            emailText.style.cssText = `
+              font-weight: 600;
+              color: ${colors.textWhite};
+              font-size: 14px;
+              flex: 1;
+            `;
+            emailText.textContent = email;
+            emailSection.appendChild(emailText);
+            
+            // Unit count badge
+            if (unitNumbers.length > 0) {
+              const unitCountBadge = document.createElement("span");
+              unitCountBadge.style.cssText = `
+                background: ${colors.accentBg};
+                color: ${colors.textWhite};
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 600;
+                margin-left: 10px;
+              `;
+              unitCountBadge.textContent = `${unitNumbers.length} unit${unitNumbers.length !== 1 ? 's' : ''}`;
+              emailSection.appendChild(unitCountBadge);
+            }
+            
+            li.appendChild(emailSection);
+
+            // Units section
+            if (unitNumbers.length > 0) {
+              const unitsContainer = document.createElement("div");
+              unitsContainer.style.cssText = `
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px dashed ${colors.borderLight};
+                display: none;
+              `;
+              
+              const unitsTitle = document.createElement("div");
+              unitsTitle.style.cssText = `
+                font-size: 12px;
+                color: ${colors.textMuted};
+                font-weight: 600;
+                margin-bottom: 5px;
+              `;
+              unitsTitle.textContent = "Assigned Units:";
+              unitsContainer.appendChild(unitsTitle);
+              
+              const unitsList = document.createElement("div");
+              unitsList.style.cssText = `
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+              `;
+              
+              unitNumbers.forEach(unitStr => {
+                const unitBadge = document.createElement("span");
+                unitBadge.style.cssText = `
+                  background: ${colors.accentBg};
+                  color: ${colors.textWhite};
+                  padding: 3px 8px;
+                  border-radius: 4px;
+                  font-size: 12px;
+                `;
+                unitBadge.textContent = unitStr;
+                unitsList.appendChild(unitBadge);
+              });
+              
+              unitsContainer.appendChild(unitsList);
+              li.appendChild(unitsContainer);
+              
+              // Click to toggle unit details
+              li.addEventListener('click', () => {
+                if (unitsContainer.style.display === 'none') {
+                  unitsContainer.style.display = 'block';
+                } else {
+                  unitsContainer.style.display = 'none';
+                }
+              });
+            }
+
+            ul.appendChild(li);
+          });
+
+          // Summary footer
+          const totalUnits = snapshot.docs.reduce((total, doc) => {
+            const data = doc.data();
+            return total + (data.unitNumbers ? data.unitNumbers.length : 0);
+          }, 0);
+          
+          const footerLi = document.createElement("li");
+          footerLi.style.cssText = `
+            padding: 12px 20px;
+            background: ${colors.mediumBg};
+            border-top: 1px solid ${colors.borderLight};
             font-size: 13px;
             color: ${colors.textWhite};
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            text-align: center;
           `;
-          
-          unitBadge.onmouseenter = () => {
-            unitBadge.style.transform = 'translateY(-2px)';
-            unitBadge.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
-            unitBadge.style.background = is1B ? 
-              `linear-gradient(135deg, ${colors.lightBg} 0%, ${colors.accentBg} 100%)` : 
-              `linear-gradient(135deg, ${colors.lightBg} 0%, ${colors.accentBg} 100%)`;
-          };
-          unitBadge.onmouseleave = () => {
-            unitBadge.style.transform = 'translateY(0)';
-            unitBadge.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
-            unitBadge.style.background = is1B ? 
-              `linear-gradient(135deg, ${colors.accentBg} 0%, ${colors.mediumBg} 100%)` : 
-              `linear-gradient(135deg, ${colors.accentBg} 0%, ${colors.lightBg} 100%)`;
-          };
-          
-          const unitNumberSpan = document.createElement("span");
-          unitNumberSpan.style.cssText = `
-            font-weight: 700;
-            color: ${colors.textWhite};
-            font-size: 14px;
+          footerLi.textContent = `${totalUnits} total units assigned`;
+          ul.appendChild(footerLi);
+
+        } catch (error) {
+          console.error("Error loading unit owners:", error);
+          ul.innerHTML = `
+            <li style="padding: 30px 20px; text-align: center; background: ${colors.mediumBg};">
+              <div style="color: ${colors.error}; font-weight: 600; margin-bottom: 12px;">
+                Error loading unit owners
+              </div>
+              <div style="color: ${colors.textMuted}; font-size: 14px;">
+                ${error.message || 'Please try refreshing the page.'}
+              </div>
+            </li>
           `;
-          unitNumberSpan.textContent = unitStr.split('-')[1];
-          
-          const unitTypeSpan = document.createElement("span");
-          unitTypeSpan.style.cssText = `
-            background: ${is1B ? colors.success : colors.goldAccent};
-            color: ${colors.darkBg};
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-          `;
-          unitTypeSpan.textContent = unitType;
-          
-          const unitDetails = document.createElement("span");
-          unitDetails.style.cssText = `
-            color: ${colors.textMuted};
-            font-size: 12px;
-            margin-left: 4px;
-            font-weight: 500;
-          `;
-          if (unitInfo) {
-            unitDetails.textContent = `Bldg ${unitInfo.building} • Floor ${unitInfo.floor}`;
-          } else {
-            unitDetails.textContent = "Unit details";
-          }
-          
-          unitBadge.appendChild(unitNumberSpan);
-          unitBadge.appendChild(unitTypeSpan);
-          unitBadge.appendChild(unitDetails);
-          unitsList.appendChild(unitBadge);
-        });
-        
-        unitsContainer.appendChild(unitsList);
-        li.appendChild(unitsContainer);
-        
-        // Click to toggle unit details
-        li.addEventListener('click', () => {
-          if (unitsContainer.style.display === 'none') {
-            unitsContainer.style.display = 'block';
-            li.style.borderLeft = `3px solid ${colors.goldAccent}`;
-            li.style.marginLeft = '-3px';
-          } else {
-            unitsContainer.style.display = 'none';
-            li.style.borderLeft = 'none';
-            li.style.marginLeft = '0';
-          }
-        });
-      } else {
-        const noUnitsMsg = document.createElement("div");
-        noUnitsMsg.style.cssText = `
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 2px dashed ${colors.borderLight};
-          color: ${colors.cream};
-          font-size: 13px;
-          font-style: italic;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: ${colors.accentBg};
-          padding: 10px 12px;
-          border-radius: 6px;
-          border: 1px solid ${colors.borderLight};
-        `;
-        noUnitsMsg.innerHTML = `
-          <span style="font-size: 14px; color: ${colors.goldAccent};">📝</span>
-          <span>No units assigned to this account</span>
-        `;
-        li.appendChild(noUnitsMsg);
+        }
       }
 
-      ul.appendChild(li);
-    });
+      async function loadAndDisplayMaintenanceCrew() {
+        const ul = document.getElementById("maintenanceCrewUl");
+        ul.innerHTML = "<li style='padding: 20px; text-align: center; color: #4a90e2; background: #1a1a2e;'>Loading maintenance crew...</li>";
+        
+        const colors = {
+          darkBg: '#1a1a2e',
+          mediumBg: '#16213e',
+          lightBg: '#0f3460',
+          accentBg: '#4a90e2',
+          borderLight: '#2d4059',
+          textWhite: '#FFFFFF',
+          textMuted: '#E0E0E0',
+          success: '#9CCC65',
+          error: '#EF5350',
+        };
+        
+        ul.style.cssText = `
+          list-style-type: none;
+          padding-left: 0;
+          max-height: 300px;
+          overflow-y: auto;
+          border: 2px solid ${colors.borderLight};
+          padding: 0;
+          border-radius: 8px;
+          background: ${colors.darkBg};
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        try {
+          const snapshot = await db.collection("users").where("role", "==", "maintenance").get();
+          if (snapshot.empty) {
+            ul.innerHTML = `
+              <li style="padding: 30px 20px; text-align: center; color: ${colors.textMuted}; border-bottom: 1px solid ${colors.borderLight}; background: ${colors.mediumBg};">
+                <div style="margin-bottom: 8px; font-weight: 500; color: ${colors.textWhite};">No maintenance crew found</div>
+                <div style="font-size: 13px; color: ${colors.textMuted};">Create your first maintenance account above</div>
+              </li>
+            `;
+            return;
+          }
 
-    // Summary footer with DARK rich brown styling
-    const totalUnits = snapshot.docs.reduce((total, doc) => {
-      const data = doc.data();
-      return total + (data.unitNumbers ? data.unitNumbers.length : 0);
-    }, 0);
-    
-    const footerLi = document.createElement("li");
-    footerLi.style.cssText = `
-      padding: 16px 20px;
-      background: linear-gradient(135deg, ${colors.mediumBg} 0%, ${colors.accentBg} 100%);
-      border-top: 2px solid ${colors.borderLight};
-      font-size: 14px;
-      color: ${colors.textWhite};
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 500;
-    `;
-    
-    const totalText = document.createElement("span");
-    totalText.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    `;
-    totalText.innerHTML = `
-      <span style="
-        background: ${colors.goldAccent}; 
-        color: ${colors.darkBg}; 
-        width: 24px; 
-        height: 24px; 
-        border-radius: 50%; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        font-size: 12px;
-        font-weight: bold;
-      ">Σ</span>
-      <span><strong style="color: ${colors.textWhite}; font-size: 16px;">${totalUnits}</strong> total units assigned</span>
-    `;
-    
-    const avgText = document.createElement("span");
-    avgText.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    `;
-    const avgUnits = snapshot.size > 0 ? (totalUnits / snapshot.size).toFixed(1) : 0;
-    avgText.innerHTML = `
-      <span style="
-        background: ${colors.bronze}; 
-        color: ${colors.textWhite}; 
-        width: 24px; 
-        height: 24px; 
-        border-radius: 50%; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        font-size: 12px;
-        font-weight: bold;
-      ">μ</span>
-      <span><strong style="color: ${colors.textWhite}; font-size: 16px;">${avgUnits}</strong> avg. units per owner</span>
-    `;
-    
-    footerLi.appendChild(totalText);
-    footerLi.appendChild(avgText);
-    ul.appendChild(footerLi);
+          ul.innerHTML = "";
+          
+          // Add header
+          const headerLi = document.createElement("li");
+          headerLi.style.cssText = `
+            padding: 16px 20px;
+            background: linear-gradient(135deg, ${colors.darkBg} 0%, ${colors.mediumBg} 100%);
+            border-bottom: 3px solid ${colors.accentBg};
+            font-weight: 600;
+            color: ${colors.textWhite};
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          `;
+          headerLi.innerHTML = `
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px; color: ${colors.accentBg};">🔧</span>
+              <span>Maintenance Crew (${snapshot.size})</span>
+            </span>
+          `;
+          ul.appendChild(headerLi);
 
-  } catch (error) {
-    console.error("Error loading unit owners:", error);
-    ul.innerHTML = `
-      <li style="
-        padding: 30px 20px; 
-        text-align: center; 
-        border-bottom: 1px solid ${colors.borderMedium}; 
-        background: ${colors.mediumBg};
-      ">
-        <div style="
-          color: ${colors.error}; 
-          font-weight: 600; 
-          margin-bottom: 12px; 
-          font-size: 15px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          gap: 8px;
-        ">
-          <span style="font-size: 18px; color: ${colors.error};">⚠️</span>
-          <span>Error loading unit owners</span>
-        </div>
-        <div style="
-          color: ${colors.textMuted}; 
-          font-size: 14px; 
-          background: ${colors.accentBg}; 
-          padding: 12px; 
-          border-radius: 6px; 
-          border: 1px solid ${colors.borderLight};
-        ">
-          ${error.message || 'Please try refreshing the page.'}
-        </div>
-      </li>
-    `;
-  }
-}
+          snapshot.forEach((doc, index) => {
+            const data = doc.data();
+            const email = data.email || "No email";
+            const name = data.name || "No name";
+            const role = data.role || "No role specified";
+            const phone = data.phone || "No contact";
+
+            const li = document.createElement("li");
+            li.style.cssText = `
+              padding: 15px 20px;
+              border-bottom: 1px solid ${colors.borderLight};
+              background: ${index % 2 === 0 ? colors.mediumBg : colors.lightBg};
+              cursor: pointer;
+              transition: all 0.3s;
+            `;
+            
+            li.onmouseenter = () => {
+              li.style.background = colors.accentBg + '20';
+            };
+            li.onmouseleave = () => {
+              li.style.background = index % 2 === 0 ? colors.mediumBg : colors.lightBg;
+            };
+
+            // Name and email section
+            const nameSection = document.createElement("div");
+            nameSection.style.cssText = `
+              display: flex;
+              align-items: center;
+              margin-bottom: 8px;
+            `;
+            
+            const statusIndicator = document.createElement("span");
+            statusIndicator.style.cssText = `
+              display: inline-block;
+              width: 10px;
+              height: 10px;
+              background: ${colors.accentBg};
+              border-radius: 50%;
+              margin-right: 10px;
+              flex-shrink: 0;
+            `;
+            
+            nameSection.appendChild(statusIndicator);
+            
+            const nameText = document.createElement("span");
+            nameText.style.cssText = `
+              font-weight: 600;
+              color: ${colors.textWhite};
+              font-size: 14px;
+              flex: 1;
+            `;
+            nameText.textContent = name;
+            nameSection.appendChild(nameText);
+            
+            li.appendChild(nameSection);
+
+            // Email
+            const emailDiv = document.createElement("div");
+            emailDiv.style.cssText = `
+              font-size: 12px;
+              color: ${colors.textMuted};
+              margin-bottom: 5px;
+            `;
+            emailDiv.textContent = email;
+            li.appendChild(emailDiv);
+
+            // Role and phone section
+            const detailsContainer = document.createElement("div");
+            detailsContainer.style.cssText = `
+              margin-top: 10px;
+              padding-top: 10px;
+              border-top: 1px dashed ${colors.borderLight};
+              display: none;
+            `;
+            
+            // Role badge
+            const roleBadge = document.createElement("span");
+            roleBadge.style.cssText = `
+              display: inline-block;
+              background: ${colors.accentBg};
+              color: ${colors.textWhite};
+              padding: 3px 10px;
+              border-radius: 12px;
+              font-size: 11px;
+              font-weight: 600;
+              margin-bottom: 8px;
+            `;
+            roleBadge.textContent = role;
+            detailsContainer.appendChild(roleBadge);
+
+            // Phone
+            if (phone !== "No contact") {
+              const phoneDiv = document.createElement("div");
+              phoneDiv.style.cssText = `
+                font-size: 12px;
+                color: ${colors.textMuted};
+                margin-top: 5px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+              `;
+              phoneDiv.innerHTML = `<span style="color: ${colors.accentBg};">📱</span> ${phone}`;
+              detailsContainer.appendChild(phoneDiv);
+            }
+
+            // Account status
+            const statusDiv = document.createElement("div");
+            statusDiv.style.cssText = `
+              font-size: 11px;
+              color: ${colors.success};
+              margin-top: 8px;
+              padding: 2px 8px;
+              background: ${colors.success}20;
+              border-radius: 4px;
+              display: inline-block;
+            `;
+            statusDiv.textContent = "Active Account";
+            detailsContainer.appendChild(statusDiv);
+
+            li.appendChild(detailsContainer);
+            
+            // Click to toggle details
+            li.addEventListener('click', () => {
+              if (detailsContainer.style.display === 'none') {
+                detailsContainer.style.display = 'block';
+              } else {
+                detailsContainer.style.display = 'none';
+              }
+            });
+
+            ul.appendChild(li);
+          });
+
+          // Summary footer
+          const rolesCount = {};
+          snapshot.forEach(doc => {
+            const role = doc.data().role || "Unspecified";
+            rolesCount[role] = (rolesCount[role] || 0) + 1;
+          });
+          
+          const rolesText = Object.entries(rolesCount)
+            .map(([role, count]) => `${role}: ${count}`)
+            .join(", ");
+          
+          const footerLi = document.createElement("li");
+          footerLi.style.cssText = `
+            padding: 12px 20px;
+            background: ${colors.mediumBg};
+            border-top: 1px solid ${colors.borderLight};
+            font-size: 12px;
+            color: ${colors.textMuted};
+            text-align: center;
+          `;
+          footerLi.textContent = rolesText;
+          ul.appendChild(footerLi);
+
+        } catch (error) {
+          console.error("Error loading maintenance crew:", error);
+          ul.innerHTML = `
+            <li style="padding: 30px 20px; text-align: center; background: ${colors.mediumBg};">
+              <div style="color: ${colors.error}; font-weight: 600; margin-bottom: 12px;">
+                Error loading maintenance crew
+              </div>
+              <div style="color: ${colors.textMuted}; font-size: 14px;">
+                ${error.message || 'Please try refreshing the page.'}
+              </div>
+            </li>
+          `;
+        }
+      }
+
       (async () => {
         let occupiedUnits = await getOccupiedUnits();
 
-        const passwordInput = document.getElementById("tenantPassword");
-        const generateBtn = document.getElementById("generatePasswordBtn");
-        const form = document.getElementById("createTenantForm");
+        // ============ TENANT FORM LOGIC ============
+        const tenantPasswordInput = document.getElementById("tenantPassword");
+        const generateTenantBtn = document.getElementById("generatePasswordBtn");
+        const tenantForm = document.getElementById("createTenantForm");
         const unitContainer = document.getElementById("unitContainer");
         const addUnitBtn = document.getElementById("addUnitBtn");
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const tenantSubmitBtn = tenantForm ? tenantForm.querySelector('button[type="submit"]') : null;
 
-        generateBtn.addEventListener("click", () => {
-          const newPassword = generatePassword();
-          passwordInput.value = newPassword;
-          passwordInput.style.border = "1px solid #4CAF50";
-          setTimeout(() => {
-            passwordInput.style.background = "#222";
-            passwordInput.style.border = "1px solid rgba(255,255,255,0.18)";
-          }, 3000);
-        });
+        // Tenant password generation
+        if (generateTenantBtn) {
+          generateTenantBtn.addEventListener("click", () => {
+            const newPassword = generatePassword();
+            tenantPasswordInput.value = newPassword;
+            tenantPasswordInput.style.border = "1px solid #4CAF50";
+            setTimeout(() => {
+              tenantPasswordInput.style.background = "#222";
+              tenantPasswordInput.style.border = "1px solid rgba(255,255,255,0.18)";
+            }, 3000);
+          });
+        }
 
+        // Tenant unit selection
         const firstType = document.querySelector(".unitType");
         const firstNumber = document.querySelector(".unitNumber");
-        firstType.addEventListener("change", () =>
-          populateUnitNumbers(firstType, firstNumber, occupiedUnits)
-        );
-
-        addUnitBtn.addEventListener("click", () => {
-          const row = document.createElement("div");
-          row.classList.add("unit-row");
-          row.style = "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
-          row.innerHTML = `
-            <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-              <option value="">-- Select Type --</option>
-              <option value="1B">1B (1 Bedroom)</option>
-              <option value="2B">2B (2 Bedroom)</option>
-            </select>
-            <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-              <option value="">-- Select Unit Number --</option>
-            </select>
-            <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-          `;
-          unitContainer.appendChild(row);
-
-          const tSelect = row.querySelector(".unitType");
-          const nSelect = row.querySelector(".unitNumber");
-          tSelect.addEventListener("change", () =>
-            populateUnitNumbers(tSelect, nSelect, occupiedUnits)
+        if (firstType && firstNumber) {
+          firstType.addEventListener("change", () =>
+            populateUnitNumbers(firstType, firstNumber, occupiedUnits)
           );
+        }
 
-          row.querySelector(".removeUnitBtn").addEventListener("click", function () {
+        // Add unit row
+        if (addUnitBtn) {
+          addUnitBtn.addEventListener("click", () => {
+            const row = document.createElement("div");
+            row.classList.add("unit-row");
+            row.style = "display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;";
+            row.innerHTML = `
+              <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                <option value="">-- Select Type --</option>
+                <option value="1B">1B (1 Bedroom)</option>
+                <option value="2B">2B (2 Bedroom)</option>
+              </select>
+              <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                <option value="">-- Select Unit Number --</option>
+              </select>
+              <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+            `;
+            unitContainer.appendChild(row);
+
+            const tSelect = row.querySelector(".unitType");
+            const nSelect = row.querySelector(".unitNumber");
+            tSelect.addEventListener("change", () =>
+              populateUnitNumbers(tSelect, nSelect, occupiedUnits)
+            );
+
+            row.querySelector(".removeUnitBtn").addEventListener("click", function () {
+              if (document.querySelectorAll(".unit-row").length > 1) {
+                row.remove();
+              }
+            });
+          });
+        }
+
+        // Remove unit row
+        const removeBtns = document.querySelectorAll(".removeUnitBtn");
+        removeBtns.forEach(btn => {
+          btn.addEventListener("click", function () {
             if (document.querySelectorAll(".unit-row").length > 1) {
-              row.remove();
+              this.parentElement.remove();
             }
           });
         });
 
-        document.querySelector(".removeUnitBtn").addEventListener("click", function () {
-          if (document.querySelectorAll(".unit-row").length > 1) {
-            this.parentElement.remove();
-          }
-        });
+        // Tenant form submission
+        if (tenantForm) {
+          tenantForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("tenantEmail").value;
+            const password = tenantPasswordInput.value;
+            const unitNumbers = Array.from(document.querySelectorAll(".unitNumber"))
+              .map((i) => i.value)
+              .filter((v) => v !== "");
 
-        await loadAndDisplayUnitOwners();
-
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const email = document.getElementById("tenantEmail").value;
-          const password = passwordInput.value;
-          const unitNumbers = Array.from(document.querySelectorAll(".unitNumber"))
-            .map((i) => i.value)
-            .filter((v) => v !== "");
-
-          const occupiedSet = new Set(occupiedUnits);
-          const occupiedSelections = unitNumbers.filter((u) => occupiedSet.has(u));
-          if (occupiedSelections.length > 0) {
-            showPopup(
-              `Error: The following units are already occupied: ${occupiedSelections.join(
-                ", "
-              )}. Please select different units.`
-            );
-            return;
-          }
-
-          try {
-            setButtonLoading(submitBtn, true);
-
-            const userCredential =
-              await auth.createUserWithEmailAndPassword(
-                email,
-                password
+            const occupiedSet = new Set(occupiedUnits);
+            const occupiedSelections = unitNumbers.filter((u) => occupiedSet.has(u));
+            if (occupiedSelections.length > 0) {
+              showPopup(
+                `Error: The following units are already occupied: ${occupiedSelections.join(
+                  ", "
+                )}. Please select different units.`
               );
-            const user = userCredential.user;
+              return;
+            }
 
-            await db.collection("users").doc(user.uid).set({
-              email,
-              role: "tenant",
-              unitNumbers,
-              mustChangePassword: true,
-              createdAt:
-                firebase.firestore.FieldValue.serverTimestamp(),
-            });
+            try {
+              setButtonLoading(tenantSubmitBtn, true);
 
-            const unitsWithDetails = unitNumbers.map(unitStr => {
-              const numPart = parseInt(unitStr.split("-")[1], 10);
-              const unitInfo = units.find(u => u.num === numPart);
+              const userCredential =
+                await auth.createUserWithEmailAndPassword(
+                  email,
+                  password
+                );
+              const user = userCredential.user;
 
-              if (unitInfo) {
-                return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
-              } else {
-                return unitStr;
-              }
-            });
+              await db.collection("users").doc(user.uid).set({
+                email,
+                role: "tenant",
+                unitNumbers,
+                mustChangePassword: true,
+                createdAt:
+                  firebase.firestore.FieldValue.serverTimestamp(),
+              });
 
-            await sendAccountEmail(email, email, password, unitsWithDetails);
+              const unitsWithDetails = unitNumbers.map(unitStr => {
+                const numPart = parseInt(unitStr.split("-")[1], 10);
+                const unitInfo = units.find(u => u.num === numPart);
 
-            occupiedUnits.push(...unitNumbers);
-
-            await auth.signInWithEmailAndPassword(
-              adminEmail,
-              adminPassword
-            );
-
-            showPopup(
-              "Unit Owner created successfully! Temporary password: " +
-              password
-            );
-
-            form.reset();
-            passwordInput.value = "";
-            passwordInput.style.background = "#222";
-            passwordInput.style.border =
-              "1px solid rgba(255,255,255,0.18)";
-
-            unitContainer.innerHTML = `
-              <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-                <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
-                  <option value="">-- Select Type --</option>
-                  <option value="1B">1B (1 Bedroom)</option>
-                  <option value="2B">2B (2 Bedroom)</option>
-                </select>
-                <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
-                  <option value="">-- Select Unit Number --</option>
-                </select>
-                <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
-              </div>
-            `;
-
-            const newFirstType = document.querySelector(".unitType");
-            const newFirstNumber = document.querySelector(".unitNumber");
-            newFirstType.addEventListener("change", () =>
-              populateUnitNumbers(
-                newFirstType,
-                newFirstNumber,
-                occupiedUnits
-              )
-            );
-
-            document
-              .querySelector(".removeUnitBtn")
-              .addEventListener("click", function () {
-                if (
-                  document.querySelectorAll(".unit-row").length > 1
-                ) {
-                  this.parentElement.remove();
+                if (unitInfo) {
+                  return `${unitStr} (Bldg ${unitInfo.building} - Floor ${unitInfo.floor})`;
+                } else {
+                  return unitStr;
                 }
               });
 
-            await loadAndDisplayUnitOwners();
+              await sendAccountEmail(email, email, password, { units: unitsWithDetails });
 
-          } catch (error) {
-            showPopup("Error: " + error.message);
-          } finally {
-            setButtonLoading(submitBtn, false);
-          }
-        });
+              occupiedUnits.push(...unitNumbers);
+
+              await auth.signInWithEmailAndPassword(
+                adminEmail,
+                adminPassword
+              );
+
+              showPopup(
+                "Unit Owner created successfully! Temporary password: " +
+                password
+              );
+
+              tenantForm.reset();
+              tenantPasswordInput.value = "";
+              tenantPasswordInput.style.background = "#222";
+              tenantPasswordInput.style.border =
+                "1px solid rgba(255,255,255,0.18)";
+
+              unitContainer.innerHTML = `
+                <div class="unit-row" style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                  <select class="unitType" required style="padding:8px; flex:1; min-width:140px;">
+                    <option value="">-- Select Type --</option>
+                    <option value="1B">1B (1 Bedroom)</option>
+                    <option value="2B">2B (2 Bedroom)</option>
+                  </select>
+                  <select class="unitNumber" required style="padding:8px; flex:1; min-width:140px;">
+                    <option value="">-- Select Unit Number --</option>
+                  </select>
+                  <button type="button" class="removeUnitBtn" style="padding:8px 10px; background:#b33a3a; color:white; border:none; border-radius:6px;">X</button>
+                </div>
+              `;
+
+              const newFirstType = document.querySelector(".unitType");
+              const newFirstNumber = document.querySelector(".unitNumber");
+              newFirstType.addEventListener("change", () =>
+                populateUnitNumbers(
+                  newFirstType,
+                  newFirstNumber,
+                  occupiedUnits
+                )
+              );
+
+              document
+                .querySelector(".removeUnitBtn")
+                .addEventListener("click", function () {
+                  if (
+                    document.querySelectorAll(".unit-row").length > 1
+                  ) {
+                    this.parentElement.remove();
+                  }
+                });
+
+              await loadAndDisplayUnitOwners();
+
+            } catch (error) {
+              showPopup("Error creating unit owner: The email is already in use");
+            } finally {
+              setButtonLoading(tenantSubmitBtn, false);
+            }
+          });
+        }
+
+        // ============ MAINTENANCE FORM LOGIC ============
+        const maintenanceForm = document.getElementById("createMaintenanceForm");
+        const maintenancePasswordInput = document.getElementById("maintenancePassword");
+        const generateMaintenanceBtn = document.getElementById("generateMaintenancePasswordBtn");
+        const maintenanceSubmitBtn = maintenanceForm ? maintenanceForm.querySelector('button[type="submit"]') : null;
+
+        // Maintenance password generation
+        if (generateMaintenanceBtn) {
+          generateMaintenanceBtn.addEventListener("click", () => {
+            const newPassword = generatePassword();
+            maintenancePasswordInput.value = newPassword;
+            maintenancePasswordInput.style.border = "1px solid #4CAF50";
+            setTimeout(() => {
+              maintenancePasswordInput.style.background = "#222";
+              maintenancePasswordInput.style.border = "1px solid rgba(255,255,255,0.18)";
+            }, 3000);
+          });
+        }
+
+        // Maintenance form submission
+        if (maintenanceForm) {
+          maintenanceForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("maintenanceEmail").value;
+            const name = document.getElementById("maintenanceName").value;
+            const password = maintenancePasswordInput.value;
+            const role = document.getElementById("maintenanceRole").value;
+            const phone = document.getElementById("maintenancePhone").value || "";
+
+            try {
+              setButtonLoading(maintenanceSubmitBtn, true);
+
+              const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+              const user = userCredential.user;
+
+              await db.collection("users").doc(user.uid).set({
+                email,
+                name,
+                role: "maintenance",
+                specialization: role,
+                phone,
+                mustChangePassword: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+
+              await sendAccountEmail(email, email, password, {
+                role: role,
+                name: name
+              });
+
+              await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+
+              showPopup(
+                `Maintenance crew account created successfully!<br><br>
+                <strong>Name:</strong> ${name}<br>
+                <strong>Role:</strong> ${role}<br>
+                <strong>Temporary Password:</strong> ${password}`
+              );
+
+              maintenanceForm.reset();
+              maintenancePasswordInput.value = "";
+              maintenancePasswordInput.style.background = "#222";
+              maintenancePasswordInput.style.border = "1px solid rgba(255,255,255,0.18)";
+
+              // Load maintenance crew list
+              await loadAndDisplayMaintenanceCrew();
+
+            } catch (error) {
+              showPopup("Error creating maintenance account: The email is already in use.");
+            } finally {
+              setButtonLoading(maintenanceSubmitBtn, false);
+            }
+          });
+        }
+
+        // Load initial user lists
+        await loadAndDisplayUnitOwners();
+
       })();
     }
 
@@ -3541,4 +3877,3 @@ async function loadAndDisplayUnitOwners() {
   </div>
 </body>
 </html>
-
