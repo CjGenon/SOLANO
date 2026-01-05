@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maintenance Crew Dashboard – Solano Hills</title>
+  <link rel="stylesheet" href="Admin_Dashboard.css" />
+</head>
+<body>
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="logo">
+      <img
+        src="SHR-LOGO-CORE-WHITE-r2s9u89e4bid2abizvtsncwzc48kzhlzz6fuhv7oko.webp"
+        alt="Solano Logo"
+      />
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#" onclick="loadContent(event, 'crew-dashboard')" class="active">My Dashboard</a></li>
+        <li><a href="#" onclick="loadContent(event, 'my-tasks')">My Tasks</a></li>
+        <li><a href="#" onclick="loadContent(event, 'task-history')">Task History</a></li>
+        <li><a href="LogIn.html">Logout</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <main class="main-content">
+    <div id="mainContent">
+      <div class="admin-header">
+        <h1>Maintenance Crew Dashboard</h1>
+        <p>Welcome back! Here are your assigned tasks.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>
+    emailjs.init("lqyGatNXQhoDJsu2B");
+  </script>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <script>
+    const TAB_STORAGE_KEY = 'maintenance_dashboard_active_tab';
+
+    function saveActiveTab(tabName) {
+      localStorage.setItem(TAB_STORAGE_KEY, tabName);
+    }
+
+    function getSavedTab() {
+      return localStorage.getItem(TAB_STORAGE_KEY) || 'crew-dashboard';
+    }
+
+    function updateActiveTabStyle(tabName) {
+      document.querySelectorAll(".sidebar nav ul li a").forEach(link => {
+        link.classList.remove("active");
+        const onclickVal = link.getAttribute("onclick") || "";
+        if (onclickVal.includes(`'${tabName}'`)) {
+          link.classList.add("active");
+        }
+      });
+    }
+
+    window.showLoading = function () {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.remove('hidden');
+      }
+    };
+
+    window.hideLoading = function () {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+    };
+
+    window.setButtonLoading = function (button, isLoading) {
+      if (!button) return;
+
+      if (isLoading) {
+        button.disabled = true;
+        button.classList.add('button-loading');
+        const originalText = button.textContent;
+        button.setAttribute('data-original-text', originalText);
+        button.textContent = 'Loading...';
+      } else {
+        button.disabled = false;
+        button.classList.remove('button-loading');
+        const originalText = button.getAttribute('data-original-text');
+        if (originalText) {
+          button.textContent = originalText;
+        }
+      }
+    };
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
+      authDomain: "solanodb-a4f65.firebaseapp.com",
+      projectId: "solanodb-a4f65",
+      storageBucket: "solanodb-a4f65.appspot.com",
+      messagingSenderId: "98081894649",
+      appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228",
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentMaintenancePerson = null;
+
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = "LogIn.html";
+      } else {
+        console.log("Maintenance crew logged in:", user.email);
+        
+        db.collection("users").doc(user.uid).get().then(doc => {
+          if (doc.exists) {
+            const userData = doc.data();
+            currentMaintenancePerson = userData.name || userData.email || user.email;
+            console.log("Current maintenance person:", currentMaintenancePerson);
+            
+            const welcomeMsg = document.querySelector(".admin-header p");
+            if (welcomeMsg) {
+              welcomeMsg.textContent = `Welcome back, ${currentMaintenancePerson}! Here are your assigned tasks.`;
+            }
+          }
+        });
+      }
+    });
+
+    function formatDateTimeAMPM(date) {
+      if (!date) return "N/A";
+      const d = date.toDate ? date.toDate() : date;
+      let hours = d.getHours();
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12 || 12;
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
+      const year = d.getFullYear();
+      return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+    }
+
+    function loadContent(event, section) {
+      if (event) event.preventDefault();
+
+      showLoading();
+
+      saveActiveTab(section);
+      updateActiveTabStyle(section);
+
+      const area = document.getElementById("mainContent");
+
+      switch (section) {
+        case "crew-dashboard":
+          area.innerHTML = `
+            <div class="admin-header">
+              <h1>My Dashboard</h1>
+              <p>Welcome back! Here's an overview of your tasks.</p>
+            </div>
+
+            <div class="kpi-row">
+              <div class="stat-card">
+                <div class="stat-label">Active Tasks</div>
+                <div class="stat-main" id="stat-active-tasks">--</div>
+                <div class="stat-sub" id="stat-urgent-tasks">Loading…</div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-label">Tasks This Week</div>
+                <div class="stat-main" id="stat-week-tasks">--</div>
+                <div class="stat-sub" id="stat-completed-week">Loading…</div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-label">Avg Work Time</div>
+                <div class="stat-main" id="stat-completion-rate">--</div>
+                <div class="stat-sub" id="stat-avg-time">Loading…</div>
+              </div>
+            </div>
+
+            <div class="dashboard-grid">
+              <div class="dashboard-main-col">
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">My Tasks by Priority</div>
+                    <div class="chart-subtitle">Distribution of your current tasks</div>
+                  </div>
+                  <div class="chart-wrapper">
+                    <canvas id="priorityChart"></canvas>
+                  </div>
+                </div>
+
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">Monthly Performance</div>
+                    <div class="chart-subtitle">Tasks completed over time</div>
+                  </div>
+                  <div class="chart-wrapper">
+                    <canvas id="performanceChart"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <div class="dashboard-side-col">
+                <div class="recent-card">
+                  <h3>Urgent Tasks</h3>
+                  <p class="recent-sub">Tasks that require immediate attention.</p>
+                  <div id="urgentTasksList"></div>
+                </div>
+
+                <div class="recent-card">
+                  <h3>Today's Schedule</h3>
+                  <p class="recent-sub">Your appointments for today.</p>
+                  <div id="todaysSchedule"></div>
+                </div>
+              </div>
+            </div>
+          `;
+          initCrewDashboard();
+          break;
+
+        case "my-tasks":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>My Assigned Tasks</h2>
+              <p>View and manage your current maintenance assignments.</p>
+            </div>
+
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="statusFilter">Filter by Status</label>
+                <select id="statusFilter">
+                  <option value="all">All Statuses</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Complete">Complete</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="priorityFilter">Filter by Priority</label>
+                <select id="priorityFilter">
+                  <option value="all">All Priorities</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="taskSearch">Search</label>
+                <input
+                  type="text"
+                  id="taskSearch"
+                  placeholder="Search by unit, issue, or notes…"
+                />
+              </div>
+
+              <button id="resetFilters" class="btn-secondary">Reset Filters</button>
+            </div>
+
+            <div id="taskStats" class="stats-strip">
+              <span id="taskCount">0</span> tasks |
+              <span id="inProgressCount">0</span> in progress |
+              <span id="pendingCount">0</span> pending |
+              <span id="completeCount">0</span> complete
+            </div>
+
+            <div id="tasksList" class="list-card">
+              <p>Loading your tasks...</p>
+            </div>
+          `;
+          initMyTasks();
+          break;
+
+        case "task-history":
+          area.innerHTML = `
+            <div class="admin-section-header">
+              <h2>Task History</h2>
+              <p>View your completed maintenance tasks.</p>
+            </div>
+
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="dateRangeFilter">Date Range</label>
+                <select id="dateRangeFilter">
+                  <option value="last7">Last 7 Days</option>
+                  <option value="last30">Last 30 Days</option>
+                  <option value="last90">Last 90 Days</option>
+                  <option value="all">All Time</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="historySearch">Search</label>
+                <input
+                  type="text"
+                  id="historySearch"
+                  placeholder="Search by unit or issue…"
+                />
+              </div>
+
+              <div class="filter-group">
+                <label for="sortBy">Sort by</label>
+                <select id="sortBy">
+                  <option value="date-desc">Date (Newest First)</option>
+                  <option value="date-asc">Date (Oldest First)</option>
+                  <option value="unit-asc">Unit Number (A–Z)</option>
+                  <option value="unit-desc">Unit Number (Z–A)</option>
+                </select>
+              </div>
+
+              <button id="resetFilters" class="btn-secondary">Reset Filters</button>
+            </div>
+
+            <div id="historyStats" class="stats-strip">
+              <span id="historyCount">0</span> completed tasks |
+              <span>Average Work Time:</span> <span id="avgCompletionTime">0h</span>
+            </div>
+
+            <div id="historyList" class="list-card">
+              <p>Loading task history...</p>
+            </div>
+          `;
+          initTaskHistory();
+          break;
+
+        default:
+          area.innerHTML =
+            "<h1>Welcome</h1><p>Select a menu option from the sidebar.</p>";
+      }
+
+      setTimeout(() => {
+        hideLoading();
+      }, 300);
+    }
+
+    async function initCrewDashboard() {
+      const activeTasksEl = document.getElementById("stat-active-tasks");
+      const urgentTasksEl = document.getElementById("stat-urgent-tasks");
+      const weekTasksEl = document.getElementById("stat-week-tasks");
+      const completedWeekEl = document.getElementById("stat-completed-week");
+      const completionRateEl = document.getElementById("stat-completion-rate");
+      const avgTimeEl = document.getElementById("stat-avg-time");
+      const urgentTasksListEl = document.getElementById("urgentTasksList");
+      const todaysScheduleEl = document.getElementById("todaysSchedule");
+
+      function calculateTimeDifference(startTime, endTime) {
+        if (!startTime || !endTime) return 0;
+        
+        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
+        const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
+        
+        return (end - start) / (1000 * 60 * 60);
+      }
+
+      function formatWorkTime(hours) {
+        if (hours === 0) return "0h";
+        const wholeHours = Math.floor(hours);
+        const minutes = Math.round((hours - wholeHours) * 60);
+        
+        if (wholeHours > 0) {
+          return `${wholeHours}h ${minutes}m`;
+        } else {
+          return `${minutes}m`;
+        }
+      }
+
+      if (!currentMaintenancePerson) {
+        setTimeout(initCrewDashboard, 500);
+        return;
+      }
+
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+
+      try {
+        const tasksSnap = await db
+          .collection("maintenanceRequests")
+          .where("maintenanceName", "==", currentMaintenancePerson)
+          .get();
+
+        let activeTasks = 0;
+        let urgentTasks = 0;
+        let tasksThisWeek = 0;
+        let completedThisWeek = 0;
+        let totalTasks = 0;
+        let completedTasks = 0;
+        let totalCompletionTime = 0;
+        let totalWorkHours = 0;
+        let tasksWithWorkTime = 0;
+        
+        const priorityCounts = { High: 0, Medium: 0, Low: 0 };
+        const urgentTasksData = [];
+        const todaysAppointments = [];
+
+        tasksSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const status = data.status || "Pending";
+          const priority = data.priority || "Medium";
+          
+          totalTasks++;
+          
+          if (status === "Complete") {
+            completedTasks++;
+            
+            if (data.startTime && data.completionTime) {
+              const hours = calculateTimeDifference(data.startTime, data.completionTime);
+              totalCompletionTime += hours;
+              totalWorkHours += hours;
+              tasksWithWorkTime++;
+            }
+            
+            if (data.completionTime) {
+              const completionDate = data.completionTime.toDate();
+              if (completionDate >= startOfWeek) {
+                completedThisWeek++;
+              }
+            }
+          } else {
+            activeTasks++;
+            
+            priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+            
+            if (priority === "High" && status !== "Complete") {
+              urgentTasks++;
+              urgentTasksData.push({ ...data, id: docSnap.id });
+            }
+            
+            if (data.preferredVisitTime) {
+              const visitDate = data.preferredVisitTime.toDate();
+              if (visitDate >= today && visitDate < tomorrow) {
+                todaysAppointments.push({ ...data, id: docSnap.id });
+              }
+            }
+            
+            const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : null;
+            if (timestamp && timestamp >= startOfWeek) {
+              tasksThisWeek++;
+            }
+            
+            if (status === "In Progress" && data.startTime) {
+              const currentHours = calculateTimeDifference(data.startTime, new Date());
+              totalWorkHours += currentHours;
+            }
+          }
+        });
+
+        if (activeTasksEl) activeTasksEl.textContent = activeTasks;
+        if (urgentTasksEl) urgentTasksEl.textContent = `${urgentTasks} urgent`;
+        if (weekTasksEl) weekTasksEl.textContent = tasksThisWeek;
+        if (completedWeekEl) completedWeekEl.textContent = `${completedThisWeek} completed this week`;
+        
+        const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        if (completionRateEl) completionRateEl.textContent = `${completionRate}%`;
+        
+        const avgWorkTime = tasksWithWorkTime > 0 ? totalCompletionTime / tasksWithWorkTime : 0;
+        if (avgTimeEl) avgTimeEl.textContent = `Avg: ${formatWorkTime(avgWorkTime)}`;
+
+        if (urgentTasksListEl) {
+          if (urgentTasksData.length === 0) {
+            urgentTasksListEl.innerHTML = '<p class="muted">No urgent tasks at the moment.</p>';
+          } else {
+            urgentTasksListEl.innerHTML = "";
+            urgentTasksData.slice(0, 5).forEach(task => {
+              const row = document.createElement("div");
+              row.className = "recent-payment-row";
+              row.style.cursor = "pointer";
+              row.onclick = () => openTaskDetails(task.id);
+              
+              const unitNumber = task.unitNumber || "N/A";
+              const problem = task.problem || "Unknown issue";
+              const shortProblem = problem.length > 40 ? problem.substring(0, 40) + "..." : problem;
+              
+              row.innerHTML = `
+                <div class="recent-main">
+                  <div class="recent-email">${unitNumber}</div>
+                  <div class="recent-method">${shortProblem}</div>
+                </div>
+                <div class="recent-meta">
+                  <div class="recent-amount" style="color: #ff4757;">URGENT</div>
+                </div>
+              `;
+              urgentTasksListEl.appendChild(row);
+            });
+          }
+        }
+
+        if (todaysScheduleEl) {
+          if (todaysAppointments.length === 0) {
+            todaysScheduleEl.innerHTML = '<p class="muted">No appointments scheduled for today.</p>';
+          } else {
+            todaysScheduleEl.innerHTML = "";
+            todaysAppointments.slice(0, 5).forEach(appointment => {
+              const row = document.createElement("div");
+              row.className = "recent-payment-row";
+              row.style.cursor = "pointer";
+              row.onclick = () => openTaskDetails(appointment.id);
+              
+              const unitNumber = appointment.unitNumber || "N/A";
+              const visitTime = appointment.preferredVisitTime ? 
+                formatDateTimeAMPM(appointment.preferredVisitTime).split(" ")[1] : "N/A";
+              
+              row.innerHTML = `
+                <div class="recent-main">
+                  <div class="recent-email">${unitNumber}</div>
+                  <div class="recent-method">${appointment.problem || "Appointment"}</div>
+                </div>
+                <div class="recent-meta">
+                  <div class="recent-amount">${visitTime}</div>
+                </div>
+              `;
+              todaysScheduleEl.appendChild(row);
+            });
+          }
+        }
+
+        const priorityCanvas = document.getElementById("priorityChart");
+        if (priorityCanvas) {
+          const priorityCtx = priorityCanvas.getContext("2d");
+          new Chart(priorityCtx, {
+            type: "doughnut",
+            data: {
+              labels: ["High", "Medium", "Low"],
+              datasets: [{
+                data: [priorityCounts.High, priorityCounts.Medium, priorityCounts.Low],
+                backgroundColor: ["#ff4757", "#ffa502", "#2ed573"],
+                borderWidth: 0,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              cutout: "60%",
+              plugins: {
+                legend: {
+                  position: "bottom",
+                  labels: { color: "#f3efe9" },
+                },
+              },
+            },
+          });
+        }
+
+        const performanceCanvas = document.getElementById("performanceChart");
+        if (performanceCanvas) {
+          const days = [];
+          const completedPerDay = {};
+          for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            days.push(label);
+            completedPerDay[label] = 0;
+          }
+
+          tasksSnap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.status === "Complete" && data.completionTime) {
+              const completionDate = data.completionTime.toDate();
+              const label = completionDate.toLocaleDateString("en-US", { 
+                month: "short", 
+                day: "numeric" 
+              });
+              if (completedPerDay[label] !== undefined) {
+                completedPerDay[label]++;
+              }
+            }
+          });
+
+          const performanceCtx = performanceCanvas.getContext("2d");
+          new Chart(performanceCtx, {
+            type: "line",
+            data: {
+              labels: days,
+              datasets: [{
+                label: "Tasks Completed",
+                data: days.map(day => completedPerDay[day]),
+                borderColor: "#c0933c",
+                backgroundColor: "rgba(192, 147, 60, 0.1)",
+                fill: true,
+                tension: 0.4,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              plugins: {
+                legend: { display: false },
+              },
+              scales: {
+                x: {
+                  grid: { display: false },
+                  ticks: { color: "#cccccc", maxRotation: 0 },
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: { color: "rgba(255,255,255,0.06)" },
+                  ticks: {
+                    color: "#cccccc",
+                    precision: 0,
+                  },
+                },
+              },
+            },
+          });
+        }
+
+      } catch (err) {
+        console.error("Error loading crew dashboard:", err);
+      }
+    }
+
+    function openTaskDetails(taskId) {
+      showPopup(`
+        <div style="text-align: left;">
+          <h3 style="margin-top: 0; color: #c0933c;">Task Details</h3>
+          <p>Opening task details...</p>
+        </div>
+      `);
+      
+      loadContent(null, "my-tasks");
+    }
+
+    function initMyTasks() {
+      const tasksList = document.getElementById("tasksList");
+      const statusFilter = document.getElementById("statusFilter");
+      const priorityFilter = document.getElementById("priorityFilter");
+      const taskSearch = document.getElementById("taskSearch");
+      const resetFilters = document.getElementById("resetFilters");
+      const taskStats = document.getElementById("taskStats");
+      const taskCount = document.getElementById("taskCount");
+      const inProgressCount = document.getElementById("inProgressCount");
+      const pendingCount = document.getElementById("pendingCount");
+      const completeCount = document.getElementById("completeCount");
+
+      let allTasks = [];
+      let filteredTasks = [];
+
+      function calculateTimeDifference(startTime, endTime) {
+        if (!startTime || !endTime) return "N/A";
+        
+        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
+        const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
+        
+        const diffMs = end - start;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (diffHours > 0) {
+          return `${diffHours}h ${diffMinutes}m`;
+        } else {
+          return `${diffMinutes}m`;
+        }
+      }
+
+      function calculateCurrentWorkTime(startTime) {
+        if (!startTime) return "N/A";
+        
+        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
+        const now = new Date();
+        
+        const diffMs = now - start;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (diffHours > 0) {
+          return `${diffHours}h ${diffMinutes}m (ongoing)`;
+        } else {
+          return `${diffMinutes}m (ongoing)`;
+        }
+      }
+
+      function applyFiltersAndSort() {
+        const statusValue = statusFilter.value;
+        const priorityValue = priorityFilter.value;
+        const searchValue = taskSearch.value.toLowerCase();
+
+        filteredTasks = allTasks.filter(task => {
+          if (statusValue !== "all" && task.status !== statusValue) {
+            return false;
+          }
+          
+          if (priorityValue !== "all" && task.priority !== priorityValue) {
+            return false;
+          }
+          
+          if (searchValue) {
+            const unitMatch = task.unitNumber && task.unitNumber.toLowerCase().includes(searchValue);
+            const problemMatch = task.problem && task.problem.toLowerCase().includes(searchValue);
+            const commentMatch = task.comment && task.comment.toLowerCase().includes(searchValue);
+            if (!unitMatch && !problemMatch && !commentMatch) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+
+        renderTasks();
+      }
+
+      function renderTasks() {
+        if (!filteredTasks.length) {
+          tasksList.innerHTML = "<p>No tasks found matching your criteria.</p>";
+          taskStats.style.display = "none";
+          return;
+        }
+
+        tasksList.innerHTML = "";
+        
+        let inProgress = 0;
+        let pending = 0;
+        let complete = 0;
+
+        filteredTasks.forEach(task => {
+          const data = task;
+          const id = data.id;
+
+          if (data.status === "In Progress") inProgress++;
+          else if (data.status === "Pending") pending++;
+          else if (data.status === "Complete") complete++;
+
+          const card = document.createElement("div");
+          card.className = "maintenance-card";
+          card.dataset.taskId = id;
+
+          let statusColor = "#f39c12";
+          if (data.status === "In Progress") statusColor = "#3498db";
+          if (data.status === "Complete") statusColor = "#27ae60";
+          
+          let priorityColor = "#f1c40f";
+          if (data.priority === "High") priorityColor = "#e74c3c";
+          if (data.priority === "Low") priorityColor = "#2ecc71";
+
+          card.style.borderLeft = `4px solid ${statusColor}`;
+
+          const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+            ? `
+                <div style="margin-top:6px;">
+                    <strong>Attachments:</strong><br/>
+                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                        <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                        ${data.imageUrls.length > 1 ? `
+                          <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                          <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
+                        ` : ""}
+                    </div>
+                </div>`
+            : "";
+
+          let workTimeInfo = "";
+          if (data.status === "In Progress" && data.startTime) {
+            const currentWorkTime = calculateCurrentWorkTime(data.startTime);
+            workTimeInfo = `<p><strong>Work Time:</strong> <span style="color:#3498db; font-weight:bold;">${currentWorkTime}</span></p>`;
+          } else if (data.status === "Complete" && data.startTime && data.completionTime) {
+            const totalWorkTime = calculateTimeDifference(data.startTime, data.completionTime);
+            workTimeInfo = `<p><strong>Total Work Time:</strong> <span style="color:#27ae60; font-weight:bold;">${totalWorkTime}</span></p>`;
+          }
+
+          card.innerHTML = `
+            <div style="position: relative;">
+                <h3>${data.problem || "Unknown Issue"} 
+                  <span style="font-size: 12px; background: ${priorityColor}; color: white; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
+                    ${data.priority || "Medium"} Priority
+                  </span>
+                </h3>
+                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:220px;">
+                        <p><strong>Unit:</strong> ${data.unitNumber || "N/A"}</p>
+                        <p><strong>Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
+                        <p><strong>Scheduled Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
+                        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
+                        <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+                        ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
+                        ${data.completionTime ? `<p><strong>Work Ended:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
+                        ${workTimeInfo}
+                    </div>
+                    <div style="min-width:220px;">${attachmentsHTML}</div>
+                </div>
+            </div>
+          `;
+
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "maintenance-card-actions";
+
+          if (data.status === "Pending") {
+            const startBtn = document.createElement("button");
+            startBtn.textContent = "🛠️ Start Work";
+            startBtn.className = "btn-primary";
+            startBtn.style.background = "#27ae60";
+            startBtn.title = "Click to start working on this task";
+            startBtn.addEventListener("click", () => startWork(id));
+            actionsDiv.appendChild(startBtn);
+            
+          } else if (data.status === "In Progress") {
+            const endBtn = document.createElement("button");
+            endBtn.textContent = "✅ End Work";
+            endBtn.className = "btn-primary";
+            endBtn.style.background = "#e74c3c";
+            endBtn.title = "Click when you've finished working on this task";
+            endBtn.addEventListener("click", () => endWork(id));
+            actionsDiv.appendChild(endBtn);
+            
+          } else if (data.status === "Complete") {
+            const timeInfo = document.createElement("div");
+            timeInfo.style.cssText = `
+              padding: 8px 12px;
+              background: #2ecc71;
+              color: white;
+              border-radius: 6px;
+              font-size: 14px;
+              font-weight: bold;
+              margin-right: 10px;
+              display: inline-block;
+            `;
+            
+            if (data.startTime && data.completionTime) {
+              const workTime = calculateTimeDifference(data.startTime, data.completionTime);
+              timeInfo.textContent = `⏱️ Work Time: ${workTime}`;
+              timeInfo.title = `Total time spent on this task`;
+            } else {
+              timeInfo.textContent = "⏱️ Work Time: N/A";
+            }
+            actionsDiv.appendChild(timeInfo);
+          }
+
+          const chatBtn = document.createElement("button");
+          chatBtn.textContent = "💬 View Conversation";
+          chatBtn.className = "btn-primary";
+          chatBtn.style.background = "#4a90e2";
+          chatBtn.title = "View and respond to messages about this task";
+          chatBtn.addEventListener("click", () => openMaintenanceChat(id));
+          actionsDiv.appendChild(chatBtn);
+
+          card.appendChild(actionsDiv);
+          tasksList.appendChild(card);
+
+          if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
+            let currentIndex = 0;
+            const imgEl = card.querySelector(`#img-${id}`);
+            const prevBtn = card.querySelector(".prev-btn");
+            const nextBtn = card.querySelector(".next-btn");
+
+            prevBtn.addEventListener("click", () => {
+              currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+
+            nextBtn.addEventListener("click", () => {
+              currentIndex = (currentIndex + 1) % data.imageUrls.length;
+              imgEl.src = data.imageUrls[currentIndex];
+            });
+          }
+        });
+
+        taskCount.textContent = filteredTasks.length;
+        inProgressCount.textContent = inProgress;
+        pendingCount.textContent = pending;
+        completeCount.textContent = complete;
+        taskStats.style.display = "block";
+      }
+
+      async function startWork(taskId) {
+        if (confirm("Are you sure you want to start work on this task? This will log your start time.")) {
+          try {
+            showLoading();
+            await db.collection("maintenanceRequests").doc(taskId).update({
+              status: "In Progress",
+              startTime: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
+              sender: "system",
+              message: `🛠️ ${currentMaintenancePerson} started work on this task at ${new Date().toLocaleString()}.`,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            
+            showPopup("✅ Work started! Your start time has been logged.");
+            applyFiltersAndSort();
+          } catch (error) {
+            showPopup("❌ Error starting work: " + error.message);
+          } finally {
+            hideLoading();
+          }
+        }
+      }
+
+      async function endWork(taskId) {
+        const notes = prompt("Add any final notes about the work completed:");
+        
+        if (notes !== null) {
+          if (confirm("Are you sure you want to end work on this task? This will mark it as complete.")) {
+            try {
+              showLoading();
+              
+              await db.collection("maintenanceRequests").doc(taskId).update({
+                status: "Complete",
+                completionTime: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+              
+              await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
+                sender: "system",
+                message: `✅ ${currentMaintenancePerson} completed this task at ${new Date().toLocaleString()}.${notes ? `\n\nNotes: ${notes}` : ''}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              
+              if (notes.trim()) {
+                await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
+                  sender: "maintenance",
+                  maintenanceName: currentMaintenancePerson,
+                  message: `📝 Work completion notes: ${notes}`,
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+              
+              showPopup("✅ Work completed successfully! Task marked as complete.");
+              applyFiltersAndSort();
+            } catch (error) {
+              showPopup("❌ Error completing task: " + error.message);
+            } finally {
+              hideLoading();
+            }
+          }
+        }
+      }
+
+      db.collection("maintenanceRequests")
+        .where("maintenanceName", "==", currentMaintenancePerson)
+        .orderBy("timestamp", "desc")
+        .onSnapshot(
+          (snapshot) => {
+            if (snapshot.empty) {
+              allTasks = [];
+              filteredTasks = [];
+              tasksList.innerHTML = "<p>No tasks assigned to you yet.</p>";
+              taskStats.style.display = "none";
+              return;
+            }
+
+            allTasks = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            }));
+
+            applyFiltersAndSort();
+          },
+          (error) => {
+            tasksList.innerHTML =
+              `<p style="color:red;">Error loading tasks: ${error.message}</p>`;
+            taskStats.style.display = "none";
+          }
+        );
+
+      statusFilter.addEventListener("change", applyFiltersAndSort);
+      priorityFilter.addEventListener("change", applyFiltersAndSort);
+      taskSearch.addEventListener("input", applyFiltersAndSort);
+      resetFilters.addEventListener("click", () => {
+        statusFilter.value = "all";
+        priorityFilter.value = "all";
+        taskSearch.value = "";
+        applyFiltersAndSort();
+      });
+    }
+
+    function initTaskHistory() {
+      const historyList = document.getElementById("historyList");
+      const dateRangeFilter = document.getElementById("dateRangeFilter");
+      const historySearch = document.getElementById("historySearch");
+      const sortBy = document.getElementById("sortBy");
+      const resetFilters = document.getElementById("resetFilters");
+      const historyStats = document.getElementById("historyStats");
+      const historyCount = document.getElementById("historyCount");
+      const avgCompletionTime = document.getElementById("avgCompletionTime");
+
+      function formatWorkTime(hours) {
+        if (hours === 0) return "0h";
+        const wholeHours = Math.floor(hours);
+        const minutes = Math.round((hours - wholeHours) * 60);
+        
+        if (wholeHours > 0) {
+          return `${wholeHours}h ${minutes}m`;
+        } else {
+          return `${minutes}m`;
+        }
+      }
+
+      function calculateTimeDifference(startTime, endTime) {
+        if (!startTime || !endTime) return 0;
+        
+        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
+        const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
+        
+        return (end - start) / (1000 * 60 * 60);
+      }
+
+      let allHistory = [];
+      let filteredHistory = [];
+
+      async function loadHistory() {
+        if (!currentMaintenancePerson) {
+          setTimeout(loadHistory, 500);
+          return;
+        }
+
+        try {
+          const snapshot = await db
+            .collection("maintenanceRequests")
+            .where("maintenanceName", "==", currentMaintenancePerson)
+            .where("status", "==", "Complete")
+            .orderBy("completionTime", "desc")
+            .get();
+
+          if (snapshot.empty) {
+            allHistory = [];
+            filteredHistory = [];
+            historyList.innerHTML = "<p>No completed tasks found.</p>";
+            historyStats.style.display = "none";
+            return;
+          }
+
+          allHistory = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }));
+
+          applyFiltersAndSort();
+        } catch (error) {
+          historyList.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
+        }
+      }
+
+      function applyFiltersAndSort() {
+        const dateRangeValue = dateRangeFilter.value;
+        const searchValue = historySearch.value.toLowerCase();
+        const sortValue = sortBy.value;
+
+        const now = new Date();
+        let startDate = null;
+
+        switch (dateRangeValue) {
+          case "last7":
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case "last30":
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case "last90":
+            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          case "all":
+            startDate = null;
+            break;
+        }
+
+        filteredHistory = allHistory.filter(task => {
+          if (startDate && task.completionTime) {
+            const completionDate = task.completionTime.toDate();
+            if (completionDate < startDate) {
+              return false;
+            }
+          }
+          
+          if (searchValue) {
+            const unitMatch = task.unitNumber && task.unitNumber.toLowerCase().includes(searchValue);
+            const problemMatch = task.problem && task.problem.toLowerCase().includes(searchValue);
+            if (!unitMatch && !problemMatch) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+
+        filteredHistory.sort((a, b) => {
+          const aDate = a.completionTime?.toDate ? a.completionTime.toDate() : null;
+          const bDate = b.completionTime?.toDate ? b.completionTime.toDate() : null;
+
+          switch (sortValue) {
+            case "date-desc":
+              return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+            case "date-asc":
+              return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+            case "unit-asc":
+              return (a.unitNumber || "").localeCompare(b.unitNumber || "");
+            case "unit-desc":
+              return (b.unitNumber || "").localeCompare(a.unitNumber || "");
+            default:
+              return 0;
+          }
+        });
+
+        renderHistory();
+      }
+
+      function renderHistory() {
+        if (!filteredHistory.length) {
+          historyList.innerHTML = "<p>No completed tasks found matching your criteria.</p>";
+          historyStats.style.display = "none";
+          return;
+        }
+
+        historyList.innerHTML = "";
+        
+        let totalCompletionHours = 0;
+        let tasksWithCompletionTime = 0;
+
+        filteredHistory.forEach(task => {
+          const data = task;
+          const id = data.id;
+
+          let completionTime = "N/A";
+          let completionHours = 0;
+          if (data.startTime && data.completionTime) {
+            completionHours = calculateTimeDifference(data.startTime, data.completionTime);
+            completionTime = formatWorkTime(completionHours);
+            totalCompletionHours += completionHours;
+            tasksWithCompletionTime++;
+          }
+
+          let efficiencyScore = "";
+          if (completionHours > 0) {
+            const efficiency = 1 / completionHours;
+            efficiencyScore = `<span style="font-size:12px; color:#666;">(${efficiency.toFixed(1)} tasks/hour)</span>`;
+          }
+
+          const card = document.createElement("div");
+          card.className = "maintenance-card";
+          card.style.borderLeft = "4px solid #27ae60";
+
+          card.innerHTML = `
+            <div style="position: relative;">
+                <h3>${data.problem || "Unknown Issue"}</h3>
+                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:220px;">
+                        <p><strong>Unit:</strong> ${data.unitNumber || "N/A"}</p>
+                        <p><strong>Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
+                        <p><strong>Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>
+                        <p><strong>Ended:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>
+                        <p><strong>Work Duration:</strong> 
+                          <span style="color:#27ae60; font-weight:bold;">${completionTime}</span>
+                          ${efficiencyScore}
+                        </p>
+                        <p><strong>Priority:</strong> ${data.priority || "Medium"}</p>
+                    </div>
+                </div>
+            </div>
+          `;
+
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "maintenance-card-actions";
+
+          const timelineBtn = document.createElement("button");
+          timelineBtn.textContent = "📊 View Work Timeline";
+          timelineBtn.className = "btn-primary";
+          timelineBtn.style.background = "#9b59b6";
+          timelineBtn.title = "View detailed work timeline";
+          timelineBtn.addEventListener("click", () => showWorkTimeline(data));
+          actionsDiv.appendChild(timelineBtn);
+
+          const chatBtn = document.createElement("button");
+          chatBtn.textContent = "💬 View Conversation";
+          chatBtn.className = "btn-secondary";
+          chatBtn.addEventListener("click", () => openMaintenanceChat(id));
+          actionsDiv.appendChild(chatBtn);
+
+          card.appendChild(actionsDiv);
+          historyList.appendChild(card);
+        });
+
+        historyCount.textContent = filteredHistory.length;
+        
+        const avgTime = tasksWithCompletionTime > 0 ? 
+          totalCompletionHours / tasksWithCompletionTime : 0;
+        avgCompletionTime.textContent = `${formatWorkTime(avgTime)}`;
+        
+        historyStats.style.display = "block";
+      }
+
+      function showWorkTimeline(taskData) {
+        if (!taskData.startTime || !taskData.completionTime) {
+          showPopup("No work time data available for this task.");
+          return;
+        }
+        
+        const start = taskData.startTime.toDate ? taskData.startTime.toDate() : new Date(taskData.startTime);
+        const end = taskData.completionTime.toDate ? taskData.completionTime.toDate() : new Date(taskData.completionTime);
+        const durationMs = end - start;
+        const durationHours = durationMs / (1000 * 60 * 60);
+        const hours = Math.floor(durationHours);
+        const minutes = Math.round((durationHours - hours) * 60);
+        
+        showPopup(`
+          <div style="text-align: left; max-width: 500px;">
+            <h3 style="margin-top: 0; color: #c0933c;">Work Timeline</h3>
+            <p><strong>Task:</strong> ${taskData.problem || "Unknown Issue"}</p>
+            <p><strong>Unit:</strong> ${taskData.unitNumber || "N/A"}</p>
+            
+            <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 15px 0;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <div>
+                  <div style="font-size: 12px; color: #888;">START TIME</div>
+                  <div style="font-weight: bold;">${formatDateTimeAMPM(start)}</div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 12px; color: #888;">END TIME</div>
+                  <div style="font-weight: bold;">${formatDateTimeAMPM(end)}</div>
+                </div>
+              </div>
+              
+              <div style="background: #333; height: 20px; border-radius: 10px; position: relative; margin: 10px 0;">
+                <div style="background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; border-radius: 10px; width: 100%;"></div>
+                <div style="position: absolute; left: 0; top: -25px; font-size: 12px; color: #27ae60;">Start</div>
+                <div style="position: absolute; right: 0; top: -25px; font-size: 12px; color: #2ecc71;">End</div>
+              </div>
+              
+              <div style="text-align: center; margin-top: 20px;">
+                <div style="font-size: 24px; font-weight: bold; color: #27ae60;">
+                  ${hours > 0 ? `${hours}h ` : ''}${minutes}m
+                </div>
+                <div style="font-size: 12px; color: #888;">Total Work Time</div>
+              </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; background: #333; padding: 10px; border-radius: 6px;">
+              <div style="text-align: center;">
+                <div style="font-size: 12px; color: #888;">Efficiency</div>
+                <div style="font-weight: bold;">
+                  ${durationHours > 0 ? (1/durationHours).toFixed(2) : 'N/A'} tasks/hour
+                </div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 12px; color: #888;">Completion Rate</div>
+                <div style="font-weight: bold; color: #27ae60;">100%</div>
+              </div>
+            </div>
+          </div>
+        `);
+      }
+
+      dateRangeFilter.addEventListener("change", applyFiltersAndSort);
+      historySearch.addEventListener("input", applyFiltersAndSort);
+      sortBy.addEventListener("change", applyFiltersAndSort);
+      resetFilters.addEventListener("click", () => {
+        dateRangeFilter.value = "last7";
+        historySearch.value = "";
+        sortBy.value = "date-desc";
+        applyFiltersAndSort();
+      });
+
+      loadHistory();
+    }
+
+    async function openMaintenanceChat(requestId) {
+      const chatPanel = document.getElementById("maintenanceMessagesPanel");
+      const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
+      const chatMessagesContainer = document.getElementById("maintenanceMessagesContainer");
+      const chatReplyTextarea = document.getElementById("maintenanceReplyMessage");
+      const chatReplyStatus = document.getElementById("maintenanceReplyStatus");
+      const chatSendBtn = document.getElementById("maintenanceSendReplyBtn");
+      const chatClearBtn = document.getElementById("maintenanceClearReplyBtn");
+      const chatCloseBtn = document.getElementById("closeMaintenanceMessagesBtn");
+      const chatQuickReplyBtns = document.querySelectorAll(".maintenanceQuickReplyBtn");
+
+      if (chatPanel && !chatPanel.dataset.bound) {
+        chatPanel.dataset.bound = "true";
+
+        chatCloseBtn.addEventListener("click", () => {
+          chatPanel.style.display = "none";
+          chatReplyTextarea.value = "";
+          chatReplyStatus.textContent = "";
+        });
+
+        chatPanel.addEventListener("click", (e) => {
+          if (e.target === chatPanel) {
+            chatPanel.style.display = "none";
+            chatReplyTextarea.value = "";
+            chatReplyStatus.textContent = "";
+          }
+        });
+
+        chatClearBtn.addEventListener("click", () => {
+          chatReplyTextarea.value = "";
+          chatReplyStatus.textContent = "";
+        });
+
+        chatQuickReplyBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const template = btn.dataset.template;
+            let msg = "";
+            switch (template) {
+              case "on_the_way":
+                msg = "I'm on my way to your unit now.";
+                break;
+              case "technician_assigned":
+                msg = "I've been assigned to your maintenance request and will be there shortly.";
+                break;
+              case "scheduled":
+                msg = "I'll be there at the scheduled time.";
+                break;
+              case "resolved":
+                msg = "The maintenance issue has been resolved.";
+                break;
+            }
+            chatReplyTextarea.value = msg;
+            chatReplyTextarea.focus();
+          });
+        });
+
+        chatSendBtn.addEventListener("click", async () => {
+          const msg = chatReplyTextarea.value.trim();
+          if (!msg) {
+            showPopup("Response message cannot be empty.");
+            return;
+          }
+
+          const requestId = chatPanel.dataset.requestId;
+          if (!requestId) return;
+
+          try {
+            setButtonLoading(chatSendBtn, true);
+
+            const requestDocRef = db.collection("maintenanceRequests").doc(requestId);
+            await requestDocRef.collection("responses").add({
+              sender: "maintenance",
+              maintenanceName: currentMaintenancePerson,
+              message: msg,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            await requestDocRef.update({
+              responseTime: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            chatReplyTextarea.value = "";
+            await loadMaintenanceChatMessages(requestId);
+
+            chatReplyStatus.textContent = "✓ Reply sent successfully.";
+            chatReplyStatus.style.color = "#4caf50";
+          } catch (error) {
+            console.error(error);
+            chatReplyStatus.textContent = "✗ Failed to send reply.";
+            chatReplyStatus.style.color = "#f44336";
+            showPopup("Failed to send response: " + error.message);
+          } finally {
+            setButtonLoading(chatSendBtn, false);
+          }
+        });
+      }
+
+      try {
+        chatMessagesContainer.innerHTML =
+          "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading conversation…</div>";
+
+        const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+        if (!docSnap.exists) {
+          showPopup("Maintenance request not found.");
+          return;
+        }
+        const data = docSnap.data();
+
+        chatTitleEl.textContent = `Maintenance – ${data.unitNumber || "Unknown unit"}`;
+        chatPanel.dataset.requestId = requestId;
+        chatPanel.style.display = "flex";
+
+        await loadMaintenanceChatMessages(requestId, data);
+      } catch (error) {
+        console.error(error);
+        showPopup("Failed to load conversation: " + error.message);
+      }
+    }
+
+    async function loadMaintenanceChatMessages(requestId, requestData) {
+      const container = document.getElementById("maintenanceMessagesContainer");
+      container.innerHTML = "";
+
+      let data = requestData;
+      if (!data) {
+        const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+        data = docSnap.data();
+      }
+
+      const header = document.createElement("div");
+      header.className = "message-bubble client";
+      header.innerHTML = `
+        <div class="message-header">
+          <div class="message-sender">${data.tenantEmail || "Unit Owner"}</div>
+          <div class="message-time">${formatDateTimeAMPM(data.timestamp)}</div>
+        </div>
+        <div style="font-size:13px;">
+          <strong>Unit:</strong> ${data.unitNumber || "N/A"}<br/>
+          <strong>Issue:</strong> ${data.problem || "N/A"}<br/>
+          <strong>Status:</strong> ${data.status || "Pending"}<br/>
+          <strong>Preferred visit:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}<br/>
+        </div>
+      `;
+      container.appendChild(header);
+
+      const respSnap = await db
+        .collection("maintenanceRequests")
+        .doc(requestId)
+        .collection("responses")
+        .orderBy("timestamp", "asc")
+        .get();
+
+      if (respSnap.empty) {
+        const empty = document.createElement("div");
+        empty.style.cssText =
+          "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
+        empty.textContent =
+          "No chat history yet. Use the reply form below to send the first message.";
+        container.appendChild(empty);
+      } else {
+        respSnap.forEach((doc) => {
+          const msg = doc.data();
+          const isAdmin = msg.sender === "admin" || !!msg.adminEmail;
+          const isMaintenance = msg.sender === "maintenance";
+          const isSystem = msg.sender === "system";
+          
+          const bubble = document.createElement("div");
+          
+          if (isAdmin) {
+            bubble.className = "message-bubble admin";
+          } else if (isMaintenance || isSystem) {
+            bubble.className = "message-bubble admin";
+          } else {
+            bubble.className = "message-bubble client";
+          }
+
+          const ts = msg.timestamp?.toDate
+            ? msg.timestamp.toDate()
+            : null;
+
+          let senderName = "";
+          if (isAdmin) {
+            senderName = msg.adminEmail || "Admin";
+          } else if (isMaintenance) {
+            senderName = msg.maintenanceName || "Maintenance Crew";
+          } else if (isSystem) {
+            senderName = "System";
+          } else {
+            senderName = data.tenantEmail || "Unit Owner";
+          }
+
+          bubble.innerHTML = `
+            <div class="message-header">
+              <div class="message-sender">${senderName}</div>
+              <div class="message-time">${
+                ts ? formatDateTimeAMPM(ts) : "N/A"
+              }</div>
+            </div>
+            <div class="message-content" style="white-space:pre-wrap;">${
+              msg.message || msg.content || ""
+            }</div>
+          `;
+          container.appendChild(bubble);
+        });
+      }
+
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 100);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return "";
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    window.showPopup = function (message) {
+      let popup = document.getElementById("customPopup");
+      if (!popup) {
+        popup = document.createElement("div");
+        popup.id = "customPopup";
+        popup.className = "popup hidden";
+        popup.innerHTML = `
+          <div class="popup-content">
+            <p id="popupMessage">Your message goes here</p>
+            <button onclick="closePopup()">Close</button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+      }
+      
+      document.getElementById("popupMessage").innerHTML = message;
+      popup.classList.remove("hidden");
+    };
+
+    window.closePopup = function () {
+      const popup = document.getElementById("customPopup");
+      if (popup) {
+        popup.classList.add("hidden");
+      }
+    };
+
+    window.onload = function () {
+      const savedTab = getSavedTab();
+      loadContent(null, savedTab);
+    };
+  </script>
+
+  <div id="maintenanceMessagesPanel" class="messages-popup-panel">
+    <div class="messages-popup-content">
+      <div class="messages-popup-header">
+        <h3 id="maintenanceMessagesTitle" class="messages-popup-title">
+          Maintenance Conversation
+        </h3>
+        <button id="closeMaintenanceMessagesBtn" class="messages-popup-close">×</button>
+      </div>
+      <div class="messages-popup-body">
+        <div id="maintenanceMessagesContainer"></div>
+
+        <div class="reply-section">
+          <h4 style="margin-top:0;">Send Reply</h4>
+
+          <textarea
+            id="maintenanceReplyMessage"
+            class="reply-textarea"
+            placeholder="Type your reply here..."
+          ></textarea>
+
+          <div class="quick-replies">
+            <p class="quick-replies-label">Quick replies:</p>
+            <div class="quick-reply-buttons">
+              <button class="maintenanceQuickReplyBtn" data-template="on_the_way">
+                On the way
+              </button>
+              <button class="maintenanceQuickReplyBtn" data-template="technician_assigned">
+                Technician assigned
+              </button>
+              <button class="maintenanceQuickReplyBtn" data-template="scheduled">
+                Scheduled per request
+              </button>
+              <button class="maintenanceQuickReplyBtn" data-template="resolved">
+                Issue resolved
+              </button>
+            </div>
+          </div>
+
+          <div class="reply-buttons">
+            <button id="maintenanceSendReplyBtn" class="send">Send reply</button>
+            <button id="maintenanceClearReplyBtn" class="cancel">Clear</button>
+          </div>
+
+          <div id="maintenanceReplyStatus" style="margin-top:8px;font-size:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
