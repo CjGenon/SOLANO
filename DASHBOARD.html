@@ -59,7 +59,7 @@
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
     import { getStorage } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-storage.js";
-
+    
     /* ======================== FIREBASE INIT ======================== */
     const firebaseConfig = {
       apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
@@ -1587,313 +1587,345 @@
           break;
 
         /* ======================== BILLING ======================== */
-        case "billing":
-          mainContent.innerHTML = `
-            <div class="tab-header">
-              <div>
-                <h1 class="page-title">Billing & Payments</h1>
-                <p class="page-subtitle">Review your current invoice and payment history.</p>
-              </div>
-            </div>
+ case "billing":
+  mainContent.innerHTML = `
+    <div class="tab-header">
+      <div>
+        <h1 class="page-title">Billing & Payments</h1>
+        <p class="page-subtitle">Review your current invoice and payment history.</p>
+      </div>
+    </div>
 
-            <div class="billing-grid payment-tab">
-              <section class="card">
-                <h2 class="section-title">Current Invoice</h2>
-                <p>Pay your monthly dues securely via PayPal.</p>
+    <div class="billing-grid payment-tab">
+      <section class="card">
+        <h2 class="section-title">Current Invoice</h2>
+        <p>Pay your monthly dues securely via PayPal.</p>
 
-                <div id="invoiceSection" style="margin-top:14px;">
-                  <p id="invoiceDetails">Loading your invoice...</p>
-                </div>
+        <div id="invoiceSection" style="margin-top:14px;">
+          <p id="invoiceDetails">Loading your invoice...</p>
+        </div>
 
-                <hr style="margin:22px 0; border-color:rgba(255,255,255,0.12);">
+        <hr style="margin:22px 0; border-color:rgba(255,255,255,0.12);">
 
-                <h3 class="section-title">Payment Method</h3>
-                <p>Payments are processed securely through PayPal.</p>
+        <h3 class="section-title">Payment Method</h3>
+        <p>Payments are processed securely through PayPal.</p>
 
-                <div id="paypal-section" style="margin-top:16px;">
-                  <div id="paypal-button-container"></div>
-                </div>
-              </section>
+        <div id="paypal-section" style="margin-top:16px;">
+          <div id="paypal-button-container"></div>
+        </div>
+      </section>
 
-              <section class="card">
-                <div class="section-header">
-                  <h2 class="section-title">Payment History</h2>
-                  <div class="section-actions">
-                    <label for="historySort">Sort by:</label>
-                    <select id="historySort" class="select-sm">
-                      <option value="date-desc">Date (Newest First)</option>
-                      <option value="date-asc">Date (Oldest First)</option>
-                    </select>
-                  </div>
-                </div>
+      <section class="card">
+        <div class="section-header">
+          <h2 class="section-title">Payment History</h2>
+          <div class="section-actions">
+            <label for="historySort">Sort by:</label>
+            <select id="historySort" class="select-sm">
+              <option value="date-desc">Date (Newest First)</option>
+              <option value="date-asc">Date (Oldest First)</option>
+            </select>
+          </div>
+        </div>
 
-                <div id="paymentStats" class="payment-stats" style="display:none;">
-                  <span style="font-weight:bold;">Showing:</span>
-                  <span id="paymentCount">0</span> payments ·
-                  <span style="font-weight:bold;">Total Paid:</span> ₱<span id="totalPaid">0.00</span>
-                </div>
+        <div id="paymentStats" class="payment-stats" style="display:none;">
+          <span style="font-weight:bold;">Showing:</span>
+          <span id="paymentCount">0</span> payments ·
+          <span style="font-weight:bold;">Total Paid:</span> ₱<span id="totalPaid">0.00</span>
+        </div>
 
-                <div id="paymentHistory" class="payment-history-scroll">
-                  <p>Loading your payment history...</p>
-                </div>
-              </section>
-            </div>
-          `;
+        <div id="paymentHistory" class="payment-history-scroll">
+          <p>Loading your payment history...</p>
+        </div>
+      </section>
+    </div>
+  `;
 
-          // Hide loading after content is rendered
-          hideLoading();
+  // Hide loading after content is rendered
+  hideLoading();
 
-          const invoiceDetails = document.getElementById("invoiceDetails");
-          const paymentHistory = document.getElementById("paymentHistory");
-          const paypalContainer = document.getElementById("paypal-button-container");
-          const historySort = document.getElementById("historySort");
-          const paymentStats = document.getElementById("paymentStats");
-          const paymentCount = document.getElementById("paymentCount");
-          const totalPaid = document.getElementById("totalPaid");
+  const invoiceDetails = document.getElementById("invoiceDetails");
+  const paymentHistory = document.getElementById("paymentHistory");
+  const paypalContainer = document.getElementById("paypal-button-container");
+  const historySort = document.getElementById("historySort");
+  const paymentStats = document.getElementById("paymentStats");
+  const paymentCount = document.getElementById("paymentCount");
+  const totalPaid = document.getElementById("totalPaid");
 
-          const unitPricing = { "1B": 10, "2B": 20 };
-          let computedAmount = 0;
-          let tenantUnits = [];
-          let allPayments = [];
-          let filteredPayments = [];
+  let computedAmount = 0;
+  let tenantUnits = [];
+  let allPayments = [];
+  let filteredPayments = [];
+  let unitPricing = { "1B": 10, "2B": 20 }; // Default values (these will be overridden)
 
-          async function loadInvoice() {
-          const tenantEmail = await getCurrentUserEmail();
-          const uid = auth.currentUser.uid;
-          const userDoc = await getDoc(doc(db, "users", uid));
-          tenantUnits = userDoc.data()?.unitNumbers || [];
+  // Function to load pricing from Firestore
+  async function loadPricing() {
+    try {
+      const pricingDoc = await getDoc(doc(db, "settings", "unitPricing"));
+      if (pricingDoc.exists()) {
+        const data = pricingDoc.data();
+        unitPricing = {
+          "1B": data["1B"] || 10,
+          "2B": data["2B"] || 20
+        };
+        console.log("Loaded pricing:", unitPricing);
+      } else {
+        // If no pricing exists in Firestore, create with defaults
+        await setDoc(doc(db, "settings", "unitPricing"), {
+          "1B": 10,
+          "2B": 20,
+          lastUpdated: serverTimestamp()
+        });
+        console.log("Created default pricing in Firestore");
+      }
+      await loadInvoice(); // Load invoice after pricing is fetched
+    } catch (error) {
+      console.error("Error loading pricing:", error);
+      // Use defaults and proceed
+      await loadInvoice();
+    }
+  }
 
-          // Original computed amount for payments (as per your unitPricing)
-          computedAmount = tenantUnits.reduce((total, unit) => {
-            const type = unit.split("-")[0];
-            return total + (unitPricing[type] || 0);
-          }, 0);
+  async function loadInvoice() {
+    const tenantEmail = await getCurrentUserEmail();
+    const uid = auth.currentUser.uid;
+    const userDoc = await getDoc(doc(db, "users", uid));
+    tenantUnits = userDoc.data()?.unitNumbers || [];
 
-          // Calculate displayedAmount based on your custom bedroom pricing
-          let displayedAmount = 0;
-          tenantUnits.forEach(unit => {
-            const type = unit.split("-")[0];
-            if (type === "1B") displayedAmount += 2500;
-            else if (type === "2B") displayedAmount += 5000;
+    // Calculate amount based on dynamic pricing
+    computedAmount = 0;
+    let breakdown = [];
+    
+    tenantUnits.forEach(unit => {
+      const type = unit.split("-")[0];
+      const price = unitPricing[type] || 0;
+      computedAmount += price;
+      breakdown.push(`${unit}: ₱${price.toLocaleString()}`);
+    });
+
+    // Format displayedAmount to currency string
+    const formattedDisplayedAmount = `₱ ${computedAmount.toLocaleString()}`;
+
+    // Create breakdown HTML if there are units
+    let breakdownHtml = "";
+    if (breakdown.length > 0) {
+      breakdownHtml = `<br><strong>Breakdown:</strong><br>${breakdown.join("<br>")}`;
+    }
+
+    invoiceDetails.innerHTML = `
+      <strong>Unit Owner:</strong> ${tenantEmail}<br>
+      <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
+      <strong>Amount Due:</strong> ${formattedDisplayedAmount}<br>
+      <strong>Due Date:</strong> 25th of this month
+      ${breakdownHtml}
+      <br><br><small style="color: #888;">Note: 1-Bedroom = ₱${(unitPricing["1B"] || 10).toLocaleString()}, 2-Bedroom = ₱${(unitPricing["2B"] || 20).toLocaleString()}</small>
+    `;
+  }
+
+  async function loadAllPayments() {
+    const tenantEmail = await getCurrentUserEmail();
+
+    try {
+      const qCol = query(
+        collection(db, "payments"),
+        where("tenantEmail", "==", tenantEmail),
+        orderBy("timestamp", "desc")
+      );
+      const snapshot = await getDocs(qCol);
+
+      if (snapshot.empty) {
+        allPayments = [];
+        applySorting();
+        return;
+      }
+
+      allPayments = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }));
+
+      applySorting();
+    } catch (error) {
+      console.error("Error loading payments:", error);
+      paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
+    }
+  }
+
+  function applySorting() {
+    const sortValue = historySort.value;
+    filteredPayments = [...allPayments];
+
+    filteredPayments.sort((a, b) => {
+      switch (sortValue) {
+        case "date-desc":
+          return (
+            (b.timestamp?.toDate?.() || 0) -
+            (a.timestamp?.toDate?.() || 0)
+          );
+        case "date-asc":
+          return (
+            (a.timestamp?.toDate?.() || 0) -
+            (b.timestamp?.toDate?.() || 0)
+          );
+        default:
+          return 0;
+      }
+    });
+
+    renderPaymentHistory();
+  }
+
+  function renderPaymentHistory() {
+    if (filteredPayments.length === 0) {
+      paymentHistory.innerHTML = "<p>No payment records found.</p>";
+      paymentStats.style.display = "none";
+      return;
+    }
+
+    paymentHistory.innerHTML = "";
+
+    let total = 0;
+
+    filteredPayments.forEach(payment => {
+      const d = payment;
+      const time = d.timestamp
+        ? d.timestamp.toDate().toLocaleString()
+        : "N/A";
+
+      let receipt = "";
+      if (d.method === "Cash on Hand" && d.receiptUrl) {
+        receipt = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" style="max-width:150px; border-radius:6px;">`;
+      }
+
+      let statusColor = "#666";
+      if (d.status === "Paid" || d.status === "Approved") statusColor = "#4CAF50";
+      if (d.status === "Pending Verification") statusColor = "#FF9800";
+      if (d.status === "Rejected") statusColor = "#F44336";
+
+      const div = document.createElement("div");
+      div.style.borderBottom = "1px solid #ccc";
+      div.style.padding = "12px 0";
+      div.style.marginBottom = "10px";
+      div.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1;">
+            <strong>Invoice ID:</strong> ${d.invoiceId || "-"}<br>
+            <strong>Amount:</strong> ₱${d.amount}<br>
+            <strong>Status:</strong> <span style="color:${statusColor};">${d.status}</span><br>
+            <strong>Date:</strong> ${time}<br>
+            <strong>Method:</strong> ${d.method}
+            ${receipt}
+          </div>
+          <div style="min-width: 150px; text-align: right;">
+            ${d.transactionId ? `<strong>Transaction ID:</strong><br><small>${d.transactionId}</small><br>` : ""}
+            ${d.payerEmail ? `<strong>Paid with:</strong><br><small>${d.payerEmail}</small>` : ""}
+          </div>
+        </div>
+      `;
+      paymentHistory.appendChild(div);
+
+      if (
+        d.status === "Paid" ||
+        d.status === "Approved" ||
+        d.status === "Completed"
+      ) {
+        total += Number(d.amount) || 0;
+      }
+    });
+
+    paymentCount.textContent = filteredPayments.length;
+    totalPaid.textContent = total.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    paymentStats.style.display = "block";
+  }
+
+  async function sendEmailReceipt(paymentData) {
+    try {
+      const templateParams = {
+        from_name: "Solano Hills Admin",
+        to_email: paymentData.payerEmail,
+        invoice_id: paymentData.invoiceId,
+        amount: paymentData.amount,
+        payment_method: paymentData.method,
+        transaction_id: paymentData.transactionId,
+        payment_date: new Date().toLocaleString()
+      };
+      await emailjs.send("service_izx63bb", "template_asn4687", templateParams);
+      console.log("Email receipt sent successfully");
+    } catch (error) {
+      console.error("Failed to send email receipt:", error);
+    }
+  }
+
+  async function setupPayPal() {
+    const tenantEmail = await getCurrentUserEmail();
+    const invoiceId = "INV-" + Date.now();
+
+    paypal
+      .Buttons({
+        style: { color: "gold", shape: "rect", label: "pay", height: 40 },
+        createOrder: function (data, actions) {
+          return actions.order.create({
+            purchase_units: [
+              {
+                reference_id: invoiceId,
+                description: "Monthly Dues Payment",
+                amount: { currency_code: "PHP", value: computedAmount.toString() }
+              }
+            ]
           });
+        },
+        onApprove: async function (data, actions) {
+          // Show loading during payment processing
+          showLoading();
+          try {
+            const order = await actions.order.capture();
 
-          // Format displayedAmount to currency string
-          const formattedDisplayedAmount = `₱ ${displayedAmount.toLocaleString()}`;
+            const paymentRecord = {
+              tenantEmail,
+              invoiceId,
+              amount: computedAmount,
+              method: "PayPal",
+              status: "Paid",
+              transactionId: order.id,
+              payerEmail: order.payer.email_address,
+              timestamp: serverTimestamp()
+            };
 
-          invoiceDetails.innerHTML = `
-            <strong>Unit Owner:</strong> ${tenantEmail}<br>
-            <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
-            <strong>Amount Due:</strong> ${formattedDisplayedAmount}<br>
-            <strong>Due Date:</strong> 25th of this month
-          `;
-        }
+            await addDoc(collection(db, "payments"), paymentRecord);
 
-
-          async function loadAllPayments() {
-            const tenantEmail = await getCurrentUserEmail();
-
-            try {
-              const qCol = query(
-                collection(db, "payments"),
-                where("tenantEmail", "==", tenantEmail),
-                orderBy("timestamp", "desc")
-              );
-              const snapshot = await getDocs(qCol);
-
-              if (snapshot.empty) {
-                allPayments = [];
-                applySorting();
-                return;
-              }
-
-              allPayments = snapshot.docs.map(docSnap => ({
-                id: docSnap.id,
-                ...docSnap.data()
-              }));
-
-              applySorting();
-            } catch (error) {
-              console.error("Error loading payments:", error);
-              paymentHistory.innerHTML = `<p style="color:red;">Error loading history: ${error.message}</p>`;
-            }
-          }
-
-          function applySorting() {
-            const sortValue = historySort.value;
-            filteredPayments = [...allPayments];
-
-            filteredPayments.sort((a, b) => {
-              switch (sortValue) {
-                case "date-desc":
-                  return (
-                    (b.timestamp?.toDate?.() || 0) -
-                    (a.timestamp?.toDate?.() || 0)
-                  );
-                case "date-asc":
-                  return (
-                    (a.timestamp?.toDate?.() || 0) -
-                    (b.timestamp?.toDate?.() || 0)
-                  );
-                default:
-                  return 0;
-              }
-            });
-
-            renderPaymentHistory();
-          }
-
-          function renderPaymentHistory() {
-            if (filteredPayments.length === 0) {
-              paymentHistory.innerHTML = "<p>No payment records found.</p>";
-              paymentStats.style.display = "none";
-              return;
-            }
-
-            paymentHistory.innerHTML = "";
-
-            let total = 0;
-
-            filteredPayments.forEach(payment => {
-              const d = payment;
-              const time = d.timestamp
-                ? d.timestamp.toDate().toLocaleString()
-                : "N/A";
-
-              let receipt = "";
-              if (d.method === "Cash on Hand" && d.receiptUrl) {
-                receipt = `<br><strong>Receipt:</strong><br><img src="${d.receiptUrl}" style="max-width:150px; border-radius:6px;">`;
-              }
-
-              let statusColor = "#666";
-              if (d.status === "Paid" || d.status === "Approved") statusColor = "#4CAF50";
-              if (d.status === "Pending Verification") statusColor = "#FF9800";
-              if (d.status === "Rejected") statusColor = "#F44336";
-
-              const div = document.createElement("div");
-              div.style.borderBottom = "1px solid #ccc";
-              div.style.padding = "12px 0";
-              div.style.marginBottom = "10px";
-              div.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                  <div style="flex: 1;">
-                    <strong>Invoice ID:</strong> ${d.invoiceId || "-"}<br>
-                    <strong>Amount:</strong> ₱${d.amount}<br>
-                    <strong>Status:</strong> <span style="color:${statusColor};">${d.status}</span><br>
-                    <strong>Date:</strong> ${time}<br>
-                    <strong>Method:</strong> ${d.method}
-                    ${receipt}
-                  </div>
-                  <div style="min-width: 150px; text-align: right;">
-                    ${d.transactionId ? `<strong>Transaction ID:</strong><br><small>${d.transactionId}</small><br>` : ""}
-                    ${d.payerEmail ? `<strong>Paid with:</strong><br><small>${d.payerEmail}</small>` : ""}
-                  </div>
-                </div>
-              `;
-              paymentHistory.appendChild(div);
-
-              if (
-                d.status === "Paid" ||
-                d.status === "Approved" ||
-                d.status === "Completed"
-              ) {
-                total += Number(d.amount) || 0;
-              }
-            });
-
-            paymentCount.textContent = filteredPayments.length;
-            totalPaid.textContent = total.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            });
-            paymentStats.style.display = "block";
-          }
-
-          async function sendEmailReceipt(paymentData) {
-            try {
-              const templateParams = {
-                from_name: "Solano Hills Admin",
-                to_email: paymentData.payerEmail,
-                invoice_id: paymentData.invoiceId,
-                amount: paymentData.amount,
-                payment_method: paymentData.method,
-                transaction_id: paymentData.transactionId,
-                payment_date: new Date().toLocaleString()
-              };
-              await emailjs.send("service_izx63bb", "template_asn4687", templateParams);
-              console.log("Email receipt sent successfully");
-            } catch (error) {
-              console.error("Failed to send email receipt:", error);
-            }
-          }
-
-          async function setupPayPal() {
-            const tenantEmail = await getCurrentUserEmail();
-            const invoiceId = "INV-" + Date.now();
-
-            paypal
-              .Buttons({
-                style: { color: "gold", shape: "rect", label: "pay", height: 40 },
-                createOrder: function (data, actions) {
-                  return actions.order.create({
-                    purchase_units: [
-                      {
-                        reference_id: invoiceId,
-                        description: "Monthly Dues Payment",
-                        amount: { currency_code: "PHP", value: computedAmount.toString() }
-                      }
-                    ]
-                  });
-                },
-                onApprove: async function (data, actions) {
-                  // Show loading during payment processing
-                  showLoading();
-                  try {
-                    const order = await actions.order.capture();
-
-                    const paymentRecord = {
-                      tenantEmail,
-                      invoiceId,
-                      amount: computedAmount,
-                      method: "PayPal",
-                      status: "Paid",
-                      transactionId: order.id,
-                      payerEmail: order.payer.email_address,
-                      timestamp: serverTimestamp()
-                    };
-
-                    await addDoc(collection(db, "payments"), paymentRecord);
-
-                    showPopup("✅ Payment successful!");
-                    await loadAllPayments();
-                    await sendEmailReceipt(paymentRecord);
-                  } catch (error) {
-                    console.error("Payment error:", error);
-                    showPopup("❌ Payment failed. Please try again.");
-                  } finally {
-                    hideLoading();
-                  }
-                },
-                onCancel: async function () {
-                  showPopup("⚠️ Payment cancelled by user.");
-                },
-                onError: async function (err) {
-                  console.error("PayPal error:", err);
-                  showPopup("❌ Payment failed. Please try again later.");
-                }
-              })
-              .render(paypalContainer);
-          }
-
-          historySort.addEventListener("change", applySorting);
-
-          (async () => {
-            await loadInvoice();
+            showPopup("✅ Payment successful!");
             await loadAllPayments();
-            await setupPayPal();
-          })();
+            await sendEmailReceipt(paymentRecord);
+          } catch (error) {
+            console.error("Payment error:", error);
+            showPopup("❌ Payment failed. Please try again.");
+          } finally {
+            hideLoading();
+          }
+        },
+        onCancel: async function () {
+          showPopup("⚠️ Payment cancelled by user.");
+        },
+        onError: async function (err) {
+          console.error("PayPal error:", err);
+          showPopup("❌ Payment failed. Please try again later.");
+        }
+      })
+      .render(paypalContainer);
+  }
 
-          break;
+  historySort.addEventListener("change", applySorting);
 
+  // Load pricing first, then everything else
+  (async () => {
+    await loadPricing();
+    await loadAllPayments();
+    await setupPayPal();
+  })();
+
+  break; 
         /* ======================== FEEDBACK ======================== */
         case "feedback":
           loadFeedbackForm();
@@ -2309,5 +2341,4 @@
   </div>
 </body>
 </html>
-
 
