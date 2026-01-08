@@ -1587,7 +1587,7 @@
           break;
 
         /* ======================== BILLING ======================== */
- case "billing":
+case "billing":
   mainContent.innerHTML = `
     <div class="tab-header">
       <div>
@@ -1655,9 +1655,167 @@
   let tenantUnits = [];
   let allPayments = [];
   let filteredPayments = [];
-  let unitPricing = { "1B": 10, "2B": 20 }; // Default values (these will be overridden)
+  let unitPricing = { "1B": 10, "2B": 20 };
+  let currentDueDate = new Date(); // Will be calculated dynamically
+  let gracePeriodDays = 5; // Number of days grace period after due date
 
-  // Function to load pricing from Firestore
+  // Function to load tenant's billing settings and calculate next due date
+  async function loadTenantBillingSettings() {
+    try {
+      const tenantEmail = await getCurrentUserEmail();
+      const uid = auth.currentUser.uid;
+      
+      // Check if tenant has billing settings
+      const billingSettingsRef = doc(db, "billingSettings", uid);
+      const billingSettingsSnap = await getDoc(billingSettingsRef);
+      
+      if (billingSettingsSnap.exists()) {
+        const settings = billingSettingsSnap.data();
+        
+        // Calculate next due date
+        const lastPaymentDate = settings.lastPaymentDate?.toDate();
+        const billingCycleDays = settings.billingCycleDays || 30; // Default 30 days
+        const fixedDueDay = settings.fixedDueDay || 25; // Default 25th of month
+        
+        if (lastPaymentDate) {
+          // Calculate based on last payment date
+          currentDueDate = new Date(lastPaymentDate);
+          currentDueDate.setDate(currentDueDate.getDate() + billingCycleDays);
+        } else {
+          // Use fixed due day of month
+          const today = new Date();
+          currentDueDate = new Date(today.getFullYear(), today.getMonth(), fixedDueDay);
+          
+          // If today is past the due date, set for next month
+          if (today > currentDueDate) {
+            currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+          }
+        }
+        
+        gracePeriodDays = settings.gracePeriodDays || 5;
+      } else {
+        // Create default billing settings
+        const defaultSettings = {
+          tenantEmail: tenantEmail,
+          tenantId: uid,
+          billingCycleDays: 30,
+          fixedDueDay: 25,
+          gracePeriodDays: 5,
+          lastPaymentDate: null,
+          nextDueDate: null,
+          createdAt: serverTimestamp()
+        };
+        
+        // Set initial due date to 25th of current or next month
+        const today = new Date();
+        currentDueDate = new Date(today.getFullYear(), today.getMonth(), 25);
+        if (today > currentDueDate) {
+          currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+        }
+        
+        await setDoc(billingSettingsRef, defaultSettings);
+      }
+      
+      return currentDueDate;
+    } catch (error) {
+      console.error("Error loading billing settings:", error);
+      // Fallback: Set due date to 25th of next month
+      const today = new Date();
+      currentDueDate = new Date(today.getFullYear(), today.getMonth() + 1, 25);
+      return currentDueDate;
+    }
+  }
+
+  // Function to update billing settings after payment
+  async function updateBillingSettingsAfterPayment(paymentDate) {
+    try {
+      const uid = auth.currentUser.uid;
+      const billingSettingsRef = doc(db, "billingSettings", uid);
+      
+      // Get current settings
+      const billingSettingsSnap = await getDoc(billingSettingsRef);
+      const currentSettings = billingSettingsSnap.exists() ? billingSettingsSnap.data() : {};
+      const billingCycleDays = currentSettings.billingCycleDays || 30;
+      
+      // Calculate next due date based on payment date
+      const nextDueDate = new Date(paymentDate);
+      nextDueDate.setDate(nextDueDate.getDate() + billingCycleDays);
+      
+      // Update billing settings
+      await updateDoc(billingSettingsRef, {
+        lastPaymentDate: paymentDate,
+        nextDueDate: nextDueDate,
+        lastUpdated: serverTimestamp()
+      });
+      
+      currentDueDate = nextDueDate;
+      return nextDueDate;
+    } catch (error) {
+      console.error("Error updating billing settings:", error);
+      // Fallback: Add 30 days to payment date
+      const nextDueDate = new Date(paymentDate);
+      nextDueDate.setDate(nextDueDate.getDate() + 30);
+      currentDueDate = nextDueDate;
+      return nextDueDate;
+    }
+  }
+
+  // Function to format date
+  function formatDate(date) {
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    
+    // Add suffix to day
+    const suffix = (day % 10 === 1 && day !== 11) ? 'st' :
+                  (day % 10 === 2 && day !== 12) ? 'nd' :
+                  (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+    
+    return `${day}${suffix} of ${month} ${year}`;
+  }
+
+  // Function to check if payment is overdue
+  function checkIfOverdue() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = new Date(currentDueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    return today > dueDate;
+  }
+
+  // Function to calculate days until due
+  function calculateDaysUntilDue() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = new Date(currentDueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = dueDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  }
+
+  // Function to calculate late fee (if applicable)
+  function calculateLateFee() {
+    if (!checkIfOverdue()) return 0;
+    
+    const today = new Date();
+    const dueDate = new Date(currentDueDate);
+    const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+    
+    // Calculate late fee (example: ₱50 per day after grace period)
+    if (daysOverdue > gracePeriodDays) {
+      const lateDays = daysOverdue - gracePeriodDays;
+      return lateDays * 50; // ₱50 per day late fee
+    }
+    
+    return 0;
+  }
+
   async function loadPricing() {
     try {
       const pricingDoc = await getDoc(doc(db, "settings", "unitPricing"));
@@ -1669,7 +1827,6 @@
         };
         console.log("Loaded pricing:", unitPricing);
       } else {
-        // If no pricing exists in Firestore, create with defaults
         await setDoc(doc(db, "settings", "unitPricing"), {
           "1B": 10,
           "2B": 20,
@@ -1677,10 +1834,9 @@
         });
         console.log("Created default pricing in Firestore");
       }
-      await loadInvoice(); // Load invoice after pricing is fetched
+      await loadInvoice();
     } catch (error) {
       console.error("Error loading pricing:", error);
-      // Use defaults and proceed
       await loadInvoice();
     }
   }
@@ -1691,33 +1847,69 @@
     const userDoc = await getDoc(doc(db, "users", uid));
     tenantUnits = userDoc.data()?.unitNumbers || [];
 
-    // Calculate amount based on dynamic pricing
-    computedAmount = 0;
+    // Load billing settings and get due date
+    await loadTenantBillingSettings();
+    
+    // Calculate base amount
+    let baseAmount = 0;
     let breakdown = [];
     
     tenantUnits.forEach(unit => {
       const type = unit.split("-")[0];
       const price = unitPricing[type] || 0;
-      computedAmount += price;
+      baseAmount += price;
       breakdown.push(`${unit}: ₱${price.toLocaleString()}`);
     });
-
+    
+    // Calculate late fee if overdue
+    const lateFee = calculateLateFee();
+    computedAmount = baseAmount + lateFee;
+    
+    // Check payment status
+    const isOverdue = checkIfOverdue();
+    const daysUntilDue = calculateDaysUntilDue();
+    
     // Format displayedAmount to currency string
     const formattedDisplayedAmount = `₱ ${computedAmount.toLocaleString()}`;
+    const formattedBaseAmount = `₱ ${baseAmount.toLocaleString()}`;
+    const formattedLateFee = `₱ ${lateFee.toLocaleString()}`;
 
-    // Create breakdown HTML if there are units
+    // Create breakdown HTML
     let breakdownHtml = "";
     if (breakdown.length > 0) {
       breakdownHtml = `<br><strong>Breakdown:</strong><br>${breakdown.join("<br>")}`;
+    }
+    
+    // Status indicator
+    let statusHtml = "";
+    if (isOverdue) {
+      statusHtml = `<br><span style="color: #ff4444; font-weight: bold;">⚠️ OVERDUE</span>`;
+    } else if (daysUntilDue <= 7) {
+      statusHtml = `<br><span style="color: #ff9800; font-weight: bold;">⚠️ Due in ${daysUntilDue} days</span>`;
+    } else {
+      statusHtml = `<br><span style="color: #4CAF50; font-weight: bold;">✓ Current</span>`;
+    }
+    
+    // Late fee section if applicable
+    let lateFeeHtml = "";
+    if (lateFee > 0) {
+      lateFeeHtml = `<br><strong>Late Fee:</strong> ${formattedLateFee}`;
     }
 
     invoiceDetails.innerHTML = `
       <strong>Unit Owner:</strong> ${tenantEmail}<br>
       <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
-      <strong>Amount Due:</strong> ${formattedDisplayedAmount}<br>
-      <strong>Due Date:</strong> 25th of this month
+      <strong>Base Amount:</strong> ${formattedBaseAmount}<br>
+      ${lateFeeHtml}
+      <strong>Total Amount Due:</strong> ${formattedDisplayedAmount}<br>
+      <strong>Due Date:</strong> ${formatDate(currentDueDate)}
+      ${statusHtml}
       ${breakdownHtml}
-      <br><br><small style="color: #888;">Note: 1-Bedroom = ₱${(unitPricing["1B"] || 10).toLocaleString()}, 2-Bedroom = ₱${(unitPricing["2B"] || 20).toLocaleString()}</small>
+      <br><br><small style="color: #888;">
+        Note: 1-Bedroom = ₱${(unitPricing["1B"] || 10).toLocaleString()}, 
+        2-Bedroom = ₱${(unitPricing["2B"] || 20).toLocaleString()}<br>
+        Grace period: ${gracePeriodDays} days after due date
+      </small>
     `;
   }
 
@@ -1790,6 +1982,14 @@
       const time = d.timestamp
         ? d.timestamp.toDate().toLocaleString()
         : "N/A";
+        
+      // Calculate period covered
+      let periodCovered = "N/A";
+      if (d.periodStart && d.periodEnd) {
+        const start = d.periodStart.toDate().toLocaleDateString();
+        const end = d.periodEnd.toDate().toLocaleDateString();
+        periodCovered = `${start} to ${end}`;
+      }
 
       let receipt = "";
       if (d.method === "Cash on Hand" && d.receiptUrl) {
@@ -1810,6 +2010,7 @@
           <div style="flex: 1;">
             <strong>Invoice ID:</strong> ${d.invoiceId || "-"}<br>
             <strong>Amount:</strong> ₱${d.amount}<br>
+            <strong>Period Covered:</strong> ${periodCovered}<br>
             <strong>Status:</strong> <span style="color:${statusColor};">${d.status}</span><br>
             <strong>Date:</strong> ${time}<br>
             <strong>Method:</strong> ${d.method}
@@ -1849,7 +2050,8 @@
         amount: paymentData.amount,
         payment_method: paymentData.method,
         transaction_id: paymentData.transactionId,
-        payment_date: new Date().toLocaleString()
+        payment_date: new Date().toLocaleString(),
+        next_due_date: formatDate(currentDueDate)
       };
       await emailjs.send("service_izx63bb", "template_asn4687", templateParams);
       console.log("Email receipt sent successfully");
@@ -1877,10 +2079,16 @@
           });
         },
         onApprove: async function (data, actions) {
-          // Show loading during payment processing
           showLoading();
           try {
             const order = await actions.order.capture();
+            const paymentDate = new Date();
+            
+            // Define period covered (previous due date to new due date)
+            const periodStart = new Date(currentDueDate);
+            periodStart.setDate(periodStart.getDate() - 30); // Previous due date
+            const periodEnd = new Date(paymentDate);
+            periodEnd.setDate(paymentDate.getDate() + 30); // Next due date
 
             const paymentRecord = {
               tenantEmail,
@@ -1890,12 +2098,19 @@
               status: "Paid",
               transactionId: order.id,
               payerEmail: order.payer.email_address,
-              timestamp: serverTimestamp()
+              periodStart: periodStart,
+              periodEnd: periodEnd,
+              timestamp: serverTimestamp(),
+              paymentDate: paymentDate
             };
 
             await addDoc(collection(db, "payments"), paymentRecord);
-
-            showPopup("✅ Payment successful!");
+            
+            // Update billing settings with new due date
+            await updateBillingSettingsAfterPayment(paymentDate);
+            
+            showPopup("✅ Payment successful! Next due date has been adjusted.");
+            await loadInvoice(); // Reload invoice with new due date
             await loadAllPayments();
             await sendEmailReceipt(paymentRecord);
           } catch (error) {
@@ -1918,15 +2133,15 @@
 
   historySort.addEventListener("change", applySorting);
 
-  // Load pricing first, then everything else
+  // Initialize everything
   (async () => {
     await loadPricing();
     await loadAllPayments();
     await setupPayPal();
   })();
 
-  break; 
-        /* ======================== FEEDBACK ======================== */
+  break;
+          /* ======================== FEEDBACK ======================== */
         case "feedback":
           loadFeedbackForm();
           hideLoading(); // Hide loading after content is rendered
