@@ -1709,1119 +1709,1213 @@ function renderAdminCalendar() {
   });
 }
     // ======================== MAINTENANCE REQUESTS LOGIC ========================
-    function initMaintenanceRequests() {
-      const maintenanceList = document.getElementById("maintenanceList");
-      const statusFilter = document.getElementById("statusFilter");
-      const personnelFilter = document.getElementById("personnelFilter");
-      const maintenanceSearch = document.getElementById("maintenanceSearch");
-      const sortBy = document.getElementById("sortBy");
-      const resetFilters = document.getElementById("resetFilters");
-      const maintenanceStats = document.getElementById("maintenanceStats");
-      const requestCount = document.getElementById("requestCount");
-      const pendingCountEl = document.getElementById("pendingCount");
-      const inProgressCountEl = document.getElementById("inProgressCount");
-      const completeCountEl = document.getElementById("completeCount");
+ function initMaintenanceRequests() {
+  const maintenanceList = document.getElementById("maintenanceList");
+  const statusFilter = document.getElementById("statusFilter");
+  const personnelFilter = document.getElementById("personnelFilter");
+  const maintenanceSearch = document.getElementById("maintenanceSearch");
+  const sortBy = document.getElementById("sortBy");
+  const resetFilters = document.getElementById("resetFilters");
+  const maintenanceStats = document.getElementById("maintenanceStats");
+  const requestCount = document.getElementById("requestCount");
+  const pendingCountEl = document.getElementById("pendingCount");
+  const inProgressCountEl = document.getElementById("inProgressCount");
+  const completeCountEl = document.getElementById("completeCount");
 
-      // ==== ADD: Red dot notification element for sidebar tab ====
-      let redDotNotification = null;
+  // ==== ADD: Red dot notification element for sidebar tab ====
+  let redDotNotification = null;
+  
+  // Find the Maintenance Requests tab in the sidebar
+  const maintenanceNavItem = document.querySelector('a[onclick*="Maintenance Requests"]');
+  if (maintenanceNavItem) {
+    // Check if red dot already exists
+    redDotNotification = maintenanceNavItem.querySelector('.notification-dot');
+    
+    if (!redDotNotification) {
+      // Create new red dot notification
+      redDotNotification = document.createElement('span');
+      redDotNotification.className = 'notification-dot';
+      redDotNotification.style.cssText = `
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 10px;
+        height: 10px;
+        background-color: #ff4757;
+        border-radius: 50%;
+        display: none;
+        animation: pulse 2s infinite;
+      `;
       
-      // Find the Maintenance Requests tab in the sidebar
-      const maintenanceNavItem = document.querySelector('a[onclick*="Maintenance Requests"]');
-      if (maintenanceNavItem) {
-        // Check if red dot already exists
-        redDotNotification = maintenanceNavItem.querySelector('.notification-dot');
-        
-        if (!redDotNotification) {
-          // Create new red dot notification
-          redDotNotification = document.createElement('span');
-          redDotNotification.className = 'notification-dot';
-          redDotNotification.style.cssText = `
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 10px;
-            height: 10px;
-            background-color: #ff4757;
-            border-radius: 50%;
-            display: none;
-            animation: pulse 2s infinite;
-          `;
-          
-          // Add pulse animation
-          if (!document.querySelector('#pulse-animation')) {
-            const style = document.createElement('style');
-            style.id = 'pulse-animation';
-            style.textContent = `
-              @keyframes pulse {
-                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
-                70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
-                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
-              }
-            `;
-            document.head.appendChild(style);
+      // Add pulse animation
+      if (!document.querySelector('#pulse-animation')) {
+        const style = document.createElement('style');
+        style.id = 'pulse-animation';
+        style.textContent = `
+          @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
           }
-          
-          maintenanceNavItem.style.position = 'relative';
-          maintenanceNavItem.appendChild(redDotNotification);
-        }
+        `;
+        document.head.appendChild(style);
       }
-
-      let allRequests = [];
-      let filteredRequests = [];
-      let personnelAssignments = new Map();
-      let maintenanceCrew = []; // Array to store maintenance crew from database
-      let personnelGroups = []; // Array to store personnel grouped by specialization
       
-      // NEW: Add seen requests tracking
-      let seenRequestIds = new Set();
-      let lastVisitTime = localStorage.getItem('maintenanceLastVisit') || null;
+      maintenanceNavItem.style.position = 'relative';
+      maintenanceNavItem.appendChild(redDotNotification);
+    }
+  }
 
-      // Load previously seen requests
-      const savedSeenRequests = localStorage.getItem('maintenanceSeenRequests');
-      if (savedSeenRequests) {
-        seenRequestIds = new Set(JSON.parse(savedSeenRequests));
-      }
+  let allRequests = [];
+  let filteredRequests = [];
+  let personnelAssignments = new Map();
+  let maintenanceCrew = []; // Array to store maintenance crew from database
+  let personnelGroups = []; // Array to store personnel grouped by specialization
+  
+  // NEW: Add seen requests tracking
+  let seenRequestIds = new Set();
+  let lastVisitTime = localStorage.getItem('maintenanceLastVisit') || null;
 
-      // Update last visit time when loading the page
-      localStorage.setItem('maintenanceLastVisit', new Date().toISOString());
+  // Load previously seen requests
+  const savedSeenRequests = localStorage.getItem('maintenanceSeenRequests');
+  if (savedSeenRequests) {
+    seenRequestIds = new Set(JSON.parse(savedSeenRequests));
+  }
 
-      // Function to mark requests as seen
-      function markRequestsAsSeen(ids) {
-        ids.forEach(id => seenRequestIds.add(id));
-        localStorage.setItem('maintenanceSeenRequests', JSON.stringify(Array.from(seenRequestIds)));
-      }
+  // Update last visit time when loading the page
+  localStorage.setItem('maintenanceLastVisit', new Date().toISOString());
 
-      // Function to check if request is new
-      function isRequestNew(request) {
-        // Check if request ID is in seen set
-        if (seenRequestIds.has(request.id)) return false;
-        
-        // If we have last visit time, check if request is newer
-        if (lastVisitTime && request.timestamp) {
-          const requestTime = request.timestamp?.toDate ? request.timestamp.toDate() : new Date(request.timestamp);
-          const lastVisit = new Date(lastVisitTime);
-          return requestTime > lastVisit;
-        }
-        
-        // Default: consider new if not seen before
-        return true;
-      }
+  // Function to mark requests as seen
+  function markRequestsAsSeen(ids) {
+    ids.forEach(id => seenRequestIds.add(id));
+    localStorage.setItem('maintenanceSeenRequests', JSON.stringify(Array.from(seenRequestIds)));
+  }
 
-      // Function to update notification dot in sidebar
-      function updateNotificationDot() {
-        if (!redDotNotification) return;
-        
-        const newRequestsCount = allRequests.filter(request => 
-          isRequestNew(request) && request.status !== 'Complete'
-        ).length;
-        
-        if (newRequestsCount > 0) {
-          redDotNotification.style.display = 'block';
-          // Optional: Add count badge
-          if (!redDotNotification.dataset.badgeAdded && newRequestsCount > 1) {
-            const badge = document.createElement('span');
-            badge.className = 'notification-count';
-            badge.style.cssText = `
-              position: absolute;
-              top: -8px;
-              right: -8px;
-              min-width: 18px;
-              height: 18px;
-              background-color: #ff4757;
-              color: white;
-              border-radius: 9px;
-              font-size: 10px;
-              font-weight: bold;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 0 2px;
-              border: 2px solid #1a1a1a;
-            `;
-            badge.textContent = newRequestsCount > 99 ? '99+' : newRequestsCount;
-            redDotNotification.appendChild(badge);
-            redDotNotification.dataset.badgeAdded = true;
-          } else if (redDotNotification.dataset.badgeAdded && newRequestsCount <= 1) {
-            // Remove badge if only 1 new request
-            const badge = redDotNotification.querySelector('.notification-count');
-            if (badge) {
-              redDotNotification.removeChild(badge);
-              delete redDotNotification.dataset.badgeAdded;
-            }
-          }
-        } else {
-          redDotNotification.style.display = 'none';
-          if (redDotNotification.querySelector('.notification-count')) {
-            redDotNotification.removeChild(redDotNotification.querySelector('.notification-count'));
-            delete redDotNotification.dataset.badgeAdded;
-          }
-        }
-      }
+  // Function to check if request is new
+  function isRequestNew(request) {
+    // Check if request ID is in seen set
+    if (seenRequestIds.has(request.id)) return false;
+    
+    // If we have last visit time, check if request is newer
+    if (lastVisitTime && request.timestamp) {
+      const requestTime = request.timestamp?.toDate ? request.timestamp.toDate() : new Date(request.timestamp);
+      const lastVisit = new Date(lastVisitTime);
+      return requestTime > lastVisit;
+    }
+    
+    // Default: consider new if not seen before
+    return true;
+  }
 
-      // Function to load maintenance crew from database
-      async function loadMaintenanceCrew() {
-        try {
-          const snapshot = await db.collection("users")
-            .where("role", "==", "maintenance")
-            .get();
-          
-          maintenanceCrew = [];
-          personnelGroups = [];
-          
-          if (!snapshot.empty) {
-            snapshot.forEach(doc => {
-              const data = doc.data();
-              maintenanceCrew.push({
-                id: doc.id,
-                name: data.name || data.email.split('@')[0],
-                email: data.email,
-                specialization: data.specialization || "General Maintenance",
-                phone: data.phone || ""
-              });
-            });
-            
-            // Group by specialization
-            const groupedByRole = {};
-            maintenanceCrew.forEach(person => {
-              if (!groupedByRole[person.specialization]) {
-                groupedByRole[person.specialization] = [];
-              }
-              groupedByRole[person.specialization].push(person.name);
-            });
-            
-            // Convert to personnelGroups format
-            Object.entries(groupedByRole).forEach(([role, names]) => {
-              personnelGroups.push({
-                role: role,
-                names: names
-              });
-            });
-            
-            // Update personnel filter dropdown
-            updatePersonnelFilter();
-          } else {
-            // If no maintenance crew found, show default options
-            personnelGroups = [
-              {
-                role: "General Maintenance",
-                names: ["No crew available"]
-              }
-            ];
-            updatePersonnelFilter();
-          }
-        } catch (error) {
-          console.error("Error loading maintenance crew:", error);
-          // Fallback to default options
-          personnelGroups = [
-            {
-              role: "General Maintenance",
-              names: ["Error loading crew"]
-            }
-          ];
-          updatePersonnelFilter();
+  // Function to update notification dot in sidebar
+  function updateNotificationDot() {
+    if (!redDotNotification) return;
+    
+    const newRequestsCount = allRequests.filter(request => 
+      isRequestNew(request) && request.status !== 'Complete'
+    ).length;
+    
+    if (newRequestsCount > 0) {
+      redDotNotification.style.display = 'block';
+      // Optional: Add count badge
+      if (!redDotNotification.dataset.badgeAdded && newRequestsCount > 1) {
+        const badge = document.createElement('span');
+        badge.className = 'notification-count';
+        badge.style.cssText = `
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          min-width: 18px;
+          height: 18px;
+          background-color: #ff4757;
+          color: white;
+          border-radius: 9px;
+          font-size: 10px;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 2px;
+          border: 2px solid #1a1a1a;
+        `;
+        badge.textContent = newRequestsCount > 99 ? '99+' : newRequestsCount;
+        redDotNotification.appendChild(badge);
+        redDotNotification.dataset.badgeAdded = true;
+      } else if (redDotNotification.dataset.badgeAdded && newRequestsCount <= 1) {
+        // Remove badge if only 1 new request
+        const badge = redDotNotification.querySelector('.notification-count');
+        if (badge) {
+          redDotNotification.removeChild(badge);
+          delete redDotNotification.dataset.badgeAdded;
         }
       }
-
-      // Function to update personnel filter dropdown
-      function updatePersonnelFilter() {
-        if (!personnelFilter) return;
-        
-        // Store current value
-        const currentValue = personnelFilter.value;
-        
-        // Clear existing options except the first one
-        personnelFilter.innerHTML = '<option value="all">All Personnel</option>';
-        
-        // Add unassigned option
-        const unassignedOption = document.createElement('option');
-        unassignedOption.value = "unassigned";
-        unassignedOption.textContent = "Unassigned";
-        personnelFilter.appendChild(unassignedOption);
-        
-        // Add all maintenance crew names as options
-        maintenanceCrew.forEach(person => {
-          const option = document.createElement('option');
-          option.value = person.name;
-          option.textContent = `${person.name} (${person.specialization})`;
-          personnelFilter.appendChild(option);
-        });
-        
-        // Restore previous selection if possible
-        if (currentValue && Array.from(personnelFilter.options).some(opt => opt.value === currentValue)) {
-          personnelFilter.value = currentValue;
-        }
+    } else {
+      redDotNotification.style.display = 'none';
+      if (redDotNotification.querySelector('.notification-count')) {
+        redDotNotification.removeChild(redDotNotification.querySelector('.notification-count'));
+        delete redDotNotification.dataset.badgeAdded;
       }
+    }
+  }
 
-      // Flat list of all personnel names
-      const allPersonnelNames = maintenanceCrew.flatMap(person => person.name);
-
-      const drill = window.adminDashboardDrilldown || {};
-      if (drill.maintenanceStatus) {
-        statusFilter.value = drill.maintenanceStatus;
-      }
-      window.adminDashboardDrilldown = null;
-
-      function formatDateTimeAMPM(date) {
-        if (!date) return "N/A";
-        const d = date.toDate ? date.toDate() : date;
-        let hours = d.getHours();
-        const minutes = d.getMinutes().toString().padStart(2, "0");
-        const ampm = hours >= 12 ? "PM" : "AM";
-        hours = hours % 12 || 12;
-        const month = (d.getMonth() + 1).toString().padStart(2, "0");
-        const day = d.getDate().toString().padStart(2, "0");
-        const year = d.getFullYear();
-        return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-      }
-
-      // ===== MAINTENANCE MESSAGES POPUP BINDINGS =====
-      const chatPanel = document.getElementById("maintenanceMessagesPanel");
-      const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
-      const chatMessagesContainer = document.getElementById("maintenanceMessagesContainer");
-      const chatReplyTextarea = document.getElementById("maintenanceReplyMessage");
-      const chatReplyStatus = document.getElementById("maintenanceReplyStatus");
-      const chatSendBtn = document.getElementById("maintenanceSendReplyBtn");
-      const chatClearBtn = document.getElementById("maintenanceClearReplyBtn");
-      const chatCloseBtn = document.getElementById("closeMaintenanceMessagesBtn");
-      const chatQuickReplyBtns = document.querySelectorAll(".maintenanceQuickReplyBtn");
-
-      if (chatPanel && !chatPanel.dataset.bound) {
-        chatPanel.dataset.bound = "true";
-
-        chatCloseBtn.addEventListener("click", () => {
-          chatPanel.style.display = "none";
-          chatReplyTextarea.value = "";
-          chatReplyStatus.textContent = "";
-        });
-
-        chatPanel.addEventListener("click", (e) => {
-          if (e.target === chatPanel) {
-            chatPanel.style.display = "none";
-            chatReplyTextarea.value = "";
-            chatReplyStatus.textContent = "";
-          }
-        });
-
-        chatClearBtn.addEventListener("click", () => {
-          chatReplyTextarea.value = "";
-          chatReplyStatus.textContent = "";
-        });
-
-        chatQuickReplyBtns.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const template = btn.dataset.template;
-            let msg = "";
-            switch (template) {
-              case "on_the_way":
-                msg = "Our maintenance team is on the way.";
-                break;
-              case "technician_assigned":
-                msg = "A technician has been assigned and will be there soon.";
-                break;
-              case "scheduled":
-                msg = "We have scheduled your maintenance as per your requested date and time.";
-                break;
-              case "resolved":
-                msg = "Thank you for your patience. This maintenance concern has been resolved.";
-                break;
-            }
-            chatReplyTextarea.value = msg;
-            chatReplyTextarea.focus();
+  // Function to load maintenance crew from database
+  async function loadMaintenanceCrew() {
+    try {
+      const snapshot = await db.collection("users")
+        .where("role", "==", "maintenance")
+        .get();
+      
+      maintenanceCrew = [];
+      personnelGroups = [];
+      
+      if (!snapshot.empty) {
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          maintenanceCrew.push({
+            id: doc.id,
+            name: data.name || data.email.split('@')[0],
+            email: data.email,
+            specialization: data.specialization || "General Maintenance",
+            phone: data.phone || ""
           });
         });
+        
+        // Group by specialization
+        const groupedByRole = {};
+        maintenanceCrew.forEach(person => {
+          if (!groupedByRole[person.specialization]) {
+            groupedByRole[person.specialization] = [];
+          }
+          groupedByRole[person.specialization].push(person.name);
+        });
+        
+        // Convert to personnelGroups format
+        Object.entries(groupedByRole).forEach(([role, names]) => {
+          personnelGroups.push({
+            role: role,
+            names: names
+          });
+        });
+        
+        // Update personnel filter dropdown
+        updatePersonnelFilter();
+      } else {
+        // If no maintenance crew found, show default options
+        personnelGroups = [
+          {
+            role: "General Maintenance",
+            names: ["No crew available"]
+          }
+        ];
+        updatePersonnelFilter();
+      }
+    } catch (error) {
+      console.error("Error loading maintenance crew:", error);
+      // Fallback to default options
+      personnelGroups = [
+        {
+          role: "General Maintenance",
+          names: ["Error loading crew"]
+        }
+      ];
+      updatePersonnelFilter();
+    }
+  }
 
-        chatSendBtn.addEventListener("click", async () => {
-          const msg = chatReplyTextarea.value.trim();
-          if (!msg) {
-            showPopup("Response message cannot be empty.");
+  // Function to update personnel filter dropdown
+  function updatePersonnelFilter() {
+    if (!personnelFilter) return;
+    
+    // Store current value
+    const currentValue = personnelFilter.value;
+    
+    // Clear existing options except the first one
+    personnelFilter.innerHTML = '<option value="all">All Personnel</option>';
+    
+    // Add unassigned option
+    const unassignedOption = document.createElement('option');
+    unassignedOption.value = "unassigned";
+    unassignedOption.textContent = "Unassigned";
+    personnelFilter.appendChild(unassignedOption);
+    
+    // Add all maintenance crew names as options
+    maintenanceCrew.forEach(person => {
+      const option = document.createElement('option');
+      option.value = person.name;
+      option.textContent = `${person.name} (${person.specialization})`;
+      personnelFilter.appendChild(option);
+    });
+    
+    // Restore previous selection if possible
+    if (currentValue && Array.from(personnelFilter.options).some(opt => opt.value === currentValue)) {
+      personnelFilter.value = currentValue;
+    }
+  }
+
+  // Flat list of all personnel names
+  const allPersonnelNames = maintenanceCrew.flatMap(person => person.name);
+
+  const drill = window.adminDashboardDrilldown || {};
+  if (drill.maintenanceStatus) {
+    statusFilter.value = drill.maintenanceStatus;
+  }
+  window.adminDashboardDrilldown = null;
+
+  function formatDateTimeAMPM(date) {
+    if (!date) return "N/A";
+    const d = date.toDate ? date.toDate() : date;
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
+    const year = d.getFullYear();
+    return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+  }
+
+  // ===== MAINTENANCE MESSAGES POPUP BINDINGS =====
+  const chatPanel = document.getElementById("maintenanceMessagesPanel");
+  const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
+  const chatMessagesContainer = document.getElementById("maintenanceMessagesContainer");
+  const chatReplyTextarea = document.getElementById("maintenanceReplyMessage");
+  const chatReplyStatus = document.getElementById("maintenanceReplyStatus");
+  const chatSendBtn = document.getElementById("maintenanceSendReplyBtn");
+  const chatClearBtn = document.getElementById("maintenanceClearReplyBtn");
+  const chatCloseBtn = document.getElementById("closeMaintenanceMessagesBtn");
+  const chatQuickReplyBtns = document.querySelectorAll(".maintenanceQuickReplyBtn");
+
+  if (chatPanel && !chatPanel.dataset.bound) {
+    chatPanel.dataset.bound = "true";
+
+    chatCloseBtn.addEventListener("click", () => {
+      chatPanel.style.display = "none";
+      chatReplyTextarea.value = "";
+      chatReplyStatus.textContent = "";
+    });
+
+    chatPanel.addEventListener("click", (e) => {
+      if (e.target === chatPanel) {
+        chatPanel.style.display = "none";
+        chatReplyTextarea.value = "";
+        chatReplyStatus.textContent = "";
+      }
+    });
+
+    chatClearBtn.addEventListener("click", () => {
+      chatReplyTextarea.value = "";
+      chatReplyStatus.textContent = "";
+    });
+
+    chatQuickReplyBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const template = btn.dataset.template;
+        let msg = "";
+        switch (template) {
+          case "on_the_way":
+            msg = "Our maintenance team is on the way.";
+            break;
+          case "technician_assigned":
+            msg = "A technician has been assigned and will be there soon.";
+            break;
+          case "scheduled":
+            msg = "We have scheduled your maintenance as per your requested date and time.";
+            break;
+          case "resolved":
+            msg = "Thank you for your patience. This maintenance concern has been resolved.";
+            break;
+        }
+        chatReplyTextarea.value = msg;
+        chatReplyTextarea.focus();
+      });
+    });
+
+    chatSendBtn.addEventListener("click", async () => {
+      const msg = chatReplyTextarea.value.trim();
+      if (!msg) {
+        showPopup("Response message cannot be empty.");
+        return;
+      }
+
+      const requestId = chatPanel.dataset.requestId;
+      if (!requestId) return;
+
+      try {
+        setButtonLoading(chatSendBtn, true);
+
+        const requestDocRef = db.collection("maintenanceRequests").doc(requestId);
+        await requestDocRef.collection("responses").add({
+          sender: "admin",
+          adminEmail: auth.currentUser ? auth.currentUser.email : null,
+          message: msg,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await requestDocRef.update({
+          responseTime: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        chatReplyTextarea.value = "";
+        await loadMaintenanceChatMessages(requestId);
+
+        chatReplyStatus.textContent = "✓ Reply sent successfully.";
+        chatReplyStatus.style.color = "#4caf50";
+      } catch (error) {
+        console.error(error);
+        chatReplyStatus.textContent = "✗ Failed to send reply.";
+        chatReplyStatus.style.color = "#f44336";
+        showPopup("Failed to send response: " + error.message);
+      } finally {
+        setButtonLoading(chatSendBtn, false);
+      }
+    });
+  }
+
+  window.openMaintenanceChat = async function (requestId) {
+    if (!chatPanel) return;
+
+    try {
+      chatMessagesContainer.innerHTML =
+        "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading conversation…</div>";
+
+      const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+      if (!docSnap.exists) {
+        showPopup("Maintenance request not found.");
+        return;
+      }
+      const data = docSnap.data();
+
+      chatTitleEl.textContent = `Maintenance – ${data.unitNumber || "Unknown unit"}`;
+      chatPanel.dataset.requestId = requestId;
+      chatPanel.style.display = "flex";
+
+      await loadMaintenanceChatMessages(requestId, data);
+    } catch (error) {
+      console.error(error);
+      showPopup("Failed to load conversation: " + error.message);
+    }
+  };
+
+  async function loadMaintenanceChatMessages(requestId, requestData) {
+    const container = chatMessagesContainer;
+    container.innerHTML = "";
+
+    let data = requestData;
+    if (!data) {
+      const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
+      data = docSnap.data();
+    }
+
+    const header = document.createElement("div");
+    header.className = "message-bubble client";
+    header.innerHTML = `
+      <div class="message-header">
+        <div class="message-sender">${data.tenantEmail || "Unit Owner"}</div>
+        <div class="message-time">${formatDateTimeAMPM(data.timestamp)}</div>
+      </div>
+      <div style="font-size:13px;">
+        <strong>Unit:</strong> ${data.unitNumber || "N/A"}<br/>
+        <strong>Issue:</strong> ${data.problem || "N/A"}<br/>
+        <strong>Status:</strong> ${data.status || "Pending"}<br/>
+        <strong>Preferred visit:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}<br/>
+        ${data.maintenanceName ? `<strong>Personnel:</strong> ${data.maintenanceName}<br/>` : ""}
+        ${data.tenantMarkedComplete ? `<strong style="color:#f39c12;">⏳ Unit Owner marked as complete - waiting for admin finalization</strong><br/>` : ""}
+      </div>
+    `;
+    container.appendChild(header);
+
+    const respSnap = await db
+      .collection("maintenanceRequests")
+      .doc(requestId)
+      .collection("responses")
+      .orderBy("timestamp", "asc")
+      .get();
+
+    if (respSnap.empty) {
+      const empty = document.createElement("div");
+      empty.style.cssText =
+        "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
+      empty.textContent =
+        "No chat history yet. Use the reply form below to send the first message.";
+      container.appendChild(empty);
+    } else {
+      respSnap.forEach((doc) => {
+        const msg = doc.data();
+        const isAdmin = msg.sender === "admin" || !!msg.adminEmail;
+        const bubble = document.createElement("div");
+        bubble.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
+
+        const ts = msg.timestamp?.toDate
+          ? msg.timestamp.toDate()
+          : null;
+
+        bubble.innerHTML = `
+          <div class="message-header">
+            <div class="message-sender">${
+              isAdmin
+                ? (msg.adminEmail || "Admin")
+                : (data.tenantEmail || "Unit Owner")
+            }</div>
+            <div class="message-time">${
+              ts ? formatDateTimeAMPM(ts) : "N/A"
+            }</div>
+          </div>
+          <div class="message-content" style="white-space:pre-wrap;">${
+            msg.message || msg.content || ""
+          }</div>
+        `;
+        container.appendChild(bubble);
+      });
+    }
+
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight;
+    }, 100);
+  }
+
+  function updatePersonnelAssignments() {
+    personnelAssignments.clear();
+    allRequests.forEach(request => {
+      if (request.maintenanceName &&
+        request.maintenanceName.trim() !== "" &&
+        request.status === "In Progress") {
+        personnelAssignments.set(request.maintenanceName, request.id);
+      }
+    });
+  }
+
+  function isPersonnelAvailable(personnelName) {
+    if (!personnelAssignments.has(personnelName)) return true;
+
+    const assignedRequestId = personnelAssignments.get(personnelName);
+    const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+
+    return !(assignedRequest && assignedRequest.status === "In Progress");
+  }
+
+  function getPersonnelStatus(personnelName) {
+    if (!personnelAssignments.has(personnelName)) {
+      return { available: true, status: "Available", workingOn: null };
+    }
+
+    const assignedRequestId = personnelAssignments.get(personnelName);
+    const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+
+    if (!assignedRequest || assignedRequest.status !== "In Progress") {
+      personnelAssignments.delete(personnelName);
+      return { available: true, status: "Available", workingOn: null };
+    }
+
+    return {
+      available: false,
+      status: "Currently Working",
+      workingOn: assignedRequest.problem || "a task",
+      unitNumber: assignedRequest.unitNumber || "Unknown unit"
+    };
+  }
+
+  function applyFiltersAndSort() {
+    const statusValue = statusFilter.value;
+    const personnelValue = personnelFilter.value;
+    const searchValue = maintenanceSearch.value.toLowerCase();
+    const sortValue = sortBy.value;
+
+    filteredRequests = [...allRequests];
+
+    if (statusValue !== "all") {
+      filteredRequests = filteredRequests.filter(
+        (r) => r.status === statusValue
+      );
+    }
+
+    if (personnelValue !== "all") {
+      if (personnelValue === "unassigned") {
+        filteredRequests = filteredRequests.filter(
+          (r) => !r.maintenanceName || !r.maintenanceName.trim()
+        );
+      } else {
+        filteredRequests = filteredRequests.filter(
+          (r) => r.maintenanceName === personnelValue
+        );
+      }
+    }
+
+    if (searchValue) {
+      filteredRequests = filteredRequests.filter((r) => {
+        const emailMatch = r.tenantEmail && r.tenantEmail.toLowerCase().includes(searchValue);
+        const unitMatch = r.unitNumber && r.unitNumber.toLowerCase().includes(searchValue);
+        const problemMatch = r.problem && r.problem.toLowerCase().includes(searchValue);
+        const commentMatch = r.comment && r.comment.toLowerCase().includes(searchValue);
+        return emailMatch || unitMatch || problemMatch || commentMatch;
+      });
+    }
+
+    filteredRequests.sort((a, b) => {
+      const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
+      const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
+      switch (sortValue) {
+        case "date-desc": return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+        case "date-asc": return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+        case "unit-asc": return (a.unitNumber || "").localeCompare(b.unitNumber || "");
+        case "unit-desc": return (b.unitNumber || "").localeCompare(a.unitNumber || "");
+        case "email-asc": return (a.tenantEmail || "").localeCompare(b.tenantEmail || "");
+        case "email-desc": return (b.tenantEmail || "").localeCompare(a.tenantEmail || "");
+        default: return 0;
+      }
+    });
+
+    renderMaintenanceRequests();
+    updateNotificationDot();
+  }
+
+  function renderMaintenanceRequests() {
+    if (!filteredRequests.length) {
+      maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
+      maintenanceStats.style.display = "none";
+      updateNotificationDot();
+      return;
+    }
+
+    maintenanceList.innerHTML = "";
+    updatePersonnelAssignments();
+
+    let pending = 0;
+    let inProgress = 0;
+    let complete = 0;
+    let newRequestsCount = 0;
+    let tenantMarkedCompleteCount = 0;
+
+    // Collect new request IDs to mark as seen
+    const newRequestIds = [];
+
+    filteredRequests.forEach((request) => {
+      const data = request;
+      const id = data.id;
+
+      // Check if request is new
+      const isNew = isRequestNew(data) && data.status !== 'Complete';
+      if (isNew) {
+        newRequestsCount++;
+        newRequestIds.push(id);
+      }
+
+      // Count tenant marked complete requests
+      if (data.tenantMarkedComplete && data.status !== "Complete") {
+        tenantMarkedCompleteCount++;
+      }
+
+      // Auto-switch Pending + has personnel -> In Progress
+      if (data.maintenanceName && data.status === "Pending") {
+        db.collection("maintenanceRequests").doc(id).update({
+          status: "In Progress",
+          startTime: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        data.status = "In Progress";
+      }
+
+      if (data.status === "Pending") pending++;
+      if (data.status === "In Progress") inProgress++;
+      if (data.status === "Complete") complete++;
+
+      const card = document.createElement("div");
+      card.className = "maintenance-card";
+      card.dataset.requestId = id;
+
+      let statusColor = "#f39c12";
+      if (data.status === "In Progress") statusColor = "#3498db";
+      if (data.status === "Complete") statusColor = "#27ae60";
+
+      // Add special color for tenant marked complete
+      if (data.tenantMarkedComplete && data.status !== "Complete") {
+        statusColor = "#f39c12"; // Orange for waiting admin finalization
+      }
+
+      card.style.borderLeft = `4px solid ${statusColor}`;
+
+      // ==== ADD: "NEW" tag for new requests ====
+      const newTagHTML = isNew ? `
+        <div class="new-request-tag" style="
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background-color: #ff4757;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: bold;
+          animation: fadeInOut 2s infinite;
+          z-index: 10;
+        ">NEW</div>
+      ` : '';
+
+      // Add tenant marked complete tag
+      const tenantMarkedTagHTML = (data.tenantMarkedComplete && data.status !== "Complete") ? `
+        <div class="tenant-marked-tag" style="
+          position: absolute;
+          top: 40px;
+          right: 10px;
+          background-color: #f39c12;
+          color: #000;
+          padding: 4px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: bold;
+          animation: pulse 2s infinite;
+          z-index: 10;
+        ">✅ Unit Owner Marked Complete</div>
+      ` : '';
+
+      // Add fade animation for NEW tag
+      if (!document.querySelector('#fade-animation')) {
+        const fadeStyle = document.createElement('style');
+        fadeStyle.id = 'fade-animation';
+        fadeStyle.textContent = `
+          @keyframes fadeInOut {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+          }
+        `;
+        document.head.appendChild(fadeStyle);
+      }
+
+      // ==== ADD: Highlight border for new requests ====
+      if (isNew) {
+        card.style.boxShadow = '0 0 0 2px rgba(255, 71, 87, 0.3)';
+        card.style.animation = 'pulseBorder 2s infinite';
+        
+        // Add pulse border animation
+        if (!document.querySelector('#pulse-border-animation')) {
+          const borderStyle = document.createElement('style');
+          borderStyle.id = 'pulse-border-animation';
+          borderStyle.textContent = `
+            @keyframes pulseBorder {
+              0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+              70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+            }
+          `;
+          document.head.appendChild(borderStyle);
+        }
+      }
+
+      const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
+        ? `
+            <div style="margin-top:6px;">
+                <strong>Attachments:</strong><br/>
+                <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                    <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
+                    ${data.imageUrls.length > 1 ? `
+                      <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                      <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
+                    ` : ""}
+                </div>
+            </div>`
+        : "";
+
+      // Add tenant marked info
+      const tenantMarkedInfoHTML = data.tenantMarkedComplete ? `
+        <p><strong>Unit Owner Action:</strong> 
+          <span style="color: #f39c12; font-weight:bold;">
+            ✅ Marked as complete by ${data.tenantMarkedBy || "Unit Owner"}
+          </span>
+        </p>
+        ${data.tenantMarkedAt ? `<p><strong>Marked at:</strong> ${formatDateTimeAMPM(data.tenantMarkedAt)}</p>` : ''}
+      ` : '';
+
+      card.innerHTML = `
+            <div style="position: relative;">
+                ${newTagHTML}
+                ${tenantMarkedTagHTML}
+                <h3>${data.problem || "Unknown Issue"}</h3>
+                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:220px;">
+                        <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
+                        <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
+                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
+                        <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
+                        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
+                        <p><strong>Maintenance Personnel:</strong> <span style="color:#b08d35; font-weight:700;">${data.maintenanceName || "Not assigned"}</span></p>
+                        <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
+                        ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
+                        ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
+                        ${tenantMarkedInfoHTML}
+                    </div>
+                    <div style="min-width:220px;">${attachmentsHTML}</div>
+                </div>
+            </div>
+      `;
+
+      // ==== ADD: Click handler to mark as seen ====
+      card.addEventListener('click', (e) => {
+        // Don't mark as seen if clicking on interactive elements
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || 
+            e.target.tagName === 'OPTION' || e.target.tagName === 'IMG' ||
+            e.target.closest('button') || e.target.closest('select')) {
+          return;
+        }
+        
+        if (isNew) {
+          markRequestsAsSeen([id]);
+          // Remove visual indicators
+          card.style.boxShadow = '';
+          card.style.animation = '';
+          const newTag = card.querySelector('.new-request-tag');
+          if (newTag) newTag.remove();
+          updateNotificationDot();
+        }
+      });
+
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "maintenance-card-actions";
+
+      // ==== ASSIGNMENT SECTION ====
+      const assignmentSection = document.createElement("div");
+      assignmentSection.style.marginBottom = "10px";
+      assignmentSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Assignment:</strong>`;
+
+      const assignmentContainer = document.createElement("div");
+      assignmentContainer.style.display = "flex";
+      assignmentContainer.style.gap = "10px";
+      assignmentContainer.style.alignItems = "center";
+      assignmentContainer.style.marginTop = "5px";
+
+      const personnelSelect = document.createElement("select");
+      personnelSelect.style.minWidth = "220px";
+
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = data.maintenanceName
+        ? `Assigned: ${data.maintenanceName}`
+        : "Assign personnel…";
+      personnelSelect.appendChild(emptyOption);
+
+      // Populate dropdown with real maintenance crew
+      if (personnelGroups.length > 0) {
+        personnelGroups.forEach((group) => {
+          const optgroup = document.createElement("optgroup");
+          optgroup.label = group.role;
+
+          group.names.forEach((name) => {
+            const opt = document.createElement("option");
+            opt.value = name;
+
+            const personnelStatus = getPersonnelStatus(name);
+
+            if (data.maintenanceName === name) {
+              opt.selected = true;
+              opt.textContent = `${name} ✓ (Assigned)`;
+              opt.style.color = "#27ae60";
+            } else if (!personnelStatus.available) {
+              opt.disabled = true;
+              opt.textContent = `${name} ✗ (Working on ${personnelStatus.unitNumber})`;
+              opt.style.color = "#e74c3c";
+              opt.title = `Currently working on: ${personnelStatus.workingOn}`;
+            } else {
+              opt.textContent = `${name} ✓ (Available)`;
+              opt.style.color = "#27ae60";
+            }
+
+            optgroup.appendChild(opt);
+          });
+
+          personnelSelect.appendChild(optgroup);
+        });
+      } else {
+        // Fallback if no maintenance crew is loaded
+        const noCrewOption = document.createElement("option");
+        noCrewOption.value = "";
+        noCrewOption.textContent = "No maintenance crew available";
+        noCrewOption.disabled = true;
+        personnelSelect.appendChild(noCrewOption);
+      }
+
+      if (data.status === "In Progress" || data.status === "Complete") {
+        personnelSelect.disabled = true;
+        personnelSelect.title = data.status === "In Progress"
+          ? "Cannot change personnel while work is in progress"
+          : "Request is already completed";
+      }
+
+      assignmentContainer.appendChild(personnelSelect);
+
+      // Only show "Assign" button when there is NO personnel yet and request is not complete.
+      if (!data.maintenanceName && data.status !== "Complete") {
+        const assignBtn = document.createElement("button");
+        assignBtn.textContent = "Assign";
+        assignBtn.className = "btn-primary";
+        assignBtn.style.padding = "6px 12px";
+        assignBtn.style.fontSize = "13px";
+        assignBtn.style.background = "#8d6c39";
+
+        assignmentContainer.appendChild(assignBtn);
+
+        assignBtn.addEventListener("click", async () => {
+          const selectedPersonnel = personnelSelect.value;
+
+          if (!selectedPersonnel) {
+            showPopup("Please select a personnel to assign.");
             return;
           }
 
-          const requestId = chatPanel.dataset.requestId;
-          if (!requestId) return;
+          const personnelStatus = getPersonnelStatus(selectedPersonnel);
+          if (!personnelStatus.available) {
+            showPopup(
+              `Cannot assign ${selectedPersonnel}. They are currently working on ${personnelStatus.unitNumber}.`
+            );
+            return;
+          }
 
           try {
-            setButtonLoading(chatSendBtn, true);
+            setButtonLoading(assignBtn, true);
 
-            const requestDocRef = db.collection("maintenanceRequests").doc(requestId);
-            await requestDocRef.collection("responses").add({
-              sender: "admin",
-              adminEmail: auth.currentUser ? auth.currentUser.email : null,
-              message: msg,
-              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            });
+            const updateData = {
+              maintenanceName: selectedPersonnel,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            };
 
-            await requestDocRef.update({
-              responseTime: firebase.firestore.FieldValue.serverTimestamp(),
-            });
+            personnelAssignments.set(selectedPersonnel, id);
 
-            chatReplyTextarea.value = "";
-            await loadMaintenanceChatMessages(requestId);
+            await db.collection("maintenanceRequests").doc(id).update(updateData);
 
-            chatReplyStatus.textContent = "✓ Reply sent successfully.";
-            chatReplyStatus.style.color = "#4caf50";
+            showPopup(
+              `Personnel assigned successfully! ${selectedPersonnel} will start working on this request.`
+            );
+
+            setTimeout(() => {
+              applyFiltersAndSort();
+            }, 500);
           } catch (error) {
-            console.error(error);
-            chatReplyStatus.textContent = "✗ Failed to send reply.";
-            chatReplyStatus.style.color = "#f44336";
-            showPopup("Failed to send response: " + error.message);
+            showPopup("Error assigning personnel: " + error.message);
           } finally {
-            setButtonLoading(chatSendBtn, false);
+            setButtonLoading(assignBtn, false);
           }
         });
       }
 
-      window.openMaintenanceChat = async function (requestId) {
-        if (!chatPanel) return;
+      assignmentSection.appendChild(assignmentContainer);
+      actionsDiv.appendChild(assignmentSection);
 
-        try {
-          chatMessagesContainer.innerHTML =
-            "<div style='text-align:center;padding:30px;color:#b0b0b0;'>Loading conversation…</div>";
+      // ==== COMPLETE WORK SECTION ====
+      // Show complete button only when tenant has marked it as complete
+      if (data.status === "In Progress" && data.tenantMarkedComplete) {
+        const completeSection = document.createElement("div");
+        completeSection.style.marginBottom = "10px";
+        completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
 
-          const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
-          if (!docSnap.exists) {
-            showPopup("Maintenance request not found.");
-            return;
+        const completeBtn = document.createElement("button");
+        completeBtn.textContent = "Finalize Completion";
+        completeBtn.className = "btn-primary";
+        completeBtn.style.padding = "8px 16px";
+        completeBtn.style.fontSize = "14px";
+        completeBtn.style.background = "#27ae60";
+        completeBtn.style.color = "white";
+        completeBtn.style.border = "none";
+        completeBtn.style.borderRadius = "6px";
+        completeBtn.style.cursor = "pointer";
+        completeBtn.style.transition = "background-color 0.3s";
+        completeBtn.style.marginTop = "5px";
+
+        completeBtn.addEventListener("mouseenter", () => {
+          completeBtn.style.background = "#219653";
+        });
+
+        completeBtn.addEventListener("mouseleave", () => {
+          completeBtn.style.background = "#27ae60";
+        });
+
+        completeBtn.addEventListener("click", async () => {
+          if (confirm(`${data.tenantMarkedBy || "Unit Owner"} has marked this as complete. Finalize the request?`)) {
+            try {
+              setButtonLoading(completeBtn, true);
+
+              await db.collection("maintenanceRequests").doc(id).update({
+                status: "Complete",
+                completionTime: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+
+              if (data.maintenanceName) {
+                personnelAssignments.delete(data.maintenanceName);
+              }
+
+              showPopup("Maintenance request finalized as complete!");
+
+              setTimeout(() => {
+                applyFiltersAndSort();
+              }, 500);
+
+            } catch (error) {
+              showPopup("Error finalizing completion: " + error.message);
+            } finally {
+              setButtonLoading(completeBtn, false);
+            }
           }
-          const data = docSnap.data();
+        });
 
-          chatTitleEl.textContent = `Maintenance – ${data.unitNumber || "Unknown unit"}`;
-          chatPanel.dataset.requestId = requestId;
-          chatPanel.style.display = "flex";
-
-          await loadMaintenanceChatMessages(requestId, data);
-        } catch (error) {
-          console.error(error);
-          showPopup("Failed to load conversation: " + error.message);
-        }
-      };
-
-      async function loadMaintenanceChatMessages(requestId, requestData) {
-        const container = chatMessagesContainer;
-        container.innerHTML = "";
-
-        let data = requestData;
-        if (!data) {
-          const docSnap = await db.collection("maintenanceRequests").doc(requestId).get();
-          data = docSnap.data();
-        }
-
-        const header = document.createElement("div");
-        header.className = "message-bubble client";
-        header.innerHTML = `
-          <div class="message-header">
-            <div class="message-sender">${data.tenantEmail || "Unit Owner"}</div>
-            <div class="message-time">${formatDateTimeAMPM(data.timestamp)}</div>
-          </div>
-          <div style="font-size:13px;">
-            <strong>Unit:</strong> ${data.unitNumber || "N/A"}<br/>
-            <strong>Issue:</strong> ${data.problem || "N/A"}<br/>
-            <strong>Status:</strong> ${data.status || "Pending"}<br/>
-            <strong>Preferred visit:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}<br/>
-            ${data.maintenanceName ? `<strong>Personnel:</strong> ${data.maintenanceName}<br/>` : ""}
+        completeSection.appendChild(completeBtn);
+        actionsDiv.appendChild(completeSection);
+      } else if (data.status === "In Progress" && !data.tenantMarkedComplete) {
+        // Show waiting message
+        const waitingSection = document.createElement("div");
+        waitingSection.style.marginBottom = "10px";
+        waitingSection.innerHTML = `
+          <strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>
+          <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; margin-top: 5px; font-size: 13px;">
+            <i class="fas fa-clock"></i> 
+            <strong>Status:</strong> Waiting for unit owner to mark as complete<br>
+            <small>Unit owner must confirm completion in their dashboard first.</small>
           </div>
         `;
-        container.appendChild(header);
-
-        const respSnap = await db
-          .collection("maintenanceRequests")
-          .doc(requestId)
-          .collection("responses")
-          .orderBy("timestamp", "asc")
-          .get();
-
-        if (respSnap.empty) {
-          const empty = document.createElement("div");
-          empty.style.cssText =
-            "padding:18px;text-align:center;font-size:13px;color:#b0b0b0;";
-          empty.textContent =
-            "No chat history yet. Use the reply form below to send the first message.";
-          container.appendChild(empty);
-        } else {
-          respSnap.forEach((doc) => {
-            const msg = doc.data();
-            const isAdmin = msg.sender === "admin" || !!msg.adminEmail;
-            const bubble = document.createElement("div");
-            bubble.className = `message-bubble ${isAdmin ? "admin" : "client"}`;
-
-            const ts = msg.timestamp?.toDate
-              ? msg.timestamp.toDate()
-              : null;
-
-            bubble.innerHTML = `
-              <div class="message-header">
-                <div class="message-sender">${
-                  isAdmin
-                    ? (msg.adminEmail || "Admin")
-                    : (data.tenantEmail || "Unit Owner")
-                }</div>
-                <div class="message-time">${
-                  ts ? formatDateTimeAMPM(ts) : "N/A"
-                }</div>
-              </div>
-              <div class="message-content" style="white-space:pre-wrap;">${
-                msg.message || msg.content || ""
-              }</div>
-            `;
-            container.appendChild(bubble);
-          });
-        }
-
-        setTimeout(() => {
-          container.scrollTop = container.scrollHeight;
-        }, 100);
+        actionsDiv.appendChild(waitingSection);
       }
 
-      function updatePersonnelAssignments() {
-        personnelAssignments.clear();
-        allRequests.forEach(request => {
-          if (request.maintenanceName &&
-            request.maintenanceName.trim() !== "" &&
-            request.status === "In Progress") {
-            personnelAssignments.set(request.maintenanceName, request.id);
-          }
-        });
+      // ==== TENANT MARKED COMPLETE SECTION ====
+      if (data.tenantMarkedComplete && data.status !== "Complete") {
+        const tenantActionSection = document.createElement("div");
+        tenantActionSection.style.marginBottom = "10px";
+        tenantActionSection.innerHTML = `
+          <strong style="color: #27ae60; font-size: 14px;">
+            <i class="fas fa-user-check"></i> Unit Owner Action:
+          </strong>
+          <div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; margin-top: 5px; font-size: 13px;">
+            <i class="fas fa-check-circle"></i> 
+            <strong>Unit owner marked this as complete</strong><br>
+            <small>${data.tenantMarkedBy || "Unit Owner"} confirmed completion on 
+            ${data.tenantMarkedAt ? formatDateTimeAMPM(data.tenantMarkedAt) : "recently"}</small>
+          </div>
+          <p style="font-size: 12px; color: #666; margin-top: 5px;">
+            <i class="fas fa-info-circle"></i> Click "Finalize Completion" above to complete the request.
+          </p>
+        `;
+        actionsDiv.appendChild(tenantActionSection);
       }
 
-      function isPersonnelAvailable(personnelName) {
-        if (!personnelAssignments.has(personnelName)) return true;
+      // ==== COMMUNICATION SECTION ====
+      const respondSection = document.createElement("div");
+      respondSection.style.marginTop = "10px";
+      respondSection.innerHTML =
+        `<strong style="color: #b3b3b3; font-size: 14px;">Communication:</strong>`;
 
-        const assignedRequestId = personnelAssignments.get(personnelName);
-        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
+      const openChatBtn = document.createElement("button");
+      openChatBtn.textContent = "View Conversation";
+      openChatBtn.className = "btn-primary";
+      openChatBtn.style.background = "#4a90e2";
+      openChatBtn.style.padding = "6px 12px";
+      openChatBtn.style.fontSize = "13px";
+      openChatBtn.style.marginTop = "5px";
 
-        return !(assignedRequest && assignedRequest.status === "In Progress");
+      openChatBtn.addEventListener("click", () => {
+        openMaintenanceChat(id);
+      });
+
+      respondSection.appendChild(openChatBtn);
+      actionsDiv.appendChild(respondSection);
+
+      // ==== DELETE SECTION ====
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete Request";
+      deleteBtn.className = "btn-danger";
+      deleteBtn.style.marginTop = "10px";
+      deleteBtn.style.padding = "6px 12px";
+      deleteBtn.style.fontSize = "13px";
+
+      if (data.status === "In Progress") {
+        deleteBtn.disabled = true;
+        deleteBtn.style.backgroundColor = "#777";
+        deleteBtn.style.cursor = "not-allowed";
+        deleteBtn.title = "Cannot delete request while work is in progress";
       }
 
-      function getPersonnelStatus(personnelName) {
-        if (!personnelAssignments.has(personnelName)) {
-          return { available: true, status: "Available", workingOn: null };
-        }
-
-        const assignedRequestId = personnelAssignments.get(personnelName);
-        const assignedRequest = allRequests.find(r => r.id === assignedRequestId);
-
-        if (!assignedRequest || assignedRequest.status !== "In Progress") {
-          personnelAssignments.delete(personnelName);
-          return { available: true, status: "Available", workingOn: null };
-        }
-
-        return {
-          available: false,
-          status: "Currently Working",
-          workingOn: assignedRequest.problem || "a task",
-          unitNumber: assignedRequest.unitNumber || "Unknown unit"
-        };
-      }
-
-      function applyFiltersAndSort() {
-        const statusValue = statusFilter.value;
-        const personnelValue = personnelFilter.value;
-        const searchValue = maintenanceSearch.value.toLowerCase();
-        const sortValue = sortBy.value;
-
-        filteredRequests = [...allRequests];
-
-        if (statusValue !== "all") {
-          filteredRequests = filteredRequests.filter(
-            (r) => r.status === statusValue
-          );
-        }
-
-        if (personnelValue !== "all") {
-          if (personnelValue === "unassigned") {
-            filteredRequests = filteredRequests.filter(
-              (r) => !r.maintenanceName || !r.maintenanceName.trim()
-            );
-          } else {
-            filteredRequests = filteredRequests.filter(
-              (r) => r.maintenanceName === personnelValue
-            );
-          }
-        }
-
-        if (searchValue) {
-          filteredRequests = filteredRequests.filter((r) => {
-            const emailMatch = r.tenantEmail && r.tenantEmail.toLowerCase().includes(searchValue);
-            const unitMatch = r.unitNumber && r.unitNumber.toLowerCase().includes(searchValue);
-            const problemMatch = r.problem && r.problem.toLowerCase().includes(searchValue);
-            const commentMatch = r.comment && r.comment.toLowerCase().includes(searchValue);
-            return emailMatch || unitMatch || problemMatch || commentMatch;
-          });
-        }
-
-        filteredRequests.sort((a, b) => {
-          const aDate = a.timestamp?.toDate ? a.timestamp.toDate() : null;
-          const bDate = b.timestamp?.toDate ? b.timestamp.toDate() : null;
-          switch (sortValue) {
-            case "date-desc": return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
-            case "date-asc": return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-            case "unit-asc": return (a.unitNumber || "").localeCompare(b.unitNumber || "");
-            case "unit-desc": return (b.unitNumber || "").localeCompare(a.unitNumber || "");
-            case "email-asc": return (a.tenantEmail || "").localeCompare(b.tenantEmail || "");
-            case "email-desc": return (b.tenantEmail || "").localeCompare(a.tenantEmail || "");
-            default: return 0;
-          }
-        });
-
-        renderMaintenanceRequests();
-        updateNotificationDot();
-      }
-
-      function renderMaintenanceRequests() {
-        if (!filteredRequests.length) {
-          maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
-          maintenanceStats.style.display = "none";
-          updateNotificationDot();
+      deleteBtn.addEventListener("click", () => {
+        if (data.status === "In Progress") {
+          showPopup("Cannot delete request while work is in progress.");
           return;
         }
 
-        maintenanceList.innerHTML = "";
-        updatePersonnelAssignments();
+        showPopup(`
+                <strong>Are you sure?</strong><br>
+                This maintenance request will be permanently deleted.<br><br>
+                <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
+                    Delete
+                </button>
+                <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
+                    Cancel
+                </button>
+            `);
 
-        let pending = 0;
-        let inProgress = 0;
-        let complete = 0;
-        let newRequestsCount = 0;
+        setTimeout(() => {
+          const confirmBtn = document.getElementById("confirmDeleteBtn");
+          if (!confirmBtn) return;
+          confirmBtn.addEventListener("click", async () => {
+            try {
+              setButtonLoading(confirmBtn, true);
 
-        // Collect new request IDs to mark as seen
-        const newRequestIds = [];
-
-        filteredRequests.forEach((request) => {
-          const data = request;
-          const id = data.id;
-
-          // Check if request is new
-          const isNew = isRequestNew(data) && data.status !== 'Complete';
-          if (isNew) {
-            newRequestsCount++;
-            newRequestIds.push(id);
-          }
-
-          // Auto-switch Pending + has personnel -> In Progress
-          if (data.maintenanceName && data.status === "Pending") {
-            db.collection("maintenanceRequests").doc(id).update({
-              status: "In Progress",
-              startTime: firebase.firestore.FieldValue.serverTimestamp(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            data.status = "In Progress";
-          }
-
-          if (data.status === "Pending") pending++;
-          if (data.status === "In Progress") inProgress++;
-          if (data.status === "Complete") complete++;
-
-          const card = document.createElement("div");
-          card.className = "maintenance-card";
-          card.dataset.requestId = id;
-
-          let statusColor = "#f39c12";
-          if (data.status === "In Progress") statusColor = "#3498db";
-          if (data.status === "Complete") statusColor = "#27ae60";
-
-          card.style.borderLeft = `4px solid ${statusColor}`;
-
-          // ==== ADD: "NEW" tag for new requests ====
-          const newTagHTML = isNew ? `
-            <div class="new-request-tag" style="
-              position: absolute;
-              top: 10px;
-              right: 10px;
-              background-color: #ff4757;
-              color: white;
-              padding: 4px 8px;
-              border-radius: 12px;
-              font-size: 11px;
-              font-weight: bold;
-              animation: fadeInOut 2s infinite;
-              z-index: 10;
-            ">NEW</div>
-          ` : '';
-
-          // Add fade animation for NEW tag
-          if (!document.querySelector('#fade-animation')) {
-            const fadeStyle = document.createElement('style');
-            fadeStyle.id = 'fade-animation';
-            fadeStyle.textContent = `
-              @keyframes fadeInOut {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.6; }
-              }
-            `;
-            document.head.appendChild(fadeStyle);
-          }
-
-          // ==== ADD: Highlight border for new requests ====
-          if (isNew) {
-            card.style.boxShadow = '0 0 0 2px rgba(255, 71, 87, 0.3)';
-            card.style.animation = 'pulseBorder 2s infinite';
-            
-            // Add pulse border animation
-            if (!document.querySelector('#pulse-border-animation')) {
-              const borderStyle = document.createElement('style');
-              borderStyle.id = 'pulse-border-animation';
-              borderStyle.textContent = `
-                @keyframes pulseBorder {
-                  0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
-                  70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
-                  100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
-                }
-              `;
-              document.head.appendChild(borderStyle);
-            }
-          }
-
-          const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
-            ? `
-                <div style="margin-top:6px;">
-                    <strong>Attachments:</strong><br/>
-                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                        <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                        ${data.imageUrls.length > 1 ? `
-                          <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                          <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
-                        ` : ""}
-                    </div>
-                </div>`
-            : "";
-
-          card.innerHTML = `
-                <div style="position: relative;">
-                    ${newTagHTML}
-                    <h3>${data.problem || "Unknown Issue"}</h3>
-                    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:220px;">
-                            <p><strong>Unit Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                            <p><strong>Unit Number:</strong> ${data.unitNumber || "N/A"}</p>
-                            <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
-                            <p><strong>Preferred Visit Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
-                            <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
-                            <p><strong>Maintenance Personnel:</strong> <span style="color:#b08d35; font-weight:700;">${data.maintenanceName || "Not assigned"}</span></p>
-                            <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
-                            ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
-                            ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
-                        </div>
-                        <div style="min-width:220px;">${attachmentsHTML}</div>
-                    </div>
-                </div>
-          `;
-
-          // ==== ADD: Click handler to mark as seen ====
-          card.addEventListener('click', (e) => {
-            // Don't mark as seen if clicking on interactive elements
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || 
-                e.target.tagName === 'OPTION' || e.target.tagName === 'IMG' ||
-                e.target.closest('button') || e.target.closest('select')) {
-              return;
-            }
-            
-            if (isNew) {
-              markRequestsAsSeen([id]);
-              // Remove visual indicators
-              card.style.boxShadow = '';
-              card.style.animation = '';
-              const newTag = card.querySelector('.new-request-tag');
-              if (newTag) newTag.remove();
-              updateNotificationDot();
-            }
-          });
-
-          const actionsDiv = document.createElement("div");
-          actionsDiv.className = "maintenance-card-actions";
-
-          // ==== ASSIGNMENT SECTION ====
-          const assignmentSection = document.createElement("div");
-          assignmentSection.style.marginBottom = "10px";
-          assignmentSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Assignment:</strong>`;
-
-          const assignmentContainer = document.createElement("div");
-          assignmentContainer.style.display = "flex";
-          assignmentContainer.style.gap = "10px";
-          assignmentContainer.style.alignItems = "center";
-          assignmentContainer.style.marginTop = "5px";
-
-          const personnelSelect = document.createElement("select");
-          personnelSelect.style.minWidth = "220px";
-
-          const emptyOption = document.createElement("option");
-          emptyOption.value = "";
-          emptyOption.textContent = data.maintenanceName
-            ? `Assigned: ${data.maintenanceName}`
-            : "Assign personnel…";
-          personnelSelect.appendChild(emptyOption);
-
-          // Populate dropdown with real maintenance crew
-          if (personnelGroups.length > 0) {
-            personnelGroups.forEach((group) => {
-              const optgroup = document.createElement("optgroup");
-              optgroup.label = group.role;
-
-              group.names.forEach((name) => {
-                const opt = document.createElement("option");
-                opt.value = name;
-
-                const personnelStatus = getPersonnelStatus(name);
-
-                if (data.maintenanceName === name) {
-                  opt.selected = true;
-                  opt.textContent = `${name} ✓ (Assigned)`;
-                  opt.style.color = "#27ae60";
-                } else if (!personnelStatus.available) {
-                  opt.disabled = true;
-                  opt.textContent = `${name} ✗ (Working on ${personnelStatus.unitNumber})`;
-                  opt.style.color = "#e74c3c";
-                  opt.title = `Currently working on: ${personnelStatus.workingOn}`;
-                } else {
-                  opt.textContent = `${name} ✓ (Available)`;
-                  opt.style.color = "#27ae60";
-                }
-
-                optgroup.appendChild(opt);
-              });
-
-              personnelSelect.appendChild(optgroup);
-            });
-          } else {
-            // Fallback if no maintenance crew is loaded
-            const noCrewOption = document.createElement("option");
-            noCrewOption.value = "";
-            noCrewOption.textContent = "No maintenance crew available";
-            noCrewOption.disabled = true;
-            personnelSelect.appendChild(noCrewOption);
-          }
-
-          if (data.status === "In Progress" || data.status === "Complete") {
-            personnelSelect.disabled = true;
-            personnelSelect.title = data.status === "In Progress"
-              ? "Cannot change personnel while work is in progress"
-              : "Request is already completed";
-          }
-
-          assignmentContainer.appendChild(personnelSelect);
-
-          // Only show "Assign" button when there is NO personnel yet and request is not complete.
-          if (!data.maintenanceName && data.status !== "Complete") {
-            const assignBtn = document.createElement("button");
-            assignBtn.textContent = "Assign";
-            assignBtn.className = "btn-primary";
-            assignBtn.style.padding = "6px 12px";
-            assignBtn.style.fontSize = "13px";
-            assignBtn.style.background = "#8d6c39";
-
-            assignmentContainer.appendChild(assignBtn);
-
-            assignBtn.addEventListener("click", async () => {
-              const selectedPersonnel = personnelSelect.value;
-
-              if (!selectedPersonnel) {
-                showPopup("Please select a personnel to assign.");
-                return;
+              if (data.maintenanceName) {
+                personnelAssignments.delete(data.maintenanceName);
               }
 
-              const personnelStatus = getPersonnelStatus(selectedPersonnel);
-              if (!personnelStatus.available) {
-                showPopup(
-                  `Cannot assign ${selectedPersonnel}. They are currently working on ${personnelStatus.unitNumber}.`
-                );
-                return;
-              }
+              await db.collection("maintenanceRequests").doc(id).delete();
+              closePopup();
+              showPopup("Maintenance request deleted.");
 
-              try {
-                setButtonLoading(assignBtn, true);
-
-                const updateData = {
-                  maintenanceName: selectedPersonnel,
-                  updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                };
-
-                personnelAssignments.set(selectedPersonnel, id);
-
-                await db.collection("maintenanceRequests").doc(id).update(updateData);
-
-                showPopup(
-                  `Personnel assigned successfully! ${selectedPersonnel} will start working on this request.`
-                );
-
-                setTimeout(() => {
-                  applyFiltersAndSort();
-                }, 500);
-              } catch (error) {
-                showPopup("Error assigning personnel: " + error.message);
-              } finally {
-                setButtonLoading(assignBtn, false);
-              }
-            });
-          }
-
-          assignmentSection.appendChild(assignmentContainer);
-          actionsDiv.appendChild(assignmentSection);
-
-          // ==== COMPLETE WORK SECTION ====
-          if (data.status === "In Progress") {
-            const completeSection = document.createElement("div");
-            completeSection.style.marginBottom = "10px";
-            completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
-
-            const completeBtn = document.createElement("button");
-            completeBtn.textContent = "Mark as Complete";
-            completeBtn.className = "btn-primary";
-            completeBtn.style.padding = "8px 16px";
-            completeBtn.style.fontSize = "14px";
-            completeBtn.style.background = "#27ae60";
-            completeBtn.style.color = "white";
-            completeBtn.style.border = "none";
-            completeBtn.style.borderRadius = "6px";
-            completeBtn.style.cursor = "pointer";
-            completeBtn.style.transition = "background-color 0.3s";
-            completeBtn.style.marginTop = "5px";
-
-            completeBtn.addEventListener("mouseenter", () => {
-              completeBtn.style.background = "#219653";
-            });
-
-            completeBtn.addEventListener("mouseleave", () => {
-              completeBtn.style.background = "#27ae60";
-            });
-
-            completeBtn.addEventListener("click", async () => {
-              if (confirm("Are you sure you want to mark this maintenance request as complete?")) {
-                try {
-                  setButtonLoading(completeBtn, true);
-
-                  await db.collection("maintenanceRequests").doc(id).update({
-                    status: "Complete",
-                    completionTime: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                  });
-
-                  if (data.maintenanceName) {
-                    personnelAssignments.delete(data.maintenanceName);
-                  }
-
-                  showPopup("Maintenance request marked as complete! Personnel is now available.");
-
-                  setTimeout(() => {
-                    applyFiltersAndSort();
-                  }, 500);
-
-                } catch (error) {
-                  showPopup("Error marking as complete: " + error.message);
-                } finally {
-                  setButtonLoading(completeBtn, false);
-                }
-              }
-            });
-
-            completeSection.appendChild(completeBtn);
-            actionsDiv.appendChild(completeSection);
-          }
-
-          // ==== COMMUNICATION SECTION ====
-          const respondSection = document.createElement("div");
-          respondSection.style.marginTop = "10px";
-          respondSection.innerHTML =
-            `<strong style="color: #b3b3b3; font-size: 14px;">Communication:</strong>`;
-
-          const openChatBtn = document.createElement("button");
-          openChatBtn.textContent = "View Conversation";
-          openChatBtn.className = "btn-primary";
-          openChatBtn.style.background = "#4a90e2";
-          openChatBtn.style.padding = "6px 12px";
-          openChatBtn.style.fontSize = "13px";
-          openChatBtn.style.marginTop = "5px";
-
-          openChatBtn.addEventListener("click", () => {
-            openMaintenanceChat(id);
-          });
-
-          respondSection.appendChild(openChatBtn);
-          actionsDiv.appendChild(respondSection);
-
-          // ==== DELETE SECTION ====
-          const deleteBtn = document.createElement("button");
-          deleteBtn.textContent = "Delete Request";
-          deleteBtn.className = "btn-danger";
-          deleteBtn.style.marginTop = "10px";
-          deleteBtn.style.padding = "6px 12px";
-          deleteBtn.style.fontSize = "13px";
-
-          if (data.status === "In Progress") {
-            deleteBtn.disabled = true;
-            deleteBtn.style.backgroundColor = "#777";
-            deleteBtn.style.cursor = "not-allowed";
-            deleteBtn.title = "Cannot delete request while work is in progress";
-          }
-
-          deleteBtn.addEventListener("click", () => {
-            if (data.status === "In Progress") {
-              showPopup("Cannot delete request while work is in progress.");
-              return;
-            }
-
-            showPopup(`
-                    <strong>Are you sure?</strong><br>
-                    This maintenance request will be permanently deleted.<br><br>
-                    <button id="confirmDeleteBtn" style="padding:6px 12px;background:#d9534f;color:white;border:none;border-radius:6px;margin-right:10px;">
-                        Delete
-                    </button>
-                    <button onclick="closePopup()" style="padding:6px 12px;background:#777;color:white;border:none;border-radius:6px;">
-                        Cancel
-                    </button>
-                `);
-
-            setTimeout(() => {
-              const confirmBtn = document.getElementById("confirmDeleteBtn");
-              if (!confirmBtn) return;
-              confirmBtn.addEventListener("click", async () => {
-                try {
-                  setButtonLoading(confirmBtn, true);
-
-                  if (data.maintenanceName) {
-                    personnelAssignments.delete(data.maintenanceName);
-                  }
-
-                  await db.collection("maintenanceRequests").doc(id).delete();
-                  closePopup();
-                  showPopup("Maintenance request deleted.");
-
-                  setTimeout(() => {
-                    applyFiltersAndSort();
-                  }, 500);
-
-                } catch (error) {
-                  closePopup();
-                  showPopup("Failed to delete: " + error.message);
-                }
-              });
-            }, 50);
-          });
-
-          actionsDiv.appendChild(deleteBtn);
-
-          card.appendChild(actionsDiv);
-
-          maintenanceList.appendChild(card);
-
-          if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
-            let currentIndex = 0;
-            const imgEl = card.querySelector(`#img-${id}`);
-            const prevBtn = card.querySelector(".prev-btn");
-            const nextBtn = card.querySelector(".next-btn");
-
-            prevBtn.addEventListener("click", () => {
-              currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-
-            nextBtn.addEventListener("click", () => {
-              currentIndex = (currentIndex + 1) % data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-          }
-        });
-
-        // Mark all visible new requests as seen after a delay
-        if (newRequestIds.length > 0) {
-          setTimeout(() => {
-            markRequestsAsSeen(newRequestIds);
-            updateNotificationDot();
-          }, 3000);
-        }
-
-        // Update statistics
-        requestCount.textContent = filteredRequests.length;
-        pendingCountEl.textContent = pending;
-        if (inProgressCountEl) {
-          inProgressCountEl.textContent = inProgress;
-        }
-        completeCountEl.textContent = complete;
-        
-        // Add new requests count to stats
-        let newCountEl = document.getElementById('newCount');
-        if (!newCountEl) {
-          newCountEl = document.createElement('span');
-          newCountEl.id = 'newCount';
-          newCountEl.style.color = '#ff4757';
-          newCountEl.style.marginLeft = '10px';
-          newCountEl.style.fontWeight = 'bold';
-          maintenanceStats.appendChild(newCountEl);
-        }
-        
-        if (newRequestsCount > 0) {
-          newCountEl.textContent = `(${newRequestsCount} new)`;
-        } else {
-          newCountEl.textContent = '';
-        }
-
-        maintenanceStats.style.display = "block";
-        updateNotificationDot();
-      }
-
-      // Load maintenance crew first
-      loadMaintenanceCrew().then(() => {
-        // Then load maintenance requests
-        db.collection("maintenanceRequests")
-          .orderBy("timestamp", "desc")
-          .onSnapshot(
-            (snapshot) => {
-              if (snapshot.empty) {
-                allRequests = [];
-                filteredRequests = [];
-                maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
-                maintenanceStats.style.display = "none";
-                updateNotificationDot();
-                return;
-              }
-
-              allRequests = snapshot.docs.map((docSnap) => ({
-                id: docSnap.id,
-                ...docSnap.data(),
-              }));
-
-              // Always update notification dot when data changes
-              updateNotificationDot();
-              
-              // Only apply filters and sort if we're on the maintenance page
-              if (document.getElementById("maintenanceList")) {
+              setTimeout(() => {
                 applyFiltersAndSort();
-              }
-            },
-            (error) => {
-              maintenanceList.innerHTML =
-                `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-              maintenanceStats.style.display = "none";
+              }, 500);
+
+            } catch (error) {
+              closePopup();
+              showPopup("Failed to delete: " + error.message);
             }
-          );
+          });
+        }, 50);
       });
 
-      statusFilter.addEventListener("change", applyFiltersAndSort);
-      personnelFilter.addEventListener("change", applyFiltersAndSort);
-      maintenanceSearch.addEventListener("input", applyFiltersAndSort);
-      sortBy.addEventListener("change", applyFiltersAndSort);
-      resetFilters.addEventListener("click", () => {
-        statusFilter.value = "all";
-        personnelFilter.value = "all";
-        maintenanceSearch.value = "";
-        sortBy.value = "date-desc";
-        applyFiltersAndSort();
-      });
+      actionsDiv.appendChild(deleteBtn);
 
-      // ==== ADD: Clear notification when clicking on the maintenance tab ====
-      if (maintenanceNavItem) {
-        maintenanceNavItem.addEventListener('click', function() {
-          // When user clicks on maintenance tab, mark all requests as seen
-          const allNewRequestIds = allRequests
-            .filter(request => isRequestNew(request) && request.status !== 'Complete')
-            .map(request => request.id);
-          
-          if (allNewRequestIds.length > 0) {
-            markRequestsAsSeen(allNewRequestIds);
-            updateNotificationDot();
-          }
+      card.appendChild(actionsDiv);
+
+      maintenanceList.appendChild(card);
+
+      if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
+        let currentIndex = 0;
+        const imgEl = card.querySelector(`#img-${id}`);
+        const prevBtn = card.querySelector(".prev-btn");
+        const nextBtn = card.querySelector(".next-btn");
+
+        prevBtn.addEventListener("click", () => {
+          currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
+          imgEl.src = data.imageUrls[currentIndex];
         });
+
+        nextBtn.addEventListener("click", () => {
+          currentIndex = (currentIndex + 1) % data.imageUrls.length;
+          imgEl.src = data.imageUrls[currentIndex];
+        });
+      }
+    });
+
+    // Mark all visible new requests as seen after a delay
+    if (newRequestIds.length > 0) {
+      setTimeout(() => {
+        markRequestsAsSeen(newRequestIds);
+        updateNotificationDot();
+      }, 3000);
+    }
+
+    // Update statistics
+    requestCount.textContent = filteredRequests.length;
+    pendingCountEl.textContent = pending;
+    if (inProgressCountEl) {
+      inProgressCountEl.textContent = inProgress;
+    }
+    completeCountEl.textContent = complete;
+    
+    // Add new requests count to stats
+    let newCountEl = document.getElementById('newCount');
+    if (!newCountEl) {
+      newCountEl = document.createElement('span');
+      newCountEl.id = 'newCount';
+      newCountEl.style.color = '#ff4757';
+      newCountEl.style.marginLeft = '10px';
+      newCountEl.style.fontWeight = 'bold';
+      maintenanceStats.appendChild(newCountEl);
+    }
+    
+    // Add tenant marked complete count
+    let tenantMarkedCountEl = document.getElementById('tenantMarkedCount');
+    if (!tenantMarkedCountEl && tenantMarkedCompleteCount > 0) {
+      tenantMarkedCountEl = document.createElement('span');
+      tenantMarkedCountEl.id = 'tenantMarkedCount';
+      tenantMarkedCountEl.style.color = '#f39c12';
+      tenantMarkedCountEl.style.marginLeft = '10px';
+      tenantMarkedCountEl.style.fontWeight = 'bold';
+      tenantMarkedCountEl.innerHTML = `(${tenantMarkedCompleteCount} ready to finalize)`;
+      maintenanceStats.appendChild(tenantMarkedCountEl);
+    } else if (tenantMarkedCountEl) {
+      if (tenantMarkedCompleteCount > 0) {
+        tenantMarkedCountEl.textContent = `(${tenantMarkedCompleteCount} ready to finalize)`;
+        tenantMarkedCountEl.style.display = 'inline';
+      } else {
+        tenantMarkedCountEl.style.display = 'none';
       }
     }
     
+    if (newRequestsCount > 0) {
+      newCountEl.textContent = `(${newRequestsCount} new)`;
+    } else {
+      newCountEl.textContent = '';
+    }
+
+    maintenanceStats.style.display = "block";
+    updateNotificationDot();
+  }
+
+  // Load maintenance crew first
+  loadMaintenanceCrew().then(() => {
+    // Then load maintenance requests
+    db.collection("maintenanceRequests")
+      .orderBy("timestamp", "desc")
+      .onSnapshot(
+        (snapshot) => {
+          if (snapshot.empty) {
+            allRequests = [];
+            filteredRequests = [];
+            maintenanceList.innerHTML = "<p>No maintenance requests found.</p>";
+            maintenanceStats.style.display = "none";
+            updateNotificationDot();
+            return;
+          }
+
+          allRequests = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }));
+
+          // Always update notification dot when data changes
+          updateNotificationDot();
+          
+          // Only apply filters and sort if we're on the maintenance page
+          if (document.getElementById("maintenanceList")) {
+            applyFiltersAndSort();
+          }
+        },
+        (error) => {
+          maintenanceList.innerHTML =
+            `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+          maintenanceStats.style.display = "none";
+        }
+      );
+  });
+
+  statusFilter.addEventListener("change", applyFiltersAndSort);
+  personnelFilter.addEventListener("change", applyFiltersAndSort);
+  maintenanceSearch.addEventListener("input", applyFiltersAndSort);
+  sortBy.addEventListener("change", applyFiltersAndSort);
+  resetFilters.addEventListener("click", () => {
+    statusFilter.value = "all";
+    personnelFilter.value = "all";
+    maintenanceSearch.value = "";
+    sortBy.value = "date-desc";
+    applyFiltersAndSort();
+  });
+
+  // ==== ADD: Clear notification when clicking on the maintenance tab ====
+  if (maintenanceNavItem) {
+    maintenanceNavItem.addEventListener('click', function() {
+      // When user clicks on maintenance tab, mark all requests as seen
+      const allNewRequestIds = allRequests
+        .filter(request => isRequestNew(request) && request.status !== 'Complete')
+        .map(request => request.id);
+      
+      if (allNewRequestIds.length > 0) {
+        markRequestsAsSeen(allNewRequestIds);
+        updateNotificationDot();
+      }
+    });
+  }
+}   
      // ======================== ACCOUNT CREATION LOGIC (UPDATED) ========================
     function initAccountCreation() {
       const adminEmail = "adminaccount@solano.com";
