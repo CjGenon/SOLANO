@@ -55,6 +55,7 @@
       orderBy,
       doc,
       getDoc,
+      updateDoc,
       limit
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
@@ -834,758 +835,824 @@
         break;
 
         /* ======================== MAINTENANCE ======================== */
-        case "maintenance":
-          mainContent.innerHTML = `
-            <div class="tab-header">
-              <div>
-                <h1 class="page-title">Maintenance Request</h1>
-                <p class="page-subtitle">Report issues in your unit and chat with maintenance personnel.</p>
-              </div>
-            </div>
+  case "maintenance":
+  mainContent.innerHTML = `
+    <div class="tab-header">
+      <div>
+        <h1 class="page-title">Maintenance Request</h1>
+        <p class="page-subtitle">Report issues in your unit and chat with maintenance personnel.</p>
+      </div>
+    </div>
 
-            <div class="maintenance-tab">
-              <div class="maintenance-left">
-                <section class="card maintenance-form">
-                  <h2 class="section-title">New Request</h2>
-                  <p><strong>What issue do you want to report?</strong></p>
+    <div class="maintenance-tab">
+      <div class="maintenance-left">
+        <section class="card maintenance-form">
+          <h2 class="section-title">New Request</h2>
+          <p><strong>What issue do you want to report?</strong></p>
 
-                  <label for="unitSelect">Select Unit:</label>
-                  <select id="unitSelect" required>
-                    <option value="">-- Select Unit --</option>
-                  </select>
+          <label for="unitSelect">Select Unit:</label>
+          <select id="unitSelect" required>
+            <option value="">-- Select Unit --</option>
+          </select>
 
-                  <label for="problem" style="margin-top:10px;">Select issue type:</label>
-                  <select id="problem">
-                    <option value="">-- Select Issue --</option>
-                    <optgroup label="Handyman Works">
-                      <option>Drilling Works</option>
-                      <option>Peephole Installation</option>
-                      <option>PVC Door</option>
-                      <option>Vinyl Tiles</option>
-                      <option>Main Door Lockset</option>
-                      <option>Window Grills</option>
-                      <option>Door Repainting</option>
-                    </optgroup>
-                    <optgroup label="Electrical Works">
-                      <option>Chandelier Installation</option>
-                      <option>Circuit Breaker</option>
-                      <option>Outlet / Switch</option>
-                      <option>Electrical Troubleshooting</option>
-                      <option>Smoke Detector Installation</option>
-                    </optgroup>
-                    <optgroup label="Plumbing Works">
-                      <option>Bidet Installation</option>
-                      <option>Grease Trap Cleaning</option>
-                      <option>Shower Valve</option>
-                      <option>Angle Valve</option>
-                      <option>P-Trap Replacement</option>
-                    </optgroup>
-                    <optgroup label="Aircon / ACU Services">
-                      <option>ACU Installation</option>
-                      <option>ACU Re-Opening / Adjustment</option>
-                      <option>ACU Drain Pipe</option>
-                      <option>ACU Cleaning (Split Type)</option>
-                    </optgroup>
-                    <optgroup label="Other Services">
-                      <option>Wall Mounted TV Installation</option>
-                      <option>Sprinkler Installation</option>
-                      <option>Wall Opening</option>
-                      <option>Painting / Repainting</option>
-                    </optgroup>
-                    <optgroup label="Cleaning">
-                      <option>Exhaust Fan Cleaning</option>
-                      <option>Electrical Panel Cleaning</option>
-                      <option>Sweeping / General Cleaning</option>
-                    </optgroup>
-                    <option value="other">Other (Not Listed)</option>
-                  </select>
+          <label for="problem" style="margin-top:10px;">Select issue type:</label>
+          <select id="problem">
+            <option value="">-- Select Issue --</option>
+            <optgroup label="Handyman Works">
+              <option>Drilling Works</option>
+              <option>Peephole Installation</option>
+              <option>PVC Door</option>
+              <option>Vinyl Tiles</option>
+              <option>Main Door Lockset</option>
+              <option>Window Grills</option>
+              <option>Door Repainting</option>
+            </optgroup>
+            <optgroup label="Electrical Works">
+              <option>Chandelier Installation</option>
+              <option>Circuit Breaker</option>
+              <option>Outlet / Switch</option>
+              <option>Electrical Troubleshooting</option>
+              <option>Smoke Detector Installation</option>
+            </optgroup>
+            <optgroup label="Plumbing Works">
+              <option>Bidet Installation</option>
+              <option>Grease Trap Cleaning</option>
+              <option>Shower Valve</option>
+              <option>Angle Valve</option>
+              <option>P-Trap Replacement</option>
+            </optgroup>
+            <optgroup label="Aircon / ACU Services">
+              <option>ACU Installation</option>
+              <option>ACU Re-Opening / Adjustment</option>
+              <option>ACU Drain Pipe</option>
+              <option>ACU Cleaning (Split Type)</option>
+            </optgroup>
+            <optgroup label="Other Services">
+              <option>Wall Mounted TV Installation</option>
+              <option>Sprinkler Installation</option>
+              <option>Wall Opening</option>
+              <option>Painting / Repainting</option>
+            </optgroup>
+            <optgroup label="Cleaning">
+              <option>Exhaust Fan Cleaning</option>
+              <option>Electrical Panel Cleaning</option>
+              <option>Sweeping / General Cleaning</option>
+            </optgroup>
+            <option value="other">Other (Not Listed)</option>
+          </select>
 
-                  <div id="otherSection" style="display:none; margin-top:15px;">
-                    <label for="otherComment">Describe the problem:</label>
-                    <textarea id="otherComment" rows="4" placeholder="Write details here..."></textarea>
-                  </div>
+          <div id="otherSection" style="display:none; margin-top:15px;">
+            <label for="otherComment">Describe the problem:</label>
+            <textarea id="otherComment" rows="4" placeholder="Write details here..."></textarea>
+          </div>
 
-                  <div id="detailsSection" style="display:none; margin-top:10px;">
-                    <label for="imageUpload" style="display:block;">Upload 1 or 2 JPEG images (optional, required for "Others"):</label>
-                    <input type="file" id="imageUpload" accept="image/jpeg" multiple>
+          <div id="detailsSection" style="display:none; margin-top:10px;">
+            <label for="imageUpload" style="display:block;">Upload 1 or 2 JPEG images (optional, required for "Others"):</label>
+            <input type="file" id="imageUpload" accept="image/jpeg" multiple>
 
-                    <label for="preferredDate" style="margin-top:15px; display:block;">Select preferred maintenance visit date and time:</label>
-                    <label>Preferred Date:</label>
-                    <input type="date" id="preferredDate" required>
-                    <label>Preferred Time:</label>
-                    <select id="preferredTime" required>
-                      <option value="">Select Time</option>
-                      <option value="10:00 AM">10:00 AM</option>
-                      <option value="11:00 AM">11:00 AM</option>
-                      <option value="12:00 PM">12:00 PM</option>
-                      <option value="1:00 PM">1:00 PM</option>
-                      <option value="2:00 PM">2:00 PM</option>
-                      <option value="3:00 PM">3:00 PM</option>
-                      <option value="4:00 PM">4:00 PM</option>
-                      <option value="5:00 PM">5:00 PM</option>
-                      <option value="6:00 PM">6:00 PM</option>
-                      <option value="7:00 PM">7:00 PM</option>
-                      <option value="8:00 PM">8:00 PM</option>
-                      <option value="9:00 PM">9:00 PM</option>
-                      <option value="10:00 PM">10:00 PM</option>
-                    </select>
-                  </div>
-                  <button id="submitReport" class="btn-primary" style="margin-top:12px;">Submit Request</button>
-                  <p id="statusMessage" class="status-text"></p>
-                </section>
+            <label for="preferredDate" style="margin-top:15px; display:block;">Select preferred maintenance visit date and time:</label>
+            <label>Preferred Date:</label>
+            <input type="date" id="preferredDate" required>
+            <label>Preferred Time:</label>
+            <select id="preferredTime" required>
+              <option value="">Select Time</option>
+              <option value="10:00 AM">10:00 AM</option>
+              <option value="11:00 AM">11:00 AM</option>
+              <option value="12:00 PM">12:00 PM</option>
+              <option value="1:00 PM">1:00 PM</option>
+              <option value="2:00 PM">2:00 PM</option>
+              <option value="3:00 PM">3:00 PM</option>
+              <option value="4:00 PM">4:00 PM</option>
+              <option value="5:00 PM">5:00 PM</option>
+              <option value="6:00 PM">6:00 PM</option>
+              <option value="7:00 PM">7:00 PM</option>
+              <option value="8:00 PM">8:00 PM</option>
+              <option value="9:00 PM">9:00 PM</option>
+              <option value="10:00 PM">10:00 PM</option>
+            </select>
+          </div>
+          <button id="submitReport" class="btn-primary" style="margin-top:12px;">Submit Request</button>
+          <p id="statusMessage" class="status-text"></p>
+        </section>
 
-                <section class="card">
-                  <h3 class="section-title">📌 Solano Hills Job Service Rates</h3>
-                  <div class="service-rates-scroll">
-                    <h4>Handyman Works</h4>
-                    <table class="rate-table">
-                      <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
-                      <tr><td>Drilling Works</td><td>Php 120.00/set</td><td>Main Door Locket</td><td>Php 250.00</td></tr>
-                      <tr><td>Peephole (provision)</td><td>Php 120.00/set</td><td>Window Grills</td><td>Php 400.00</td></tr>
-                      <tr><td>Peephole (w/ provision)</td><td>Php 350.00/set</td><td>Main Door</td><td>Php 560.00</td></tr>
-                      <tr><td>Vinyl Tiles</td><td>Php 200.00/sqmtr</td><td>Plastering of ACU sides</td><td>Php 560.00</td></tr>
-                      <tr><td>PVC door</td><td>Php 560.00/set</td><td>Repainting of window grills</td><td>Php 560.00</td></tr>
-                      <tr><td>Rangehood w/ provision</td><td>Php 650.00/set</td><td>Repainting of ACU sides</td><td>Php 400.00</td></tr>
-                    </table>
+        <section class="card">
+          <h3 class="section-title">📌 Solano Hills Job Service Rates</h3>
+          <div class="service-rates-scroll">
+            <h4>Handyman Works</h4>
+            <table class="rate-table">
+              <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+              <tr><td>Drilling Works</td><td>Php 120.00/set</td><td>Main Door Locket</td><td>Php 250.00</td></tr>
+              <tr><td>Peephole (provision)</td><td>Php 120.00/set</td><td>Window Grills</td><td>Php 400.00</td></tr>
+              <tr><td>Peephole (w/ provision)</td><td>Php 350.00/set</td><td>Main Door</td><td>Php 560.00</td></tr>
+              <tr><td>Vinyl Tiles</td><td>Php 200.00/sqmtr</td><td>Plastering of ACU sides</td><td>Php 560.00</td></tr>
+              <tr><td>PVC door</td><td>Php 560.00/set</td><td>Repainting of window grills</td><td>Php 560.00</td></tr>
+              <tr><td>Rangehood w/ provision</td><td>Php 650.00/set</td><td>Repainting of ACU sides</td><td>Php 400.00</td></tr>
+            </table>
 
-                    <h4>Electrical Works</h4>
-                    <table class="rate-table">
-                      <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
-                      <tr><td>Chandelier</td><td>Php 1,800.00/pc</td><td>Bulb / Receptacle</td><td>Php 120.00</td></tr>
-                      <tr><td>Circuit Breaker</td><td>Php 760.00/pc</td><td>Troubleshooting</td><td>Php 250.00/item</td></tr>
-                    </table>
+            <h4>Electrical Works</h4>
+            <table class="rate-table">
+              <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+              <tr><td>Chandelier</td><td>Php 1,800.00/pc</td><td>Bulb / Receptacle</td><td>Php 120.00</td></tr>
+              <tr><td>Circuit Breaker</td><td>Php 760.00/pc</td><td>Troubleshooting</td><td>Php 250.00/item</td></tr>
+            </table>
 
-                    <h4>Plumbing Works</h4>
-                    <table class="rate-table">
-                      <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
-                      <tr><td>Bidet</td><td>Php 395.00/set</td><td>Faucet / Shower Head</td><td>Php 250.00</td></tr>
-                      <tr><td>Grease Trap</td><td>Php 1,500.00</td><td>Shower Valve</td><td>Php 900.00</td></tr>
-                    </table>
+            <h4>Plumbing Works</h4>
+            <table class="rate-table">
+              <tr><th>Installation</th><th>Rate</th><th>Replacement / Repair</th><th>Rate</th></tr>
+              <tr><td>Bidet</td><td>Php 395.00/set</td><td>Faucet / Shower Head</td><td>Php 250.00</td></tr>
+              <tr><td>Grease Trap</td><td>Php 1,500.00</td><td>Shower Valve</td><td>Php 900.00</td></tr>
+            </table>
 
-                    <h4>Other Services</h4>
-                    <table class="rate-table">
-                      <tr><th>Service</th><th>Rate</th></tr>
-                      <tr><td>Wall Mounted TV (below 40in)</td><td>Php 460.00/set</td></tr>
-                      <tr><td>ACU Installation</td><td>Php 1,500.00</td></tr>
-                      <tr><td>Smoke Detector Cleaning</td><td>Php 120.00</td></tr>
-                    </table>
+            <h4>Other Services</h4>
+            <table class="rate-table">
+              <tr><th>Service</th><th>Rate</th></tr>
+              <tr><td>Wall Mounted TV (below 40in)</td><td>Php 460.00/set</td></tr>
+              <tr><td>ACU Installation</td><td>Php 1,500.00</td></tr>
+              <tr><td>Smoke Detector Cleaning</td><td>Php 120.00</td></tr>
+            </table>
 
-                    <h4>Cleaning Services</h4>
-                    <table class="rate-table">
-                      <tr><th>Service</th><th>Rate</th></tr>
-                      <tr><td>ACU Cleaning Split Type</td><td>Php 1500.00/pc</td></tr>
-                      <tr><td>Exhaust Fan Cleaning</td><td>Php 600.00/unit</td></tr>
-                    </table>
-                  </div>
-                </section>
-              </div>
+            <h4>Cleaning Services</h4>
+            <table class="rate-table">
+              <tr><th>Service</th><th>Rate</th></tr>
+              <tr><td>ACU Cleaning Split Type</td><td>Php 1500.00/pc</td></tr>
+              <tr><td>Exhaust Fan Cleaning</td><td>Php 600.00/unit</td></tr>
+            </table>
+          </div>
+        </section>
+      </div>
 
-              <aside class="maintenance-right">
-                <section class="card maintenance-history-card">
-                  <h3 class="history-header">Request History</h3>
-                  <div id="historyList">
-                    <p>Loading your requests...</p>
-                  </div>
-                </section>
-              </aside>
+      <aside class="maintenance-right">
+        <section class="card maintenance-history-card">
+          <h3 class="history-header">Request History</h3>
+          <div id="historyList">
+            <p>Loading your requests...</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+  `;
+
+  // Hide loading after content is rendered
+  hideLoading();
+
+  function formatDateTimeAMPM(date) {
+    if (!(date instanceof Date)) date = date?.toDate ? date.toDate() : null;
+    if (!date) return "No Response Yet";
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+  }
+
+  function calculateWaitTime(priority) {
+    const waitTimes = {
+      'high': '1-2 hours',
+      'medium': '4-6 hours', 
+      'low': '24-48 hours'
+    };
+    
+    const highPriority = [
+      'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
+      'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
+    ];
+    
+    const mediumPriority = [
+      'Outlet / Switch', 'Main Door Lockset', 'Window Grills',
+      'Bidet Installation', 'ACU Cleaning (Split Type)', 'ACU Installation',
+      'ACU Re-Opening / Adjustment', 'Smoke Detector Installation'
+    ];
+    
+    if (priority && waitTimes[priority]) {
+      return waitTimes[priority];
+    }
+    
+    return waitTimes['medium'];
+  }
+
+  const preferredDateInput = document.getElementById("preferredDate");
+  const preferredTimeSelect = document.getElementById("preferredTime");
+
+  preferredDateInput.addEventListener("change", () => {
+    const selected = new Date(preferredDateInput.value);
+    const day = selected.getDay();
+    
+    if (day === 0) {
+      showPopup("Maintenance is NOT available on Sundays. Please pick Monday to Saturday.");
+      preferredDateInput.value = "";
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selected.setHours(0, 0, 0, 0);
+
+    if (selected < today) {
+      showPopup("Preferred visit date cannot be in the past.");
+      preferredDateInput.value = "";
+    }
+  });
+
+  preferredTimeSelect.addEventListener("change", function() {
+    const selectedDate = preferredDateInput.value;
+    const selectedTime = this.value;
+    
+    if (!selectedDate || !selectedTime) return;
+    
+    const timeMap = {
+      "10:00 AM": "10:00",
+      "11:00 AM": "11:00", 
+      "12:00 PM": "12:00",
+      "1:00 PM": "13:00",
+      "2:00 PM": "14:00",
+      "3:00 PM": "15:00",
+      "4:00 PM": "16:00",
+      "5:00 PM": "17:00",
+      "6:00 PM": "18:00",
+      "7:00 PM": "19:00",
+      "8:00 PM": "20:00",
+      "9:00 PM": "21:00",
+      "10:00 PM": "22:00"
+    };
+    
+    const time24 = timeMap[selectedTime];
+    const selectedDateTime = new Date(`${selectedDate}T${time24}:00`);
+    const now = new Date();
+    
+    if (selectedDateTime < now) {
+      showPopup("Preferred visit time cannot be in the past.");
+      this.value = "";
+    }
+  });
+
+  const nowMaint = new Date();
+  nowMaint.setMinutes(Math.ceil(nowMaint.getMinutes() / 15) * 15);
+  preferredDateInput.min = nowMaint.toISOString().slice(0, 16);
+
+  const problemSelect = document.getElementById("problem");
+  const otherSection = document.getElementById("otherSection");
+  const detailsSection = document.getElementById("detailsSection");
+  const submitButton = document.getElementById("submitReport");
+  const statusMessageMaint = document.getElementById("statusMessage");
+  const imageUpload = document.getElementById("imageUpload");
+  const otherComment = document.getElementById("otherComment");
+  const historyList = document.getElementById("historyList");
+  const unitSelect = document.getElementById("unitSelect");
+
+  let estimatedWaitTimeElement = null;
+
+  problemSelect.addEventListener("change", () => {
+    otherSection.style.display =
+      problemSelect.value === "other" ? "block" : "none";
+    detailsSection.style.display =
+      problemSelect.value !== "" ? "block" : "none";
+      
+    if (problemSelect.value !== "") {
+      updateEstimatedWaitTime(problemSelect.value);
+    } else {
+      if (estimatedWaitTimeElement) {
+        estimatedWaitTimeElement.style.display = "none";
+      }
+      preferredDateInput.value = "";
+      preferredTimeSelect.value = "";
+      imageUpload.value = "";
+    }
+  });
+
+  function updateEstimatedWaitTime(problemType) {
+    let priority = 'medium';
+    
+    if ([
+      'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
+      'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
+    ].includes(problemType)) {
+      priority = 'high';
+    }
+    else if ([
+      'Drilling Works', 'Peephole Installation', 'PVC Door',
+      'Vinyl Tiles', 'Door Repainting', 'Painting / Repainting',
+      'Exhaust Fan Cleaning', 'Electrical Panel Cleaning',
+      'Sweeping / General Cleaning', 'other'
+    ].includes(problemType)) {
+      priority = 'low';
+    }
+    
+    const waitTime = calculateWaitTime(priority);
+    
+    if (!estimatedWaitTimeElement) {
+      estimatedWaitTimeElement = document.createElement("div");
+      estimatedWaitTimeElement.className = "estimated-wait-time";
+      estimatedWaitTimeElement.style.marginTop = "15px";
+      estimatedWaitTimeElement.style.padding = "12px";
+      estimatedWaitTimeElement.style.backgroundColor = "rgba(141, 108, 57, 0.1)";
+      estimatedWaitTimeElement.style.border = "1px solid rgba(141, 108, 57, 0.3)";
+      estimatedWaitTimeElement.style.borderRadius = "8px";
+      estimatedWaitTimeElement.style.fontSize = "14px";
+      
+      const submitButton = document.getElementById("submitReport");
+      submitButton.parentNode.insertBefore(estimatedWaitTimeElement, submitButton);
+    }
+    
+    let priorityColor = "#f39c12";
+    if (priority === 'high') priorityColor = "#e74c3c";
+    if (priority === 'low') priorityColor = "#27ae60";
+    
+    estimatedWaitTimeElement.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span style="color: #4a3728; font-weight: bold;">⏱️ Estimated Wait Time:</span>
+        <span style="color: ${priorityColor}; font-weight: bold; font-size: 15px;">${waitTime}</span>
+      </div>
+      <div style="color: #666; font-size: 13px;">
+        <strong>Priority Level:</strong> 
+        <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span>
+        ${priority === 'high' ? ' (Emergency/Urgent)' : 
+          priority === 'medium' ? ' (Standard)' : 
+          ' (Non-Urgent)'}
+      </div>
+      <div style="color: #666; font-size: 12px; margin-top: 6px;">
+        <em>Note: This is an estimate. Actual time may vary based on technician availability and workload.</em>
+      </div>
+    `;
+    estimatedWaitTimeElement.style.display = "block";
+  }
+
+  async function populateUnits() {
+    try {
+      const currentUser = auth.currentUser;
+      const tenantDocSnap = await getDoc(doc(db, "users", currentUser.uid));
+      if (tenantDocSnap.exists()) {
+        const units = tenantDocSnap.data().unitNumbers || [];
+        unitSelect.innerHTML =
+          `<option value="">-- Select Unit --</option>` +
+          units.map(u => `<option value="${u}">${u}</option>`).join("");
+      }
+    } catch (e) {
+      console.error("Error fetching tenant units:", e);
+    }
+  }
+  populateUnits();
+
+  async function sendTenantReply(requestId, message) {
+    const user = auth.currentUser;
+    if (!user) {
+      await showPopup("Please log in before sending a reply.");
+      return;
+    }
+    await addDoc(
+      collection(db, "maintenanceRequests", requestId, "responses"),
+      {
+        sender: "tenant",
+        senderEmail: user.email,
+        message,
+        timestamp: serverTimestamp()
+      }
+    );
+  }
+
+  // Function for unit owner to mark maintenance as complete
+  async function markAsComplete(requestId, requestData) {
+    try {
+      const confirmComplete = confirm("Have the maintenance crew finished the work? Marking this as complete will notify the admin.");
+      
+      if (!confirmComplete) return;
+      
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      // Update the maintenance request
+      await updateDoc(doc(db, "maintenanceRequests", requestId), {
+        tenantMarkedComplete: true,
+        tenantMarkedAt: serverTimestamp(),
+        tenantMarkedBy: user.email,
+        updatedAt: serverTimestamp()
+      });
+      
+      // Send notification to admin
+      await addDoc(collection(db, "adminNotifications"), {
+        type: "maintenance_tenant_completed",
+        requestId: requestId,
+        tenantEmail: user.email,
+        unitNumber: requestData.unitNumber,
+        problem: requestData.problem,
+        timestamp: serverTimestamp(),
+        read: false,
+        message: `Unit owner marked maintenance as complete for ${requestData.unitNumber}`
+      });
+      
+      // Send a chat message
+      await addDoc(
+        collection(db, "maintenanceRequests", requestId, "responses"),
+        {
+          sender: "tenant",
+          senderEmail: user.email,
+          message: "✅ I confirm that the maintenance work has been completed and is satisfactory.",
+          timestamp: serverTimestamp()
+        }
+      );
+      
+      showPopup("✅ Maintenance marked as complete! Admin has been notified and will finalize the request.");
+      
+      // Refresh history
+      setTimeout(() => {
+        loadHistory();
+      }, 500);
+      
+    } catch (error) {
+      console.error("Error marking as complete:", error);
+      showPopup("Error: " + error.message);
+    }
+  }
+
+  /* ===================== IMPROVED HISTORY LOADER ===================== */
+  async function loadHistory() {
+    const historyList = document.getElementById("historyList");
+    historyList.innerHTML = `
+      <div style="text-align:center; padding:20px;">
+        <div class="loading-spinner-small"></div>
+        <p style="color:#888; font-size:0.9rem;">Loading history...</p>
+      </div>`;
+
+    try {
+      const tenantEmail = await getCurrentUserEmail();
+      const qCol = collection(db, "maintenanceRequests");
+      
+      const querySnapshot = await getDocs(
+        query(
+          qCol,
+          where("tenantEmail", "==", tenantEmail),
+          orderBy("timestamp", "desc"),
+          limit(10)
+        )
+      );
+
+      if (querySnapshot.empty) {
+        historyList.innerHTML = `
+          <div style="text-align:center; padding:30px; color:#666; border:1px dashed #444; border-radius:8px;">
+            <p>No maintenance requests found.</p>
+          </div>`;
+        return;
+      }
+
+      historyList.innerHTML = "";
+
+      for (const docSnap of querySnapshot.docs) {
+        const data = docSnap.data();
+        const docId = docSnap.id;
+        
+        const status = data.status || "Pending";
+        const problem = data.problem || "Unspecified Issue";
+        const unit = data.unitNumber || "N/A";
+        const personnel = data.maintenanceName || "Not assigned yet";
+        const priority = data.priority || "medium";
+        const waitTime = calculateWaitTime(priority);
+        
+        const submittedDate = data.timestamp ? formatDateTimeAMPM(data.timestamp) : "Unknown Date";
+        const scheduledDate = data.preferredVisitTime ? formatDateTimeAMPM(data.preferredVisitTime) : "Not scheduled";
+
+        let statusClass = "status-pending";
+        let statusColor = "#f39c12";
+        if (status === "In Progress") { statusClass = "status-progress"; statusColor = "#3498db"; } 
+        if (status === "Complete") { statusClass = "status-complete"; statusColor = "#27ae60"; }
+
+        // Check if tenant has marked as complete
+        const tenantMarkedComplete = data.tenantMarkedComplete || false;
+        const tenantMarkedAt = data.tenantMarkedAt ? formatDateTimeAMPM(data.tenantMarkedAt) : null;
+
+        const item = document.createElement("div");
+        item.className = `history-card-item ${statusClass}`;
+        
+        // Build mark as complete button HTML
+        let markCompleteButton = "";
+        if (status === "In Progress") {
+          markCompleteButton = `
+            <button class="mark-complete-btn" data-id="${docId}" 
+                    style="background: #27ae60; color: white; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; margin-top: 10px; display: flex; align-items: center; gap: 5px;">
+              <i class="fas fa-check-circle"></i> Mark as Complete
+            </button>
+          `;
+        }
+        
+        // Show tenant completion status
+        let completionStatus = "";
+        if (tenantMarkedComplete && status !== "Complete") {
+          completionStatus = `
+            <div style="background: #fff3cd; color: #856404; padding: 8px; border-radius: 6px; margin-top: 10px; font-size: 13px; border-left: 4px solid #f39c12;">
+              <i class="fas fa-clock"></i> 
+              <strong>Status:</strong> You marked this as complete on ${tenantMarkedAt}<br>
+              <small>Waiting for admin to finalize the request.</small>
             </div>
           `;
+        } else if (tenantMarkedComplete && status === "Complete") {
+          completionStatus = `
+            <div style="background: #d4edda; color: #155724; padding: 8px; border-radius: 6px; margin-top: 10px; font-size: 13px;">
+              <i class="fas fa-check-circle"></i> 
+              <strong>Status:</strong> Completed and finalized by admin<br>
+              <small>You marked it complete on ${tenantMarkedAt}</small>
+            </div>
+          `;
+        }
+        
+        item.innerHTML = `
+          <div class="req-header">
+            <div>
+              <span class="req-title">${problem}</span>
+              <span class="req-date">Ref: ${docId.substring(0,6)} • ${submittedDate}</span>
+            </div>
+            <div class="badge-group">
+              <span class="badge" style="color:${statusColor}; border:1px solid ${statusColor}">${status}</span>
+              <span class="badge badge-priority">${priority}</span>
+            </div>
+          </div>
 
-          // Hide loading after content is rendered
-          hideLoading();
-
-          // ===================== TENANT REPLY SUPPORT + HISTORY =====================
-          function formatDateTimeAMPM(date) {
-            if (!(date instanceof Date)) date = date?.toDate ? date.toDate() : null;
-            if (!date) return "No Response Yet";
-            let hours = date.getHours();
-            const minutes = date.getMinutes().toString().padStart(2, "0");
-            const ampm = hours >= 12 ? "PM" : "AM";
-            hours = hours % 12 || 12;
-            const day = date.getDate().toString().padStart(2, "0");
-            const month = (date.getMonth() + 1).toString().padStart(2, "0");
-            const year = date.getFullYear();
-            return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
-          }
-
-          // Function to calculate estimated wait time
-          function calculateWaitTime(priority) {
-            const waitTimes = {
-              'high': '1-2 hours',
-              'medium': '4-6 hours', 
-              'low': '24-48 hours'
-            };
-            
-            // Categorize issues by priority
-            const highPriority = [
-              'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
-              'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
-            ];
-            
-            const mediumPriority = [
-              'Outlet / Switch', 'Main Door Lockset', 'Window Grills',
-              'Bidet Installation', 'ACU Cleaning (Split Type)', 'ACU Installation',
-              'ACU Re-Opening / Adjustment', 'Smoke Detector Installation'
-            ];
-            
-            // If priority is provided, use it
-            if (priority && waitTimes[priority]) {
-              return waitTimes[priority];
-            }
-            
-            // Default to medium priority
-            return waitTimes['medium'];
-          }
-
-          const preferredDateInput = document.getElementById("preferredDate");
-          const preferredTimeSelect = document.getElementById("preferredTime");
-
-          // ----- LIMIT DATE PICKER TO MON–SAT -----
-          preferredDateInput.addEventListener("change", () => {
-            const selected = new Date(preferredDateInput.value);
-            const day = selected.getDay(); // 0 = Sun, 6 = Sat
-
-            // Block Sundays (0)
-            if (day === 0) {
-              showPopup("Maintenance is NOT available on Sundays. Please pick Monday to Saturday.");
-              preferredDateInput.value = "";
-              return;
-            }
-
-            // Block past dates
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            selected.setHours(0, 0, 0, 0);
-
-            if (selected < today) {
-              showPopup("Preferred visit date cannot be in the past.");
-              preferredDateInput.value = "";
-            }
-          });
-
-          // Add time validation when time is selected
-          preferredTimeSelect.addEventListener("change", function() {
-            const selectedDate = preferredDateInput.value;
-            const selectedTime = this.value;
-            
-            if (!selectedDate || !selectedTime) return;
-            
-            // Time conversion map from 12-hour to 24-hour format
-            const timeMap = {
-              "10:00 AM": "10:00",
-              "11:00 AM": "11:00", 
-              "12:00 PM": "12:00",
-              "1:00 PM": "13:00",
-              "2:00 PM": "14:00",
-              "3:00 PM": "15:00",
-              "4:00 PM": "16:00",
-              "5:00 PM": "17:00",
-              "6:00 PM": "18:00",
-              "7:00 PM": "19:00",
-              "8:00 PM": "20:00",
-              "9:00 PM": "21:00",
-              "10:00 PM": "22:00"
-            };
-            
-            const time24 = timeMap[selectedTime];
-            const selectedDateTime = new Date(`${selectedDate}T${time24}:00`);
-            const now = new Date();
-            
-            if (selectedDateTime < now) {
-              showPopup("Preferred visit time cannot be in the past.");
-              this.value = ""; // Clear the invalid time selection
-            }
-          });
-
-          const nowMaint = new Date();
-          nowMaint.setMinutes(Math.ceil(nowMaint.getMinutes() / 15) * 15);
-          preferredDateInput.min = nowMaint.toISOString().slice(0, 16);
-
-          const problemSelect = document.getElementById("problem");
-          const otherSection = document.getElementById("otherSection");
-          const detailsSection = document.getElementById("detailsSection");
-          const submitButton = document.getElementById("submitReport");
-          const statusMessageMaint = document.getElementById("statusMessage");
-          const imageUpload = document.getElementById("imageUpload");
-          const otherComment = document.getElementById("otherComment");
-          const historyList = document.getElementById("historyList");
-          const unitSelect = document.getElementById("unitSelect");
-
-          // Add estimated wait time display element
-          let estimatedWaitTimeElement = null;
-
-          problemSelect.addEventListener("change", () => {
-            otherSection.style.display =
-              problemSelect.value === "other" ? "block" : "none";
-            detailsSection.style.display =
-              problemSelect.value !== "" ? "block" : "none";
-              
-            // Update estimated wait time when problem changes
-            if (problemSelect.value !== "") {
-              updateEstimatedWaitTime(problemSelect.value);
-            } else {
-              if (estimatedWaitTimeElement) {
-                estimatedWaitTimeElement.style.display = "none";
-              }
-              preferredDateInput.value = "";
-              preferredTimeSelect.value = "";
-              imageUpload.value = "";
-            }
-          });
-
-          // Function to update estimated wait time display
-          function updateEstimatedWaitTime(problemType) {
-            // Determine priority based on problem type
-            let priority = 'medium';
-            
-            // High priority issues (urgent/emergency)
-            if ([
-              'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
-              'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
-            ].includes(problemType)) {
-              priority = 'high';
-            }
-            // Low priority issues (non-urgent)
-            else if ([
-              'Drilling Works', 'Peephole Installation', 'PVC Door',
-              'Vinyl Tiles', 'Door Repainting', 'Painting / Repainting',
-              'Exhaust Fan Cleaning', 'Electrical Panel Cleaning',
-              'Sweeping / General Cleaning', 'other'
-            ].includes(problemType)) {
-              priority = 'low';
-            }
-            
-            const waitTime = calculateWaitTime(priority);
-            
-            // Create or update the wait time display
-            if (!estimatedWaitTimeElement) {
-              estimatedWaitTimeElement = document.createElement("div");
-              estimatedWaitTimeElement.className = "estimated-wait-time";
-              estimatedWaitTimeElement.style.marginTop = "15px";
-              estimatedWaitTimeElement.style.padding = "12px";
-              estimatedWaitTimeElement.style.backgroundColor = "rgba(141, 108, 57, 0.1)";
-              estimatedWaitTimeElement.style.border = "1px solid rgba(141, 108, 57, 0.3)";
-              estimatedWaitTimeElement.style.borderRadius = "8px";
-              estimatedWaitTimeElement.style.fontSize = "14px";
-              
-              // Insert after the details section
-              const submitButton = document.getElementById("submitReport");
-              submitButton.parentNode.insertBefore(estimatedWaitTimeElement, submitButton);
-            }
-            
-            // Get priority color
-            let priorityColor = "#f39c12"; // orange for medium (default)
-            if (priority === 'high') priorityColor = "#e74c3c"; // red for high
-            if (priority === 'low') priorityColor = "#27ae60"; // green for low
-            
-            estimatedWaitTimeElement.innerHTML = `
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                <span style="color: #4a3728; font-weight: bold;">⏱️ Estimated Wait Time:</span>
-                <span style="color: ${priorityColor}; font-weight: bold; font-size: 15px;">${waitTime}</span>
-              </div>
-              <div style="color: #666; font-size: 13px;">
-                <strong>Priority Level:</strong> 
-                <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span>
-                ${priority === 'high' ? ' (Emergency/Urgent)' : 
-                  priority === 'medium' ? ' (Standard)' : 
-                  ' (Non-Urgent)'}
-              </div>
-              <div style="color: #666; font-size: 12px; margin-top: 6px;">
-                <em>Note: This is an estimate. Actual time may vary based on technician availability and workload.</em>
-              </div>
-            `;
-            estimatedWaitTimeElement.style.display = "block";
-          }
-
-          async function populateUnits() {
-            try {
-              const currentUser = auth.currentUser;
-              const tenantDocSnap = await getDoc(doc(db, "users", currentUser.uid));
-              if (tenantDocSnap.exists()) {
-                const units = tenantDocSnap.data().unitNumbers || [];
-                unitSelect.innerHTML =
-                  `<option value="">-- Select Unit --</option>` +
-                  units.map(u => `<option value="${u}">${u}</option>`).join("");
-              }
-            } catch (e) {
-              console.error("Error fetching tenant units:", e);
-            }
-          }
-          populateUnits();
-
-          // helper to write tenant reply into Firestore
-          async function sendTenantReply(requestId, message) {
-            const user = auth.currentUser;
-            if (!user) {
-              await showPopup("Please log in before sending a reply.");
-              return;
-            }
-            await addDoc(
-              collection(db, "maintenanceRequests", requestId, "responses"),
-              {
-                sender: "tenant",
-                senderEmail: user.email,
-                message,
-                timestamp: serverTimestamp()
-              }
-            );
-          }
-
-          /* ===================== IMPROVED HISTORY LOADER ===================== */
-          async function loadHistory() {
-            const historyList = document.getElementById("historyList");
-            historyList.innerHTML = `
-              <div style="text-align:center; padding:20px;">
-                <div class="loading-spinner-small"></div>
-                <p style="color:#888; font-size:0.9rem;">Loading history...</p>
-              </div>`;
-
-            try {
-              const tenantEmail = await getCurrentUserEmail();
-              const qCol = collection(db, "maintenanceRequests");
-              
-              // Fetch requests
-              const querySnapshot = await getDocs(
-                query(
-                  qCol,
-                  where("tenantEmail", "==", tenantEmail),
-                  orderBy("timestamp", "desc"),
-                  limit(10)
-                )
-              );
-
-              if (querySnapshot.empty) {
-                historyList.innerHTML = `
-                  <div style="text-align:center; padding:30px; color:#666; border:1px dashed #444; border-radius:8px;">
-                    <p>No maintenance requests found.</p>
-                  </div>`;
-                return;
-              }
-
-              historyList.innerHTML = ""; // Clear loading
-
-              // Loop through each document
-              for (const docSnap of querySnapshot.docs) {
-                const data = docSnap.data();
-                const docId = docSnap.id;
-                
-                // -- Data Formatting --
-                const status = data.status || "Pending";
-                const problem = data.problem || "Unspecified Issue";
-                const unit = data.unitNumber || "N/A";
-                const personnel = data.maintenanceName || "Not assigned yet";
-                const priority = data.priority || "medium";
-                const waitTime = calculateWaitTime(priority);
-                
-                // Dates
-                const submittedDate = data.timestamp ? formatDateTimeAMPM(data.timestamp) : "Unknown Date";
-                const scheduledDate = data.preferredVisitTime ? formatDateTimeAMPM(data.preferredVisitTime) : "Not scheduled";
-
-                // Status Styling Class
-                let statusClass = "status-pending";
-                let statusColor = "#f39c12"; // orange
-                if (status === "In Progress") { statusClass = "status-progress"; statusColor = "#3498db"; } 
-                if (status === "Complete") { statusClass = "status-complete"; statusColor = "#27ae60"; }
-
-                // -- Build the Card HTML --
-                const item = document.createElement("div");
-                item.className = `history-card-item ${statusClass}`;
-                
-                item.innerHTML = `
-                  <div class="req-header">
-                    <div>
-                      <span class="req-title">${problem}</span>
-                      <span class="req-date">Ref: ${docId.substring(0,6)} • ${submittedDate}</span>
-                    </div>
-                    <div class="badge-group">
-                      <span class="badge" style="color:${statusColor}; border:1px solid ${statusColor}">${status}</span>
-                      <span class="badge badge-priority">${priority}</span>
-                    </div>
-                  </div>
-
-                  <div class="req-details-grid">
-                    <div class="req-row">
-                      <span class="req-label">Unit:</span>
-                      <span class="req-value">${unit}</span>
-                    </div>
-                    <div class="req-row">
-                      <span class="req-label">Personnel:</span>
-                      <span class="req-value highlight">${personnel}</span>
-                    </div>
-                    <div class="req-row">
-                      <span class="req-label">Est. Wait:</span>
-                      <span class="req-value">${waitTime}</span>
-                    </div>
-                     <div class="req-row">
-                      <span class="req-label">Scheduled:</span>
-                      <span class="req-value">${scheduledDate}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="chat-section" id="chat-${docId}">
-                      <div class="chat-messages" id="messages-${docId}">
-                          <small style="color:#666; font-style:italic;">Loading conversation...</small>
-                      </div>
-                      
-                      ${status !== "Complete" ? `
-                      <div class="reply-area">
-                          <textarea id="input-${docId}" class="reply-input" rows="2" placeholder="Type a message to admin..."></textarea>
-                          <button id="btn-${docId}" class="reply-btn">Send Reply</button>
-                      </div>
-                      ` : `<div style="text-align:center; color:#27ae60; font-size:0.8rem; margin-top:5px;">✓ Request Completed</div>`}
-                  </div>
-                `;
-
-                historyList.appendChild(item);
-
-                // -- Load Messages Logic (Same as before but cleaner injection) --
-                const responsesQuery = query(
-                  collection(db, "maintenanceRequests", docId, "responses"),
-                  orderBy("timestamp", "asc")
-                );
-                
-                // We load messages asynchronously for each card
-                getDocs(responsesQuery).then(snaps => {
-                  const msgContainer = document.getElementById(`messages-${docId}`);
-                  msgContainer.innerHTML = ""; // Clear loading text
-                  
-                  if (snaps.empty) {
-                    msgContainer.innerHTML = `<small style="color:#666; display:block; text-align:center;">No messages yet.</small>`;
-                  } else {
-                    snaps.forEach(r => {
-                      const rData = r.data();
-                      const isTenant = rData.sender === "tenant";
-                      const bubble = document.createElement("div");
-                      bubble.className = `message-bubble ${isTenant ? 'msg-tenant' : 'msg-admin'}`;
-                      bubble.textContent = rData.message;
-                      msgContainer.appendChild(bubble);
-                    });
-                    // Scroll to bottom
-                    msgContainer.scrollTop = msgContainer.scrollHeight;
-                  }
-                });
-
-                // -- Attach Reply Event Listener --
-                if (status !== "Complete") {
-                    const btn = document.getElementById(`btn-${docId}`);
-                    const input = document.getElementById(`input-${docId}`);
-                    
-                    btn.addEventListener("click", async () => {
-                       const txt = input.value.trim();
-                       if(!txt) return;
-                       
-                       btn.textContent = "Sending...";
-                       btn.disabled = true;
-                       
-                       try {
-                          await sendTenantReply(docId, txt); // Use your existing helper
-                          input.value = "";
-                          
-                          // Optimistic Update (Add bubble immediately)
-                          const msgContainer = document.getElementById(`messages-${docId}`);
-                          const bubble = document.createElement("div");
-                          bubble.className = `message-bubble msg-tenant`;
-                          bubble.textContent = txt;
-                          msgContainer.appendChild(bubble);
-                          msgContainer.scrollTop = msgContainer.scrollHeight;
-
-                          // Remove "No messages" text if it exists
-                          const emptyMsg = msgContainer.querySelector("small");
-                          if(emptyMsg) emptyMsg.remove();
-                          
-                       } catch(e) {
-                          console.error(e);
-                          alert("Failed to send");
-                       } finally {
-                          btn.textContent = "Send Reply";
-                          btn.disabled = false;
-                       }
-                    });
-                }
-              }
-
-            } catch (error) {
-              console.error("History Error", error);
-              historyList.innerHTML = `<p style="color:red;">Error loading history.</p>`;
-            }
-          }
+          <div class="req-details-grid">
+            <div class="req-row">
+              <span class="req-label">Unit:</span>
+              <span class="req-value">${unit}</span>
+            </div>
+            <div class="req-row">
+              <span class="req-label">Personnel:</span>
+              <span class="req-value highlight">${personnel}</span>
+            </div>
+            <div class="req-row">
+              <span class="req-label">Est. Wait:</span>
+              <span class="req-value">${waitTime}</span>
+            </div>
+             <div class="req-row">
+              <span class="req-label">Scheduled:</span>
+              <span class="req-value">${scheduledDate}</span>
+            </div>
+          </div>
           
-          loadHistory();
+          ${markCompleteButton}
+          ${completionStatus}
+          
+          <div class="chat-section" id="chat-${docId}">
+              <div class="chat-messages" id="messages-${docId}">
+                  <small style="color:#666; font-style:italic;">Loading conversation...</small>
+              </div>
+              
+              ${status !== "Complete" ? `
+              <div class="reply-area">
+                  <textarea id="input-${docId}" class="reply-input" rows="2" placeholder="Type a message to admin..."></textarea>
+                  <button id="btn-${docId}" class="reply-btn">Send Reply</button>
+              </div>
+              ` : `<div style="text-align:center; color:#27ae60; font-size:0.8rem; margin-top:5px;">✓ Request Completed</div>`}
+          </div>
+        `;
 
-          async function uploadToCloudinary(file) {
-            // Show loading during upload
-            showLoading();
-            try {
-              const url = "https://api.cloudinary.com/v1_1/dfklsyjch/upload";
-              const preset = "tenant_uploads";
-              const formData = new FormData();
-              formData.append("file", file);
-              formData.append("upload_preset", preset);
-              const response = await fetch(url, { method: "POST", body: formData });
-              if (!response.ok) throw new Error("Cloudinary upload failed");
-              return (await response.json()).secure_url;
-            } finally {
-              hideLoading();
-            }
+        historyList.appendChild(item);
+
+        // Add event listener for mark as complete button
+        if (status === "In Progress") {
+          const markCompleteBtn = item.querySelector(".mark-complete-btn");
+          if (markCompleteBtn) {
+            markCompleteBtn.addEventListener("click", function() {
+              const requestId = this.getAttribute("data-id");
+              markAsComplete(requestId, data);
+            });
           }
+        }
 
-          submitButton.addEventListener("click", async () => {
-            const unitNumber = unitSelect.value;
-            const problem = problemSelect.value;
-            const comment = otherComment.value.trim();
-            const preferredVisitDate = preferredDateInput.value;
-            const preferredVisitTime = preferredTimeSelect.value;
-            const files = imageUpload.files;
+        // Load chat messages
+        const responsesQuery = query(
+          collection(db, "maintenanceRequests", docId, "responses"),
+          orderBy("timestamp", "asc")
+        );
+        
+        getDocs(responsesQuery).then(snaps => {
+          const msgContainer = document.getElementById(`messages-${docId}`);
+          msgContainer.innerHTML = "";
+          
+          if (snaps.empty) {
+            msgContainer.innerHTML = `<small style="color:#666; display:block; text-align:center;">No messages yet.</small>`;
+          } else {
+            snaps.forEach(r => {
+              const rData = r.data();
+              const isTenant = rData.sender === "tenant";
+              const bubble = document.createElement("div");
+              bubble.className = `message-bubble ${isTenant ? 'msg-tenant' : 'msg-admin'}`;
+              bubble.textContent = rData.message;
+              msgContainer.appendChild(bubble);
+            });
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+          }
+        });
 
-            if (!unitNumber) {
-              await showPopup("Please select the unit for maintenance.");
-              return;
-            }
-            if (!problem) {
-              await showPopup("Please select an issue type");
-              return;
-            }
-            if (!preferredVisitDate) {
-              await showPopup("Please select your preferred maintenance visit date.");
-              return;
-            }
-            if (!preferredVisitTime) {
-              await showPopup("Please select your preferred maintenance visit time.");
-              return;
-            }
+        // Attach reply event listener
+        if (status !== "Complete") {
+            const btn = document.getElementById(`btn-${docId}`);
+            const input = document.getElementById(`input-${docId}`);
             
-            // ---- COMBINED DATE + TIME VALIDATION ----
-            // Time conversion map from 12-hour to 24-hour format
-            const timeMap = {
-              "10:00 AM": "10:00",
-              "11:00 AM": "11:00", 
-              "12:00 PM": "12:00",
-              "1:00 PM": "13:00",
-              "2:00 PM": "14:00",
-              "3:00 PM": "15:00",
-              "4:00 PM": "16:00",
-              "5:00 PM": "17:00",
-              "6:00 PM": "18:00",
-              "7:00 PM": "19:00",
-              "8:00 PM": "20:00",
-              "9:00 PM": "21:00",
-              "10:00 PM": "22:00"
-            };
-            
-            const time24 = timeMap[preferredVisitTime];
-            const selectedDateTime = new Date(`${preferredVisitDate}T${time24}:00`);
-            const now = new Date();
+            btn.addEventListener("click", async () => {
+               const txt = input.value.trim();
+               if(!txt) return;
+               
+               btn.textContent = "Sending...";
+               btn.disabled = true;
+               
+               try {
+                  await sendTenantReply(docId, txt);
+                  input.value = "";
+                  
+                  const msgContainer = document.getElementById(`messages-${docId}`);
+                  const bubble = document.createElement("div");
+                  bubble.className = `message-bubble msg-tenant`;
+                  bubble.textContent = txt;
+                  msgContainer.appendChild(bubble);
+                  msgContainer.scrollTop = msgContainer.scrollHeight;
 
-            if (selectedDateTime < now) {
-              await showPopup("Preferred visit time cannot be in the past.");
-              return;
-            }
-            
-            if (problem === "other") {
-              if (!comment) {
-                await showPopup('Please describe the problem in "Others".');
-                return;
-              }
-              if (!files || files.length < 2) {
-                await showPopup('Please upload at least 2 JPEG images for "Others".');
-                return;
-              }
-            }
-            if (files && files.length > 0) {
-              for (const file of files) {
-                if (file.type !== "image/jpeg") {
-                  await showPopup("Only JPEG images are allowed.");
-                  return;
-                }
-              }
-            }
+                  const emptyMsg = msgContainer.querySelector("small");
+                  if(emptyMsg) emptyMsg.remove();
+                  
+               } catch(e) {
+                  console.error(e);
+                  alert("Failed to send");
+               } finally {
+                  btn.textContent = "Send Reply";
+                  btn.disabled = false;
+               }
+            });
+        }
+      }
 
-            statusMessageMaint.style.color = "gray";
-            statusMessageMaint.textContent = "Submitting your request...";
+    } catch (error) {
+      console.error("History Error", error);
+      historyList.innerHTML = `<p style="color:red;">Error loading history.</p>`;
+    }
+  }
+  
+  loadHistory();
 
-            try {
-              // Show loading on button
-              setButtonLoading(submitButton, true);
-              
-              const tenantEmail = await getCurrentUserEmail();
-              let imageUrls = [];
-              if (files && files.length > 0) {
-                for (const file of files) {
-                  imageUrls.push(await uploadToCloudinary(file));
-                }
-              }
-              
-              // Determine priority based on problem type
-              let priority = 'medium';
-              if ([
-                'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
-                'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
-              ].includes(problem)) {
-                priority = 'high';
-              } else if ([
-                'Drilling Works', 'Peephole Installation', 'PVC Door',
-                'Vinyl Tiles', 'Door Repainting', 'Painting / Repainting',
-                'Exhaust Fan Cleaning', 'Electrical Panel Cleaning',
-                'Sweeping / General Cleaning', 'other'
-              ].includes(problem)) {
-                priority = 'low';
-              }
+  async function uploadToCloudinary(file) {
+    showLoading();
+    try {
+      const url = "https://api.cloudinary.com/v1_1/dfklsyjch/upload";
+      const preset = "tenant_uploads";
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", preset);
+      const response = await fetch(url, { method: "POST", body: formData });
+      if (!response.ok) throw new Error("Cloudinary upload failed");
+      return (await response.json()).secure_url;
+    } finally {
+      hideLoading();
+    }
+  }
 
-              await addDoc(collection(db, "maintenanceRequests"), {
-                tenantEmail,
-                unitNumber,
-                problem,
-                comment: problem === "other" ? comment : "",
-                imageUrls,
-                priority,
-                status: "Pending",
-                responseTime: "Not yet responded",
-                preferredVisitTime: selectedDateTime,
-                timestamp: serverTimestamp()
-              });
+  submitButton.addEventListener("click", async () => {
+    const unitNumber = unitSelect.value;
+    const problem = problemSelect.value;
+    const comment = otherComment.value.trim();
+    const preferredVisitDate = preferredDateInput.value;
+    const preferredVisitTime = preferredTimeSelect.value;
+    const files = imageUpload.files;
 
-              statusMessageMaint.style.color = "green";
-              statusMessageMaint.textContent =
-                "Maintenance request submitted successfully! ✅\nEstimated wait time: " + calculateWaitTime(priority);
-              
-              // Add celebration effect to success message
-              statusMessageMaint.style.fontWeight = "bold";
-              statusMessageMaint.style.padding = "10px";
-              statusMessageMaint.style.background = "rgba(39, 174, 96, 0.1)";
-              statusMessageMaint.style.borderRadius = "8px";
-              statusMessageMaint.style.border = "2px solid #27ae60";
-              
-              problemSelect.value = "";
-              otherComment.value = "";
-              imageUpload.value = "";
-              otherSection.style.display = "none";
-              detailsSection.style.display = "none";
-              preferredDateInput.value = "";
-              preferredTimeSelect.value = "";
-              unitSelect.value = "";
-              if (estimatedWaitTimeElement) {
-                estimatedWaitTimeElement.style.display = "none";
-              }
-              
-              // Refresh history
-              setTimeout(() => {
-                loadHistory();
-              }, 1000);
-              
-            } catch (error) {
-              statusMessageMaint.style.color = "red";
-              statusMessageMaint.textContent =
-                "Failed to submit request: " + error.message;
-              statusMessageMaint.style.background = "rgba(231, 76, 60, 0.1)";
-              statusMessageMaint.style.border = "2px solid #e74c3c";
-              console.error(error);
-            } finally {
-              setButtonLoading(submitButton, false);
-            }
-          });
+    if (!unitNumber) {
+      await showPopup("Please select the unit for maintenance.");
+      return;
+    }
+    if (!problem) {
+      await showPopup("Please select an issue type");
+      return;
+    }
+    if (!preferredVisitDate) {
+      await showPopup("Please select your preferred maintenance visit date.");
+      return;
+    }
+    if (!preferredVisitTime) {
+      await showPopup("Please select your preferred maintenance visit time.");
+      return;
+    }
+    
+    const timeMap = {
+      "10:00 AM": "10:00",
+      "11:00 AM": "11:00", 
+      "12:00 PM": "12:00",
+      "1:00 PM": "13:00",
+      "2:00 PM": "14:00",
+      "3:00 PM": "15:00",
+      "4:00 PM": "16:00",
+      "5:00 PM": "17:00",
+      "6:00 PM": "18:00",
+      "7:00 PM": "19:00",
+      "8:00 PM": "20:00",
+      "9:00 PM": "21:00",
+      "10:00 PM": "22:00"
+    };
+    
+    const time24 = timeMap[preferredVisitTime];
+    const selectedDateTime = new Date(`${preferredVisitDate}T${time24}:00`);
+    const now = new Date();
 
-          break;
+    if (selectedDateTime < now) {
+      await showPopup("Preferred visit time cannot be in the past.");
+      return;
+    }
+    
+    if (problem === "other") {
+      if (!comment) {
+        await showPopup('Please describe the problem in "Others".');
+        return;
+      }
+      if (!files || files.length < 2) {
+        await showPopup('Please upload at least 2 JPEG images for "Others".');
+        return;
+      }
+    }
+    if (files && files.length > 0) {
+      for (const file of files) {
+        if (file.type !== "image/jpeg") {
+          await showPopup("Only JPEG images are allowed.");
+          return;
+        }
+      }
+    }
 
+    statusMessageMaint.style.color = "gray";
+    statusMessageMaint.textContent = "Submitting your request...";
+
+    try {
+      setButtonLoading(submitButton, true);
+      
+      const tenantEmail = await getCurrentUserEmail();
+      let imageUrls = [];
+      if (files && files.length > 0) {
+        for (const file of files) {
+          imageUrls.push(await uploadToCloudinary(file));
+        }
+      }
+      
+      let priority = 'medium';
+      if ([
+        'Circuit Breaker', 'Electrical Troubleshooting', 'ACU Drain Pipe',
+        'Angle Valve', 'P-Trap Replacement', 'Shower Valve'
+      ].includes(problem)) {
+        priority = 'high';
+      } else if ([
+        'Drilling Works', 'Peephole Installation', 'PVC Door',
+        'Vinyl Tiles', 'Door Repainting', 'Painting / Repainting',
+        'Exhaust Fan Cleaning', 'Electrical Panel Cleaning',
+        'Sweeping / General Cleaning', 'other'
+      ].includes(problem)) {
+        priority = 'low';
+      }
+
+      await addDoc(collection(db, "maintenanceRequests"), {
+        tenantEmail,
+        unitNumber,
+        problem,
+        comment: problem === "other" ? comment : "",
+        imageUrls,
+        priority,
+        status: "Pending",
+        responseTime: "Not yet responded",
+        preferredVisitTime: selectedDateTime,
+        tenantMarkedComplete: false,
+        timestamp: serverTimestamp()
+      });
+
+      statusMessageMaint.style.color = "green";
+      statusMessageMaint.textContent =
+        "Maintenance request submitted successfully! ✅\nEstimated wait time: " + calculateWaitTime(priority);
+      
+      statusMessageMaint.style.fontWeight = "bold";
+      statusMessageMaint.style.padding = "10px";
+      statusMessageMaint.style.background = "rgba(39, 174, 96, 0.1)";
+      statusMessageMaint.style.borderRadius = "8px";
+      statusMessageMaint.style.border = "2px solid #27ae60";
+      
+      problemSelect.value = "";
+      otherComment.value = "";
+      imageUpload.value = "";
+      otherSection.style.display = "none";
+      detailsSection.style.display = "none";
+      preferredDateInput.value = "";
+      preferredTimeSelect.value = "";
+      unitSelect.value = "";
+      if (estimatedWaitTimeElement) {
+        estimatedWaitTimeElement.style.display = "none";
+      }
+      
+      setTimeout(() => {
+        loadHistory();
+      }, 1000);
+      
+    } catch (error) {
+      statusMessageMaint.style.color = "red";
+      statusMessageMaint.textContent =
+        "Failed to submit request: " + error.message;
+      statusMessageMaint.style.background = "rgba(231, 76, 60, 0.1)";
+      statusMessageMaint.style.border = "2px solid #e74c3c";
+      console.error(error);
+    } finally {
+      setButtonLoading(submitButton, false);
+    }
+  });
+
+  break;
         /* ======================== BILLING ======================== */
 case "billing":
   mainContent.innerHTML = `
