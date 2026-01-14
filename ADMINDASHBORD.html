@@ -1709,7 +1709,7 @@ function renderAdminCalendar() {
   });
 }
     // ======================== MAINTENANCE REQUESTS LOGIC ========================
- function initMaintenanceRequests() {
+function initMaintenanceRequests() {
   const maintenanceList = document.getElementById("maintenanceList");
   const statusFilter = document.getElementById("statusFilter");
   const personnelFilter = document.getElementById("personnelFilter");
@@ -2268,6 +2268,33 @@ function renderAdminCalendar() {
     updateNotificationDot();
   }
 
+  // Function to load proof images for a request
+  async function loadProofImages(requestId) {
+    try {
+      const proofsSnapshot = await db.collection("maintenanceRequests").doc(requestId)
+        .collection("proofs")
+        .orderBy("timestamp", "desc")
+        .get();
+
+      if (proofsSnapshot.empty) {
+        return [];
+      }
+
+      const proofs = [];
+      proofsSnapshot.forEach((doc) => {
+        proofs.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      return proofs;
+    } catch (error) {
+      console.error("Error loading proof images:", error);
+      return [];
+    }
+  }
+
   function renderMaintenanceRequests() {
     if (!filteredRequests.length) {
       maintenanceList.innerHTML = "<p>No maintenance requests found matching your criteria.</p>";
@@ -2288,7 +2315,7 @@ function renderAdminCalendar() {
     // Collect new request IDs to mark as seen
     const newRequestIds = [];
 
-    filteredRequests.forEach((request) => {
+    filteredRequests.forEach(async (request) => {
       const data = request;
       const id = data.id;
 
@@ -2302,16 +2329,6 @@ function renderAdminCalendar() {
       // Count tenant marked complete requests
       if (data.tenantMarkedComplete && data.status !== "Complete") {
         tenantMarkedCompleteCount++;
-      }
-
-      // Auto-switch Pending + has personnel -> In Progress
-      if (data.maintenanceName && data.status === "Pending") {
-        db.collection("maintenanceRequests").doc(id).update({
-          status: "In Progress",
-          startTime: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        data.status = "In Progress";
       }
 
       if (data.status === "Pending") pending++;
@@ -2400,19 +2417,128 @@ function renderAdminCalendar() {
         }
       }
 
-      const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
-        ? `
-            <div style="margin-top:6px;">
-                <strong>Attachments:</strong><br/>
-                <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                    <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                    ${data.imageUrls.length > 1 ? `
-                      <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                      <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
-                    ` : ""}
+      // Load proof images
+      const proofImages = await loadProofImages(id);
+      
+      // Create photo sections container with side-by-side layout
+      let photosContainerHTML = '';
+      
+      if ((data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0) || proofImages.length > 0) {
+        // Create unit owner photos column
+        let unitOwnerColumnHTML = '';
+        if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0) {
+          unitOwnerColumnHTML = `
+            <div style="flex: 1; min-width: 200px; margin-right: 15px;">
+              <div style="font-weight:bold; color:#8d6c39; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-user"></i> Unit Owner Photos:
+              </div>
+              <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                  <img src="${data.imageUrls[0]}" alt="Unit Owner Photo" style="width:100%; border-radius:6px; border:2px solid #8d6c39;" id="owner-img-${id}" />
+                  ${data.imageUrls.length > 1 ? `
+                    <button class="owner-prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                    <button class="owner-next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
+                  ` : ""}
+                  <div style="text-align:center; margin-top:5px; font-size:12px; color:#666;">
+                    ${data.imageUrls.length} photo(s) submitted by unit owner
+                  </div>
+              </div>
+            </div>
+          `;
+        } else {
+          unitOwnerColumnHTML = `
+            <div style="flex: 1; min-width: 200px; margin-right: 15px;">
+              <div style="font-weight:bold; color:#999; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-user"></i> Unit Owner Photos:
+              </div>
+              <div style="background:#f8f9fa; padding:10px; border-radius:6px; text-align:center; border:1px dashed #ddd; height:150px; display:flex; align-items:center; justify-content:center;">
+                <div>
+                  <i class="fas fa-camera" style="font-size:24px; color:#ccc; margin-bottom:5px;"></i><br>
+                  <span style="font-size:12px; color:#888;">No photos submitted</span>
                 </div>
-            </div>`
-        : "";
+              </div>
+            </div>
+          `;
+        }
+        
+        // Create maintenance crew proofs column
+        let maintenanceColumnHTML = '';
+        if (proofImages.length > 0) {
+          maintenanceColumnHTML = `
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-weight:bold; color:#3498db; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-hard-hat"></i> Maintenance Crew Proofs:
+              </div>
+              <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
+                  <img src="${proofImages[0].url}" alt="Maintenance Proof" style="width:100%; border-radius:6px; border:2px solid #3498db;" id="proof-img-${id}" />
+                  ${proofImages.length > 1 ? `
+                    <button class="proof-prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#3498db; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
+                    <button class="proof-next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#3498db; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
+                  ` : ""}
+                  <div style="text-align:center; margin-top:5px; font-size:12px; color:#666;">
+                    ${proofImages.length} proof photo(s)<br>
+                    <small>By: ${proofImages[0].uploadedBy || "Unknown"}</small><br>
+                    <small>${proofImages[0].timestamp ? formatDateTimeAMPM(proofImages[0].timestamp) : ""}</small>
+                  </div>
+              </div>
+            </div>
+          `;
+        } else if (data.status === "In Progress" || data.status === "Work Finished" || data.status === "Complete") {
+          maintenanceColumnHTML = `
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-weight:bold; color:#999; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-hard-hat"></i> Maintenance Crew Proofs:
+              </div>
+              <div style="background:#f8f9fa; padding:10px; border-radius:6px; text-align:center; border:1px dashed #ddd; height:150px; display:flex; align-items:center; justify-content:center;">
+                <div>
+                  <i class="fas fa-images" style="font-size:24px; color:#ccc; margin-bottom:5px;"></i><br>
+                  <span style="font-size:12px; color:#888;">No proof photos yet</span>
+                  ${data.status === "In Progress" ? `
+                    <br><small style="font-size:11px; color:#aaa;">Maintenance crew can upload proof photos</small>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          maintenanceColumnHTML = `
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-weight:bold; color:#999; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-hard-hat"></i> Maintenance Crew Proofs:
+              </div>
+              <div style="background:#f8f9fa; padding:10px; border-radius:6px; text-align:center; border:1px dashed #ddd; height:150px; display:flex; align-items:center; justify-content:center;">
+                <div>
+                  <i class="fas fa-hard-hat" style="font-size:24px; color:#ccc; margin-bottom:5px;"></i><br>
+                  <span style="font-size:12px; color:#888;">Will appear when work starts</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        
+        photosContainerHTML = `
+          <div style="min-width:450px;">
+            <div style="display:flex; flex-wrap:nowrap; gap:15px; margin-top:15px;">
+              ${unitOwnerColumnHTML}
+              ${maintenanceColumnHTML}
+            </div>
+          </div>
+        `;
+      } else {
+        // No photos at all
+        photosContainerHTML = `
+          <div style="min-width:220px;">
+            <div style="margin-top:15px;">
+              <div style="font-weight:bold; color:#999; margin-bottom:8px; font-size:14px;">
+                <i class="fas fa-images"></i> Photos:
+              </div>
+              <div style="background:#f8f9fa; padding:20px; border-radius:6px; text-align:center; border:1px dashed #ddd;">
+                <i class="fas fa-camera" style="font-size:32px; color:#ccc; margin-bottom:10px;"></i><br>
+                <span style="font-size:13px; color:#888;">No photos submitted yet</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
       // Add tenant marked info
       const tenantMarkedInfoHTML = data.tenantMarkedComplete ? `
@@ -2442,7 +2568,7 @@ function renderAdminCalendar() {
                         ${data.completionTime ? `<p><strong>Completed:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
                         ${tenantMarkedInfoHTML}
                     </div>
-                    <div style="min-width:220px;">${attachmentsHTML}</div>
+                    ${photosContainerHTML}
                 </div>
             </div>
       `;
@@ -2531,17 +2657,22 @@ function renderAdminCalendar() {
         personnelSelect.appendChild(noCrewOption);
       }
 
-      if (data.status === "In Progress" || data.status === "Complete") {
+      // Disable assignment dropdown for all statuses except Pending (when not assigned) and In Progress (when assigned)
+      if (data.status !== "Pending" || (data.status === "Pending" && data.maintenanceName)) {
         personnelSelect.disabled = true;
-        personnelSelect.title = data.status === "In Progress"
-          ? "Cannot change personnel while work is in progress"
-          : "Request is already completed";
+        if (data.status === "Complete") {
+          personnelSelect.title = "Request is already completed";
+        } else if (data.status === "In Progress") {
+          personnelSelect.title = "Cannot change personnel while work is in progress";
+        } else if (data.status === "Pending" && data.maintenanceName) {
+          personnelSelect.title = "Personnel already assigned";
+        }
       }
 
       assignmentContainer.appendChild(personnelSelect);
 
-      // Only show "Assign" button when there is NO personnel yet and request is not complete.
-      if (!data.maintenanceName && data.status !== "Complete") {
+      // Only show "Assign" button when status is "Pending" AND there is NO personnel yet
+      if (data.status === "Pending" && !data.maintenanceName) {
         const assignBtn = document.createElement("button");
         assignBtn.textContent = "Assign";
         assignBtn.className = "btn-primary";
@@ -2572,6 +2703,8 @@ function renderAdminCalendar() {
 
             const updateData = {
               maintenanceName: selectedPersonnel,
+              status: "Pending", // ✅ Keep as Pending when assigned
+              startTime: firebase.firestore.FieldValue.serverTimestamp(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             };
 
@@ -2598,8 +2731,8 @@ function renderAdminCalendar() {
       actionsDiv.appendChild(assignmentSection);
 
       // ==== COMPLETE WORK SECTION ====
-      // Show complete button only when tenant has marked it as complete
-      if (data.status === "In Progress" && data.tenantMarkedComplete) {
+      // Show complete button whenever tenant has marked it as complete AND request isn't already Complete
+      if (data.tenantMarkedComplete && data.status !== "Complete") {
         const completeSection = document.createElement("div");
         completeSection.style.marginBottom = "10px";
         completeSection.innerHTML = `<strong style="color: #b3b3b3; font-size: 14px;">Complete Work:</strong>`;
@@ -2778,11 +2911,12 @@ function renderAdminCalendar() {
 
       maintenanceList.appendChild(card);
 
+      // Add image slider functionality for unit owner photos
       if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
         let currentIndex = 0;
-        const imgEl = card.querySelector(`#img-${id}`);
-        const prevBtn = card.querySelector(".prev-btn");
-        const nextBtn = card.querySelector(".next-btn");
+        const imgEl = card.querySelector(`#owner-img-${id}`);
+        const prevBtn = card.querySelector(".owner-prev-btn");
+        const nextBtn = card.querySelector(".owner-next-btn");
 
         prevBtn.addEventListener("click", () => {
           currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
@@ -2792,6 +2926,42 @@ function renderAdminCalendar() {
         nextBtn.addEventListener("click", () => {
           currentIndex = (currentIndex + 1) % data.imageUrls.length;
           imgEl.src = data.imageUrls[currentIndex];
+        });
+      }
+
+      // Add image slider functionality for proof photos
+      if (proofImages.length > 1) {
+        let proofIndex = 0;
+        const proofImgEl = card.querySelector(`#proof-img-${id}`);
+        const proofPrevBtn = card.querySelector(".proof-prev-btn");
+        const proofNextBtn = card.querySelector(".proof-next-btn");
+
+        proofPrevBtn.addEventListener("click", () => {
+          proofIndex = (proofIndex - 1 + proofImages.length) % proofImages.length;
+          proofImgEl.src = proofImages[proofIndex].url;
+          // Update the info text
+          const infoDiv = proofImgEl.parentNode.querySelector('div[style*="text-align:center"]');
+          if (infoDiv) {
+            infoDiv.innerHTML = `
+              ${proofImages.length} proof photo(s)<br>
+              <small>By: ${proofImages[proofIndex].uploadedBy || "Unknown"}</small><br>
+              <small>${proofImages[proofIndex].timestamp ? formatDateTimeAMPM(proofImages[proofIndex].timestamp) : ""}</small>
+            `;
+          }
+        });
+
+        proofNextBtn.addEventListener("click", () => {
+          proofIndex = (proofIndex + 1) % proofImages.length;
+          proofImgEl.src = proofImages[proofIndex].url;
+          // Update the info text
+          const infoDiv = proofImgEl.parentNode.querySelector('div[style*="text-align:center"]');
+          if (infoDiv) {
+            infoDiv.innerHTML = `
+              ${proofImages.length} proof photo(s)<br>
+              <small>By: ${proofImages[proofIndex].uploadedBy || "Unknown"}</small><br>
+              <small>${proofImages[proofIndex].timestamp ? formatDateTimeAMPM(proofImages[proofIndex].timestamp) : ""}</small>
+            `;
+          }
         });
       }
     });
@@ -2915,8 +3085,8 @@ function renderAdminCalendar() {
       }
     });
   }
-}   
-     // ======================== ACCOUNT CREATION LOGIC (UPDATED) ========================
+}
+    // ======================== ACCOUNT CREATION LOGIC (UPDATED) ========================
     function initAccountCreation() {
       const adminEmail = "adminaccount@solano.com";
       const adminPassword = "qwerty";
