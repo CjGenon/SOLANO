@@ -639,349 +639,295 @@
       loadContent(null, "my-tasks");
     }
 
-    function initMyTasks() {
-      const tasksList = document.getElementById("tasksList");
-      const statusFilter = document.getElementById("statusFilter");
-      const priorityFilter = document.getElementById("priorityFilter");
-      const taskSearch = document.getElementById("taskSearch");
-      const resetFilters = document.getElementById("resetFilters");
-      const taskStats = document.getElementById("taskStats");
-      const taskCount = document.getElementById("taskCount");
-      const inProgressCount = document.getElementById("inProgressCount");
-      const pendingCount = document.getElementById("pendingCount");
-      const completeCount = document.getElementById("completeCount");
+ function initMyTasks() {
+  const tasksList = document.getElementById("tasksList");
+  const statusFilter = document.getElementById("statusFilter");
+  const priorityFilter = document.getElementById("priorityFilter");
+  const taskSearch = document.getElementById("taskSearch");
+  const resetFilters = document.getElementById("resetFilters");
+  const taskStats = document.getElementById("taskStats");
+  const taskCount = document.getElementById("taskCount");
+  const inProgressCount = document.getElementById("inProgressCount");
+  const pendingCount = document.getElementById("pendingCount");
+  const completeCount = document.getElementById("completeCount");
 
-      let allTasks = [];
-      let filteredTasks = [];
+  // **Cloudinary Config — Replace with your actual cloud name and preset**
+  const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dfklsyjch/upload";
+  const CLOUDINARY_UPLOAD_PRESET = "tenant_uploads";
 
-      function calculateTimeDifference(startTime, endTime) {
-        if (!startTime || !endTime) return "N/A";
-        
-        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
-        const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
-        
-        const diffMs = end - start;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (diffHours > 0) {
-          return `${diffHours}h ${diffMinutes}m`;
-        } else {
-          return `${diffMinutes}m`;
-        }
-      }
+  let allTasks = [];
+  let filteredTasks = [];
 
-      function calculateCurrentWorkTime(startTime) {
-        if (!startTime) return "N/A";
-        
-        const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
-        const now = new Date();
-        
-        const diffMs = now - start;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (diffHours > 0) {
-          return `${diffHours}h ${diffMinutes}m (ongoing)`;
-        } else {
-          return `${diffMinutes}m (ongoing)`;
-        }
-      }
+  /* ---------------- TIME HELPERS ---------------- */
 
-      function applyFiltersAndSort() {
-        const statusValue = statusFilter.value;
-        const priorityValue = priorityFilter.value;
-        const searchValue = taskSearch.value.toLowerCase();
+  function calculateTimeDifference(start, end) {
+    if (!start || !end) return "N/A";
+    const s = start.toDate ? start.toDate() : new Date(start);
+    const e = end.toDate ? end.toDate() : new Date(end);
+    const diff = e - s;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return h ? `${h}h ${m}m` : `${m}m`;
+  }
 
-        filteredTasks = allTasks.filter(task => {
-          if (statusValue !== "all" && task.status !== statusValue) {
-            return false;
-          }
-          
-          if (priorityValue !== "all" && task.priority !== priorityValue) {
-            return false;
-          }
-          
-          if (searchValue) {
-            const unitMatch = task.unitNumber && task.unitNumber.toLowerCase().includes(searchValue);
-            const problemMatch = task.problem && task.problem.toLowerCase().includes(searchValue);
-            const commentMatch = task.comment && task.comment.toLowerCase().includes(searchValue);
-            if (!unitMatch && !problemMatch && !commentMatch) {
-              return false;
-            }
-          }
-          
-          return true;
-        });
+  function calculateCurrentWorkTime(start) {
+    if (!start) return "N/A";
+    const s = start.toDate ? start.toDate() : new Date(start);
+    return calculateTimeDifference(s, new Date()) + " (ongoing)";
+  }
 
-        renderTasks();
-      }
+  /* ---------------- FILTERING ---------------- */
 
-      function renderTasks() {
-        if (!filteredTasks.length) {
-          tasksList.innerHTML = "<p>No tasks found matching your criteria.</p>";
-          taskStats.style.display = "none";
-          return;
-        }
+  function applyFiltersAndSort() {
+    const s = statusFilter.value;
+    const p = priorityFilter.value;
+    const q = taskSearch.value.toLowerCase();
 
-        tasksList.innerHTML = "";
-        
-        let inProgress = 0;
-        let pending = 0;
-        let complete = 0;
-
-        filteredTasks.forEach(task => {
-          const data = task;
-          const id = data.id;
-
-          if (data.status === "In Progress") inProgress++;
-          else if (data.status === "Pending") pending++;
-          else if (data.status === "Complete") complete++;
-
-          const card = document.createElement("div");
-          card.className = "maintenance-card";
-          card.dataset.taskId = id;
-
-          let statusColor = "#f39c12";
-          if (data.status === "In Progress") statusColor = "#3498db";
-          if (data.status === "Complete") statusColor = "#27ae60";
-          
-          let priorityColor = "#f1c40f";
-          if (data.priority === "High") priorityColor = "#e74c3c";
-          if (data.priority === "Low") priorityColor = "#2ecc71";
-
-          card.style.borderLeft = `4px solid ${statusColor}`;
-
-          const attachmentsHTML = data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 0
-            ? `
-                <div style="margin-top:6px;">
-                    <strong>Attachments:</strong><br/>
-                    <div class="image-slider" style="position:relative; max-width:200px; margin-top:5px;">
-                        <img src="${data.imageUrls[0]}" alt="Attachment" style="width:100%; border-radius:6px;" id="img-${id}" />
-                        ${data.imageUrls.length > 1 ? `
-                          <button class="prev-btn" style="position:absolute; top:50%; left:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10094;</button>
-                          <button class="next-btn" style="position:absolute; top:50%; right:0; transform:translateY(-50%); background:#8d6c39; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">&#10095;</button>
-                        ` : ""}
-                    </div>
-                </div>`
-            : "";
-
-          let workTimeInfo = "";
-          if (data.status === "In Progress" && data.startTime) {
-            const currentWorkTime = calculateCurrentWorkTime(data.startTime);
-            workTimeInfo = `<p><strong>Work Time:</strong> <span style="color:#3498db; font-weight:bold;">${currentWorkTime}</span></p>`;
-          } else if (data.status === "Complete" && data.startTime && data.completionTime) {
-            const totalWorkTime = calculateTimeDifference(data.startTime, data.completionTime);
-            workTimeInfo = `<p><strong>Total Work Time:</strong> <span style="color:#27ae60; font-weight:bold;">${totalWorkTime}</span></p>`;
-          }
-
-          card.innerHTML = `
-            <div style="position: relative;">
-                <h3>${data.problem || "Unknown Issue"} 
-                  <span style="font-size: 12px; background: ${priorityColor}; color: white; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
-                    ${data.priority || "Medium"} Priority
-                  </span>
-                </h3>
-                <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:220px;">
-                        <p><strong>Unit:</strong> ${data.unitNumber || "N/A"}</p>
-                        <p><strong>Owner:</strong> ${data.tenantEmail || "Unknown"}</p>
-                        <p><strong>Details:</strong> ${data.comment || "No additional details."}</p>
-                        <p><strong>Scheduled Time:</strong> ${formatDateTimeAMPM(data.preferredVisitTime)}</p>
-                        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold;">${data.status || "Pending"}</span></p>
-                        <p><strong>Submitted:</strong> ${formatDateTimeAMPM(data.timestamp)}</p>
-                        ${data.startTime ? `<p><strong>Work Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
-                        ${data.completionTime ? `<p><strong>Work Ended:</strong> ${formatDateTimeAMPM(data.completionTime)}</p>` : ""}
-                        ${workTimeInfo}
-                    </div>
-                    <div style="min-width:220px;">${attachmentsHTML}</div>
-                </div>
-            </div>
-          `;
-
-          const actionsDiv = document.createElement("div");
-          actionsDiv.className = "maintenance-card-actions";
-
-          if (data.status === "Pending") {
-            const startBtn = document.createElement("button");
-            startBtn.textContent = "🛠️ Start Work";
-            startBtn.className = "btn-primary";
-            startBtn.style.background = "#27ae60";
-            startBtn.title = "Click to start working on this task";
-            startBtn.addEventListener("click", () => startWork(id));
-            actionsDiv.appendChild(startBtn);
-            
-          } else if (data.status === "In Progress") {
-            const endBtn = document.createElement("button");
-            endBtn.textContent = "✅ End Work";
-            endBtn.className = "btn-primary";
-            endBtn.style.background = "#e74c3c";
-            endBtn.title = "Click when you've finished working on this task";
-            endBtn.addEventListener("click", () => endWork(id));
-            actionsDiv.appendChild(endBtn);
-            
-          } else if (data.status === "Complete") {
-            const timeInfo = document.createElement("div");
-            timeInfo.style.cssText = `
-              padding: 8px 12px;
-              background: #2ecc71;
-              color: white;
-              border-radius: 6px;
-              font-size: 14px;
-              font-weight: bold;
-              margin-right: 10px;
-              display: inline-block;
-            `;
-            
-            if (data.startTime && data.completionTime) {
-              const workTime = calculateTimeDifference(data.startTime, data.completionTime);
-              timeInfo.textContent = `⏱️ Work Time: ${workTime}`;
-              timeInfo.title = `Total time spent on this task`;
-            } else {
-              timeInfo.textContent = "⏱️ Work Time: N/A";
-            }
-            actionsDiv.appendChild(timeInfo);
-          }
-
-          const chatBtn = document.createElement("button");
-          chatBtn.textContent = "💬 View Conversation";
-          chatBtn.className = "btn-primary";
-          chatBtn.style.background = "#4a90e2";
-          chatBtn.title = "View and respond to messages about this task";
-          chatBtn.addEventListener("click", () => openMaintenanceChat(id));
-          actionsDiv.appendChild(chatBtn);
-
-          card.appendChild(actionsDiv);
-          tasksList.appendChild(card);
-
-          if (data.imageUrls && Array.isArray(data.imageUrls) && data.imageUrls.length > 1) {
-            let currentIndex = 0;
-            const imgEl = card.querySelector(`#img-${id}`);
-            const prevBtn = card.querySelector(".prev-btn");
-            const nextBtn = card.querySelector(".next-btn");
-
-            prevBtn.addEventListener("click", () => {
-              currentIndex = (currentIndex - 1 + data.imageUrls.length) % data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-
-            nextBtn.addEventListener("click", () => {
-              currentIndex = (currentIndex + 1) % data.imageUrls.length;
-              imgEl.src = data.imageUrls[currentIndex];
-            });
-          }
-        });
-
-        taskCount.textContent = filteredTasks.length;
-        inProgressCount.textContent = inProgress;
-        pendingCount.textContent = pending;
-        completeCount.textContent = complete;
-        taskStats.style.display = "block";
-      }
-
-      async function startWork(taskId) {
-        if (confirm("Are you sure you want to start work on this task? This will log your start time.")) {
-          try {
-            showLoading();
-            await db.collection("maintenanceRequests").doc(taskId).update({
-              status: "In Progress",
-              startTime: firebase.firestore.FieldValue.serverTimestamp(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
-              sender: "system",
-              message: `🛠️ ${currentMaintenancePerson} started work on this task at ${new Date().toLocaleString()}.`,
-              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            
-            showPopup("✅ Work started! Your start time has been logged.");
-            applyFiltersAndSort();
-          } catch (error) {
-            showPopup("❌ Error starting work: " + error.message);
-          } finally {
-            hideLoading();
-          }
-        }
-      }
-
-      async function endWork(taskId) {
-        const notes = prompt("Add any final notes about the work completed:");
-        
-        if (notes !== null) {
-          if (confirm("Are you sure you want to end work on this task? This will mark it as complete.")) {
-            try {
-              showLoading();
-              
-              await db.collection("maintenanceRequests").doc(taskId).update({
-                status: "Complete",
-                completionTime: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
-              
-              await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
-                sender: "system",
-                message: `✅ ${currentMaintenancePerson} completed this task at ${new Date().toLocaleString()}.${notes ? `\n\nNotes: ${notes}` : ''}`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-              });
-              
-              if (notes.trim()) {
-                await db.collection("maintenanceRequests").doc(taskId).collection("responses").add({
-                  sender: "maintenance",
-                  maintenanceName: currentMaintenancePerson,
-                  message: `📝 Work completion notes: ${notes}`,
-                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                });
-              }
-              
-              showPopup("✅ Work completed successfully! Task marked as complete.");
-              applyFiltersAndSort();
-            } catch (error) {
-              showPopup("❌ Error completing task: " + error.message);
-            } finally {
-              hideLoading();
-            }
-          }
-        }
-      }
-
-      db.collection("maintenanceRequests")
-        .where("maintenanceName", "==", currentMaintenancePerson)
-        .orderBy("timestamp", "desc")
-        .onSnapshot(
-          (snapshot) => {
-            if (snapshot.empty) {
-              allTasks = [];
-              filteredTasks = [];
-              tasksList.innerHTML = "<p>No tasks assigned to you yet.</p>";
-              taskStats.style.display = "none";
-              return;
-            }
-
-            allTasks = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            }));
-
-            applyFiltersAndSort();
-          },
-          (error) => {
-            tasksList.innerHTML =
-              `<p style="color:red;">Error loading tasks: ${error.message}</p>`;
-            taskStats.style.display = "none";
-          }
+    filteredTasks = allTasks.filter(t => {
+      if (s !== "all" && t.status !== s) return false;
+      if (p !== "all" && t.priority !== p) return false;
+      if (q) {
+        return (
+          t.unitNumber?.toLowerCase().includes(q) ||
+          t.problem?.toLowerCase().includes(q) ||
+          t.comment?.toLowerCase().includes(q)
         );
+      }
+      return true;
+    });
 
-      statusFilter.addEventListener("change", applyFiltersAndSort);
-      priorityFilter.addEventListener("change", applyFiltersAndSort);
-      taskSearch.addEventListener("input", applyFiltersAndSort);
-      resetFilters.addEventListener("click", () => {
-        statusFilter.value = "all";
-        priorityFilter.value = "all";
-        taskSearch.value = "";
-        applyFiltersAndSort();
-      });
+    renderTasks();
+  }
+
+  /* ---------------- RENDER ---------------- */
+
+  function renderTasks() {
+    tasksList.innerHTML = "";
+
+    let pending = 0, inProgress = 0, finished = 0;
+
+    if (!filteredTasks.length) {
+      tasksList.innerHTML = "<p>No assigned tasks.</p>";
+      taskStats.style.display = "none";
+      return;
     }
+
+    filteredTasks.forEach(data => {
+      const id = data.id;
+
+      if (data.status === "Pending") pending++;
+      if (data.status === "In Progress") inProgress++;
+      if (data.status === "Work Finished" || data.status === "Complete") finished++;
+
+      let statusColor = "#f39c12";
+      if (data.status === "In Progress") statusColor = "#3498db";
+      if (data.status === "On Hold") statusColor = "#e67e22";
+      if (data.status === "Work Finished") statusColor = "#9b59b6";
+
+      const card = document.createElement("div");
+      card.className = "maintenance-card";
+      card.style.borderLeft = `4px solid ${statusColor}`;
+
+      card.innerHTML = `
+        <h3>${data.problem || "Maintenance Task"}</h3>
+        <p><strong>Unit:</strong> ${data.unitNumber}</p>
+        <p><strong>Status:</strong> <span style="color:${statusColor}; font-weight:bold">${data.status}</span></p>
+        <p><strong>Owner:</strong> ${data.tenantEmail || "N/A"}</p>
+        <p><strong>Details:</strong> ${data.comment || "-"}</p>
+        ${data.startTime ? `<p><strong>Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
+        ${data.finishedTime ? `<p><strong>Finished:</strong> ${formatDateTimeAMPM(data.finishedTime)}</p>` : ""}
+        ${data.status === "In Progress" ? `<p><strong>Work Time:</strong> ${calculateCurrentWorkTime(data.startTime)}</p>` : ""}
+      `;
+
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "maintenance-card-actions";
+
+      /* ---------------- BUTTON HELPERS ---------------- */
+
+      function addBtn(label, color, fn) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.style.background = color;
+        b.className = "btn-primary";
+        b.onclick = fn;
+        actionsDiv.appendChild(b);
+      }
+
+      /* ---------------- STATUS ACTIONS ---------------- */
+
+      if (data.status === "Pending") {
+        addBtn("🛠️ Start Work", "#27ae60", () => startWork(id));
+      }
+
+      if (data.status === "In Progress") {
+        addBtn("⏸️ On Hold", "#f39c12", () => pauseWork(id));
+        addBtn("✅ Finish Work", "#8e44ad", () => finishWork(id));
+        addBtn("📤 Send Proof", "#2980b9", () => openProofUpload(id));  // <-- Send Proof button
+      }
+
+      if (data.status === "On Hold") {
+        addBtn("▶️ Resume Work", "#3498db", () => resumeWork(id));
+        addBtn("⚠️ Report Issue", "#e67e22", () => reportIssue(id));
+      }
+
+      if (data.status === "Work Finished") {
+        const badge = document.createElement("div");
+        badge.textContent = "🕒 Waiting for owner confirmation";
+        badge.style.cssText = "padding:8px;background:#9b59b6;color:white;border-radius:6px";
+        actionsDiv.appendChild(badge);
+      }
+
+      card.appendChild(actionsDiv);
+      tasksList.appendChild(card);
+    });
+
+    taskCount.textContent = filteredTasks.length;
+    pendingCount.textContent = pending;
+    inProgressCount.textContent = inProgress;
+    completeCount.textContent = finished;
+    taskStats.style.display = "block";
+  }
+
+  /* ---------------- ACTION FUNCTIONS ---------------- */
+
+  async function logSystemMessage(id, msg) {
+    return db.collection("maintenanceRequests").doc(id)
+      .collection("responses")
+      .add({
+        sender: "system",
+        message: msg,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+  }
+
+  async function startWork(id) {
+    await db.collection("maintenanceRequests").doc(id).update({
+      status: "In Progress",
+      startTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await logSystemMessage(id, `🛠️ Work started by ${currentMaintenancePerson}`);
+  }
+
+  async function pauseWork(id) {
+    const reason = prompt("Reason for putting task on hold:");
+    if (!reason) return;
+    await db.collection("maintenanceRequests").doc(id).update({
+      status: "On Hold",
+      holdReason: reason
+    });
+    await logSystemMessage(id, `⏸️ Task on hold: ${reason}`);
+  }
+
+  async function resumeWork(id) {
+    await db.collection("maintenanceRequests").doc(id).update({
+      status: "In Progress"
+    });
+    await logSystemMessage(id, "▶️ Work resumed");
+  }
+
+  async function finishWork(id) {
+    const notes = prompt("Work summary / what was fixed:");
+    if (notes === null) return;
+
+    await db.collection("maintenanceRequests").doc(id).update({
+      status: "Work Finished",
+      finishedTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    await logSystemMessage(id, "✅ Work finished. Awaiting owner confirmation.");
+
+    if (notes.trim()) {
+      await db.collection("maintenanceRequests").doc(id)
+        .collection("responses").add({
+          sender: "maintenance",
+          maintenanceName: currentMaintenancePerson,
+          message: `📝 Work summary: ${notes}`,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+  }
+
+  async function reportIssue(id) {
+    const issue = prompt("Describe the issue:");
+    if (!issue) return;
+    await db.collection("maintenanceRequests").doc(id)
+      .collection("responses").add({
+        sender: "maintenance",
+        message: `⚠️ Issue reported: ${issue}`,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+  }
+
+  /* ---------------- SEND PROOF ---------------- */
+
+  async function openProofUpload(taskId) {
+    // Create hidden file input
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.style.display = "none";
+
+    fileInput.onchange = async () => {
+      const file = fileInput.files[0];
+      if (!file) return alert("No file selected.");
+
+      try {
+        // Show uploading alert or spinner if you want here
+
+        // Prepare form data for Cloudinary
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+        // Upload to Cloudinary
+        const res = await fetch(CLOUDINARY_URL, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (!data.secure_url) throw new Error("Upload failed");
+
+        // Save proof url to Firestore under maintenance request's proofs subcollection
+        await db.collection("maintenanceRequests").doc(taskId)
+          .collection("proofs").add({
+            url: data.secure_url,
+            uploadedBy: currentMaintenancePerson,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+        alert("Proof sent successfully!");
+      } catch (error) {
+        console.error("Proof upload error:", error);
+        alert("Failed to upload proof. Please try again.");
+      }
+    };
+
+    document.body.appendChild(fileInput);
+    fileInput.click();
+
+    // Cleanup input after use
+    fileInput.remove();
+  }
+
+  /* ---------------- FIRESTORE LISTENER ---------------- */
+
+  db.collection("maintenanceRequests")
+    .where("maintenanceName", "==", currentMaintenancePerson)
+    .orderBy("timestamp", "desc")
+    .onSnapshot(snapshot => {
+      allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      applyFiltersAndSort();
+    });
+
+  statusFilter.onchange = priorityFilter.onchange = applyFiltersAndSort;
+  taskSearch.oninput = applyFiltersAndSort;
+  resetFilters.onclick = () => {
+    statusFilter.value = "all";
+    priorityFilter.value = "all";
+    taskSearch.value = "";
+    applyFiltersAndSort();
+  };
+}
 
     function initTaskHistory() {
       const historyList = document.getElementById("historyList");
@@ -1170,20 +1116,8 @@
 
           const actionsDiv = document.createElement("div");
           actionsDiv.className = "maintenance-card-actions";
-
-          const timelineBtn = document.createElement("button");
-          timelineBtn.textContent = "📊 View Work Timeline";
-          timelineBtn.className = "btn-primary";
-          timelineBtn.style.background = "#9b59b6";
-          timelineBtn.title = "View detailed work timeline";
-          timelineBtn.addEventListener("click", () => showWorkTimeline(data));
-          actionsDiv.appendChild(timelineBtn);
-
-          const chatBtn = document.createElement("button");
-          chatBtn.textContent = "💬 View Conversation";
-          chatBtn.className = "btn-secondary";
-          chatBtn.addEventListener("click", () => openMaintenanceChat(id));
-          actionsDiv.appendChild(chatBtn);
+          
+          // REMOVED: Timeline and chat buttons
 
           card.appendChild(actionsDiv);
           historyList.appendChild(card);
@@ -1198,67 +1132,6 @@
         historyStats.style.display = "block";
       }
 
-      function showWorkTimeline(taskData) {
-        if (!taskData.startTime || !taskData.completionTime) {
-          showPopup("No work time data available for this task.");
-          return;
-        }
-        
-        const start = taskData.startTime.toDate ? taskData.startTime.toDate() : new Date(taskData.startTime);
-        const end = taskData.completionTime.toDate ? taskData.completionTime.toDate() : new Date(taskData.completionTime);
-        const durationMs = end - start;
-        const durationHours = durationMs / (1000 * 60 * 60);
-        const hours = Math.floor(durationHours);
-        const minutes = Math.round((durationHours - hours) * 60);
-        
-        showPopup(`
-          <div style="text-align: left; max-width: 500px;">
-            <h3 style="margin-top: 0; color: #c0933c;">Work Timeline</h3>
-            <p><strong>Task:</strong> ${taskData.problem || "Unknown Issue"}</p>
-            <p><strong>Unit:</strong> ${taskData.unitNumber || "N/A"}</p>
-            
-            <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin: 15px 0;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                <div>
-                  <div style="font-size: 12px; color: #888;">START TIME</div>
-                  <div style="font-weight: bold;">${formatDateTimeAMPM(start)}</div>
-                </div>
-                <div style="text-align: right;">
-                  <div style="font-size: 12px; color: #888;">END TIME</div>
-                  <div style="font-weight: bold;">${formatDateTimeAMPM(end)}</div>
-                </div>
-              </div>
-              
-              <div style="background: #333; height: 20px; border-radius: 10px; position: relative; margin: 10px 0;">
-                <div style="background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; border-radius: 10px; width: 100%;"></div>
-                <div style="position: absolute; left: 0; top: -25px; font-size: 12px; color: #27ae60;">Start</div>
-                <div style="position: absolute; right: 0; top: -25px; font-size: 12px; color: #2ecc71;">End</div>
-              </div>
-              
-              <div style="text-align: center; margin-top: 20px;">
-                <div style="font-size: 24px; font-weight: bold; color: #27ae60;">
-                  ${hours > 0 ? `${hours}h ` : ''}${minutes}m
-                </div>
-                <div style="font-size: 12px; color: #888;">Total Work Time</div>
-              </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; background: #333; padding: 10px; border-radius: 6px;">
-              <div style="text-align: center;">
-                <div style="font-size: 12px; color: #888;">Efficiency</div>
-                <div style="font-weight: bold;">
-                  ${durationHours > 0 ? (1/durationHours).toFixed(2) : 'N/A'} tasks/hour
-                </div>
-              </div>
-              <div style="text-align: center;">
-                <div style="font-size: 12px; color: #888;">Completion Rate</div>
-                <div style="font-weight: bold; color: #27ae60;">100%</div>
-              </div>
-            </div>
-          </div>
-        `);
-      }
-
       dateRangeFilter.addEventListener("change", applyFiltersAndSort);
       historySearch.addEventListener("input", applyFiltersAndSort);
       sortBy.addEventListener("change", applyFiltersAndSort);
@@ -1271,7 +1144,6 @@
 
       loadHistory();
     }
-
     async function openMaintenanceChat(requestId) {
       const chatPanel = document.getElementById("maintenanceMessagesPanel");
       const chatTitleEl = document.getElementById("maintenanceMessagesTitle");
