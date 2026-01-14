@@ -42,7 +42,7 @@
   <main class="main-content">
     <div id="mainContent">
       <h1 class="pm-dashboard-title">Project Manager Dashboard</h1>
-      <p class="pm-dashboard-subtitle">High-level overview of inquiries, mortgage calculations, and client documents.</p>
+      <p class="pm-dashboard-subtitle">High-level overview of inquiries and client documents.</p>
     </div>
   </main>
 
@@ -417,7 +417,7 @@
       mainContent.innerHTML = `
         <h1 class="pm-dashboard-title">Project Manager Dashboard</h1>
         <p class="pm-dashboard-subtitle">
-          High-level overview of inquiries, mortgage calculations, and client documents.
+          High-level overview of inquiries and client documents.
         </p>
 
         <div class="kpi-row">
@@ -431,13 +431,6 @@
                 <span class="dashboard-inbox-notification" id="dashboardInboxNotification"></span>
               </button>
             </div>
-          </div>
-
-          <div class="card kpi-card" id="kpi-calculations">
-            <div class="kpi-label">MORTGAGE CALCULATIONS</div>
-            <div class="kpi-value" id="kpiCalculationsCount">0</div>
-            <div class="kpi-meta" id="kpiCalculationsMeta">–</div>
-            <button class="kpi-cta" type="button">CLICK TO VIEW CALCULATIONS</button>
           </div>
 
           <div class="card kpi-card" id="kpi-documents">
@@ -479,7 +472,7 @@
             <div class="card activity-card">
               <div class="activity-header">
                 <div class="activity-title">Recent activity</div>
-                <div class="activity-subtitle">Latest inquiries &amp; calculations</div>
+                <div class="activity-subtitle">Latest inquiries & documents</div>
               </div>
               <div class="activity-list" id="activityList"></div>
             </div>
@@ -517,20 +510,12 @@
 
     function hookDashboardDrilldown() {
       const inqCard = document.getElementById("kpi-inquiries");
-      const calcCard = document.getElementById("kpi-calculations");
       const docCard = document.getElementById("kpi-documents");
 
       inqCard
         .querySelector(".kpi-cta")
         .addEventListener("click", () => {
           window.__initialInquiryView = "inquiries";
-          loadContent(null, "inquiries");
-        });
-
-      calcCard
-        .querySelector(".kpi-cta")
-        .addEventListener("click", () => {
-          window.__initialInquiryView = "calculations";
           loadContent(null, "inquiries");
         });
 
@@ -571,13 +556,11 @@
 
     async function loadDashboardData() {
       try {
-        const [inqSnap, calcSnap] = await Promise.all([
-          getDocs(collection(db, "inquiries")),
-          getDocs(collection(db, "mortgage_calculations"))
+        const [inqSnap] = await Promise.all([
+          getDocs(collection(db, "inquiries"))
         ]);
 
         let inquiries = inqSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        let calcs = calcSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
         const getTime = (obj) => {
           const t = obj.createdAt?.toDate ? obj.createdAt.toDate() : null;
@@ -585,7 +568,6 @@
         };
 
         inquiries.sort((a, b) => getTime(b) - getTime(a));
-        calcs.sort((a, b) => getTime(b) - getTime(a));
 
         const history = JSON.parse(localStorage.getItem("uploadHistory") || "[]");
 
@@ -596,11 +578,6 @@
         const inqLast7 = inquiries.filter((i) => {
           const t = i.createdAt?.toDate ? i.createdAt.toDate() : null;
           return t && t >= sevenDaysAgo;
-        }).length;
-
-        const calcLast30 = calcs.filter((c) => {
-          const t = c.createdAt?.toDate ? c.createdAt.toDate() : null;
-          return t && t >= thirtyDaysAgo;
         }).length;
 
         const employedCount = history.filter(
@@ -618,12 +595,6 @@
         document.getElementById(
           "kpiInquiriesMeta"
         ).textContent = `${inqLast7} in the last 7 days`;
-
-        document.getElementById("kpiCalculationsCount").textContent =
-          calcs.length;
-        document.getElementById(
-          "kpiCalculationsMeta"
-        ).textContent = `${calcLast30} in the last 30 days`;
 
         const totalDocs = history.length;
         document.getElementById("kpiDocumentsCount").textContent = totalDocs;
@@ -758,17 +729,6 @@
           });
         });
 
-        calcs.forEach((c) => {
-          const t = c.createdAt?.toDate ? c.createdAt.toDate() : null;
-          if (!t) return;
-          activities.push({
-            type: "calc",
-            label: c.name || "Mortgage calculation",
-            meta: `Monthly: ${formatCurrency(c.monthlyPayment)}`,
-            time: t
-          });
-        });
-
         history.forEach((h) => {
           const t = h.time ? new Date(h.time) : null;
           if (!t) return;
@@ -791,14 +751,10 @@
             const badgeClass =
               act.type === "inquiry"
                 ? "inquiry"
-                : act.type === "calc"
-                ? "calc"
                 : "document";
             const typeLabel =
               act.type === "inquiry"
                 ? "INQUIRY"
-                : act.type === "calc"
-                ? "CALC"
                 : "DOCS";
 
             div.innerHTML = `
@@ -825,21 +781,21 @@
     }
 
     // ============================================================
-    // INQUIRIES & MORTGAGE
+    // INQUIRIES MANAGEMENT
     // ============================================================
 
 function renderInquiries() {
   mainContent.innerHTML = `
     <div class="inquiries-header">
       <div>
-        <h1 class="inquiries-title">Inquiries & Mortgage Calculations</h1>
+        <h1 class="inquiries-title">Inquiries Management</h1>
       </div>
       <div class="filter-bar">
-        <span class="filter-label">View</span>
+        <span class="filter-label">Filter by</span>
         <div class="filter-pill-group">
           <button id="toggleViewBtn" class="filter-pill">All</button>
-          <button id="showInquiriesBtn" class="filter-pill">Inquiries</button>
-          <button id="showCalculationsBtn" class="filter-pill">Calculations</button>
+          <button id="showInquiriesBtn" class="filter-pill">New</button>
+          <button id="showRespondedBtn" class="filter-pill">Responded</button>
         </div>
       </div>
     </div>
@@ -888,18 +844,7 @@ function renderInquiries() {
 
 function setupInquiriesLogic() {
   const dataContainer = document.getElementById("dataContainer");
-  let currentView =
-    window.__initialInquiryView === "inquiries"
-      ? "inquiries"
-      : window.__initialInquiryView === "calculations"
-      ? "calculations"
-      : "all";
-
-  // Reset after using
-  window.__initialInquiryView = "all";
-
-  const MORTGAGE_CALCULATOR_LINK =
-    "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
+  let currentView = "all";
 
   const inquiryTopicMap = {
     payment: "Payment / Price",
@@ -919,14 +864,14 @@ function setupInquiriesLogic() {
 
   // Filter pill interactions
   const allBtn = document.getElementById("toggleViewBtn");
-  const inqBtn = document.getElementById("showInquiriesBtn");
-  const calcBtn = document.getElementById("showCalculationsBtn");
+  const newBtn = document.getElementById("showInquiriesBtn");
+  const respondedBtn = document.getElementById("showRespondedBtn");
 
   function updateFilterPills() {
-    [allBtn, inqBtn, calcBtn].forEach((b) => b.classList.remove("active"));
+    [allBtn, newBtn, respondedBtn].forEach((b) => b.classList.remove("active"));
     if (currentView === "all") allBtn.classList.add("active");
-    else if (currentView === "inquiries") inqBtn.classList.add("active");
-    else calcBtn.classList.add("active");
+    else if (currentView === "new") newBtn.classList.add("active");
+    else if (currentView === "responded") respondedBtn.classList.add("active");
   }
 
   allBtn.addEventListener("click", () => {
@@ -934,74 +879,18 @@ function setupInquiriesLogic() {
     updateFilterPills();
     loadData();
   });
-  inqBtn.addEventListener("click", () => {
-    currentView = "inquiries";
+  newBtn.addEventListener("click", () => {
+    currentView = "new";
     updateFilterPills();
     loadData();
   });
-  calcBtn.addEventListener("click", () => {
-    currentView = "calculations";
+  respondedBtn.addEventListener("click", () => {
+    currentView = "responded";
     updateFilterPills();
     loadData();
   });
 
   updateFilterPills();
-
-  // Setup mark all as read button
-  const markAllReadBtn = document.getElementById('markAllInquiriesReadBtn');
-  if (markAllReadBtn) {
-    markAllReadBtn.addEventListener('click', async () => {
-      setButtonLoading(markAllReadBtn, true);
-      try {
-        // Mark all inquiries as read
-        const q = query(collection(db, "inquiries"));
-        const snapshot = await getDocs(q);
-        
-        const updatePromises = [];
-        
-        for (const docSnap of snapshot.docs) {
-          // Update inquiry status if it's new
-          const data = docSnap.data();
-          if (data.status === "new") {
-            updatePromises.push(
-              updateDoc(doc(db, "inquiries", docSnap.id), {
-                status: "responded"
-              })
-            );
-          }
-          
-          // Mark all user messages as read
-          const messagesQuery = query(
-            collection(db, "inquiries", docSnap.id, "messages"),
-            where("sender", "!=", "admin"),
-            where("readByPM", "==", false)
-          );
-          
-          const messagesSnapshot = await getDocs(messagesQuery);
-          messagesSnapshot.forEach(msgDoc => {
-            updatePromises.push(
-              updateDoc(doc(db, "inquiries", docSnap.id, "messages", msgDoc.id), {
-                readByPM: true
-              })
-            );
-          });
-        }
-        
-        await Promise.all(updatePromises);
-        await updateNotificationBadges();
-        
-        // Refresh the data
-        await loadData();
-        
-        Toast.show("All inquiries marked as read!", "success");
-      } catch (error) {
-        console.error("Error marking all as read:", error);
-        Toast.show("Error marking inquiries as read", "error");
-      } finally {
-        setButtonLoading(markAllReadBtn, false);
-      }
-    });
-  }
 
   // MESSAGES PANEL SETUP
   const messagesPanel = document.getElementById("messagesPopupPanel");
@@ -1063,8 +952,6 @@ function setupInquiriesLogic() {
     document.getElementById("replyStatus").textContent = "";
   });
 
-  const MORT_LINK = MORTGAGE_CALCULATOR_LINK;
-
   quickReplyBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const template = btn.dataset.template;
@@ -1079,10 +966,10 @@ function setupInquiriesLogic() {
             "I'm following up on your recent inquiry about our units. Are you still interested, or would you like to schedule a site viewing so we can walk you through the options?";
           break;
         case "pricelist_1bed":
-          message = `Here are the details for our 1-Bedroom units:\n\n• Floor area: 24–28 sqm\n• Price range: ₱2.8M–₱3.2M\n• Typical downpayment: ₱150,000\n• Sample monthly amortization available upon request.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+          message = `Here are the details for our 1-Bedroom units:\n\n• Floor area: 24–28 sqm\n• Price range: ₱2.8M–₱3.2M\n• Typical downpayment: ₱150,000\n• Sample monthly amortization available upon request.`;
           break;
         case "pricelist_2bed":
-          message = `Here are the details for our 2-Bedroom units:\n\n• Floor area: 36–42 sqm\n• Price range: ₱3.8M–₱4.2M\n• Flexible payment terms available.\n\nYou can also try our mortgage calculator here: ${MORT_LINK}`;
+          message = `Here are the details for our 2-Bedroom units:\n\n• Floor area: 36–42 sqm\n• Price range: ₱3.8M–₱4.2M\n• Flexible payment terms available.`;
           break;
         case "appointment":
           message =
@@ -1312,30 +1199,14 @@ function setupInquiriesLogic() {
     }
   }
 
-  // Delete calculation
-  window.deleteCalculation = async function (calcId) {
-    if (
-      !confirm("Delete this mortgage calculation? This action is permanent.")
-    )
-      return;
-    try {
-      await deleteDoc(doc(db, "mortgage_calculations", calcId));
-      Toast.show("Calculation deleted", "success");
-      loadData();
-    } catch (error) {
-      console.error(error);
-      Toast.show("Delete failed", "error");
-    }
-  };
-
-  // ======================= LOAD DATA (INQUIRIES + CALCULATIONS) =======================
+  // ======================= LOAD INQUIRIES DATA =======================
   async function loadData() {
     try {
       // Show loading indicator
       dataContainer.innerHTML = `
         <div style="text-align: center; padding: 20px; color: #b9ae9d;">
           <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #2b2520; border-top: 3px solid #cfa85b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          <p style="margin-top: 10px;">Loading data...</p>
+          <p style="margin-top: 10px;">Loading inquiries...</p>
         </div>
         <style>
           @keyframes spin {
@@ -1345,10 +1216,27 @@ function setupInquiriesLogic() {
         </style>
       `;
 
-      const [inquiriesSnapshot, calculationsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "inquiries"), orderBy("createdAt", "desc"))),
-        getDocs(query(collection(db, "mortgage_calculations"), orderBy("createdAt", "desc")))
-      ]);
+      let inquiriesQuery;
+      if (currentView === "new") {
+        inquiriesQuery = query(
+          collection(db, "inquiries"),
+          where("status", "==", "new"),
+          orderBy("createdAt", "desc")
+        );
+      } else if (currentView === "responded") {
+        inquiriesQuery = query(
+          collection(db, "inquiries"),
+          where("status", "==", "responded"),
+          orderBy("createdAt", "desc")
+        );
+      } else {
+        inquiriesQuery = query(
+          collection(db, "inquiries"),
+          orderBy("createdAt", "desc")
+        );
+      }
+
+      const inquiriesSnapshot = await getDocs(inquiriesQuery);
 
       const inquiriesData = inquiriesSnapshot.docs.map(doc => ({
         id: doc.id,
@@ -1356,37 +1244,14 @@ function setupInquiriesLogic() {
         data: doc.data()
       }));
 
-      const calculationsData = calculationsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: "calculation",
-        data: doc.data()
-      }));
-
-      let filteredData;
-      if (currentView === "inquiries") {
-        filteredData = inquiriesData;
-      } else if (currentView === "calculations") {
-        filteredData = calculationsData;
-      } else {
-        filteredData = [...inquiriesData, ...calculationsData];
-      }
-
-      filteredData.sort((a, b) => {
-        const dateA =
-          a.data.createdAt?.toMillis?.() || a.data.calculationDate || 0;
-        const dateB =
-          b.data.createdAt?.toMillis?.() || b.data.calculationDate || 0;
-        return dateB - dateA;
-      });
-
-      if (filteredData.length === 0) {
+      if (inquiriesData.length === 0) {
         dataContainer.innerHTML = `
           <div style="text-align: center; padding: 40px; color: #b9ae9d;">
             <p style="font-size: 16px; margin-bottom: 10px;">
-              No ${currentView === "all" ? "data" : currentView} yet.
+              No ${currentView === "all" ? "inquiries" : currentView} yet.
             </p>
             <p style="font-size: 14px; color: #8e8272;">
-              Check back later for new inquiries and calculations.
+              Check back later for new inquiries.
             </p>
           </div>
         `;
@@ -1396,23 +1261,18 @@ function setupInquiriesLogic() {
       // Group items by email
       const emailGroups = new Map();
 
-      filteredData.forEach(item => {
+      inquiriesData.forEach(item => {
         const email = item.data.email || "No email provided";
         if (!emailGroups.has(email)) {
           emailGroups.set(email, {
             email,
             name: item.data.name || "Client",
-            inquiries: [],
-            calculations: []
+            inquiries: []
           });
         }
 
         const group = emailGroups.get(email);
-        if (item.type === "inquiry") {
-          group.inquiries.push(item);
-        } else if (item.type === "calculation") {
-          group.calculations.push(item);
-        }
+        group.inquiries.push(item);
       });
 
       const fragment = document.createDocumentFragment();
@@ -1420,7 +1280,6 @@ function setupInquiriesLogic() {
       for (const [, group] of emailGroups) {
         const groupDiv = document.createElement("div");
         groupDiv.className = "email-group";
-        // darker, matching your CSS
         groupDiv.style.cssText =
           "border: 1px solid #3a3329; padding: 16px 18px; margin-bottom: 18px; border-radius: 12px; background-color: #1c1813; box-shadow: 0 10px 24px rgba(0,0,0,0.4);";
 
@@ -1435,9 +1294,6 @@ function setupInquiriesLogic() {
             <div>
               <span class="badge inquiry">
                 ${group.inquiries.length} Inquiry${group.inquiries.length !== 1 ? "ies" : ""}
-              </span>
-              <span class="badge calculation">
-                ${group.calculations.length} Calculation${group.calculations.length !== 1 ? "s" : ""}
               </span>
             </div>
           </div>
@@ -1496,46 +1352,6 @@ function setupInquiriesLogic() {
           });
         }
 
-        // ----- Mortgage calculations -----
-        if (group.calculations.length > 0) {
-          groupHTML += `
-            <h4 style="color:#c8f7d5;margin:8px 0 4px;font-size:13px;">Mortgage Calculations</h4>
-          `;
-
-          group.calculations.forEach(calc => {
-            const d = calc.data;
-            const calcSummary = d.formatted || {};
-
-            groupHTML += `
-              <div class="calculation-item">
-                <div class="item-content">
-                  <div class="item-details">
-                    <div><strong>Property Price:</strong>
-                      ${calcSummary.propertyPrice || formatCurrency(d.propertyPrice)}</div>
-                    <div><strong>Downpayment:</strong>
-                      ${d.downpaymentPercent}% (${calcSummary.downpayment || formatCurrency(d.downpaymentAmount)})</div>
-                    <div><strong>Loan Amount:</strong>
-                      ${calcSummary.loanAmount || formatCurrency(d.loanAmount)}</div>
-                    <div><strong>Monthly Payment:</strong>
-                      ${
-                        calcSummary.monthlyPayment ||
-                        formatCurrencyDecimal(d.monthlyPayment)
-                      }</div>
-                    <div><strong>Term:</strong>
-                      ${d.loanTermYears} years @ ${d.interestRate}%</div>
-                  </div>
-                  <div class="item-actions">
-                    <button class="item-action-btn delete"
-                            onclick="deleteCalculation('${calc.id}')">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `;
-          });
-        }
-
         groupDiv.innerHTML = groupHTML;
         fragment.appendChild(groupDiv);
       }
@@ -1543,7 +1359,7 @@ function setupInquiriesLogic() {
       dataContainer.innerHTML = "";
       dataContainer.appendChild(fragment);
 
-      Toast.show(`Loaded ${filteredData.length} items`, "info", 1500);
+      Toast.show(`Loaded ${inquiriesData.length} inquiries`, "info", 1500);
     } catch (error) {
       console.error(error);
       Toast.show(`Failed to load data: ${error.message}`, "error");
@@ -1623,7 +1439,7 @@ function setupInquiriesLogic() {
                 </div>
               </div>
 
-              <button type="submit" class="doc-submit-btn">Upload &amp; send to Solano Mgt</button>
+              <button type="submit" class="doc-submit-btn">Upload &amp; send to admin</button>
             </form>
           </section>
 
@@ -2069,4 +1885,3 @@ function setupInquiriesLogic() {
   </script>
 </body>
 </html>
-
