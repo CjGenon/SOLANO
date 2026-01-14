@@ -1713,6 +1713,33 @@ case "billing":
 
         <div id="paypal-section" style="margin-top:16px;">
           <div id="paypal-button-container"></div>
+          <div style="margin-top:15px; padding:15px; background:#4a3728; border-radius:8px;">
+            <label style="display:flex; align-items:center; margin-bottom:10px;">
+              <input type="checkbox" id="advancePaymentCheckbox" style="margin-right:10px;">
+              <strong>Pay in Advance</strong>
+            </label>
+            
+            <div id="advanceOptions" style="display:none; margin-top:10px;">
+              <label for="advanceMonths">Advance Period:</label>
+              <select id="advanceMonths" style="margin-left:10px; padding:5px 10px; border-radius:4px;">
+                <option value="1">1 month</option>
+                <option value="2">2 months</option>
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="12">12 months</option>
+              </select>
+              
+              <div id="advanceAmountDisplay" style="margin-top:10px; padding:8px; background:#c0933c; border-radius:4px;">
+                <strong>Advance Amount:</strong> <span id="advanceTotalAmount">₱0.00</span><br>
+                <small>Total for selected months</small>
+              </div>
+              
+              <div style="margin-top:10px; font-size:14px; color:#666;">
+                <small>✅ Each month covers until end of month</small><br>
+                <small>✅ Pay once, covered for multiple months</small>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1752,6 +1779,10 @@ case "billing":
   const paymentCount = document.getElementById("paymentCount");
   const totalPaid = document.getElementById("totalPaid");
   const coverageStatus = document.getElementById("coverageStatus");
+  const advancePaymentCheckbox = document.getElementById("advancePaymentCheckbox");
+  const advanceOptions = document.getElementById("advanceOptions");
+  const advanceMonths = document.getElementById("advanceMonths");
+  const advanceTotalAmount = document.getElementById("advanceTotalAmount");
 
   let computedAmount = 0;
   let tenantUnits = [];
@@ -1761,19 +1792,19 @@ case "billing":
   let currentDueDate = new Date();
   let gracePeriodDays = 5;
   let monthlyBaseAmount = 0;
-  let billingCycleDays = 25; // Fixed 25-day cycle
+  let paymentCoverageData = [];
 
-  // SIMPLE: Function to calculate next due date - just count 25 days for EACH payment
+  // Function to get last day of month for a given date
+  function getLastDayOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0); // 0th day of next month = last day of current month
+  }
+
+  // Function to calculate next due date (always end of month)
   async function calculateNextDueDateFromHistory(payments) {
     if (!payments || payments.length === 0) {
-      // No payments yet, set initial due date to 25th of current month
+      // No payments yet, set to end of current month
       const today = new Date();
-      const nextDueDate = new Date(today.getFullYear(), today.getMonth(), 25);
-      if (today > nextDueDate) {
-        // If today is past the 25th, set to 25th of next month
-        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-      }
-      return nextDueDate;
+      return getLastDayOfMonth(today);
     }
 
     // Filter only paid/approved payments
@@ -1784,13 +1815,9 @@ case "billing":
     );
 
     if (validPayments.length === 0) {
-      // No valid payments, set initial due date
+      // No valid payments, set to end of current month
       const today = new Date();
-      const nextDueDate = new Date(today.getFullYear(), today.getMonth(), 25);
-      if (today > nextDueDate) {
-        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-      }
-      return nextDueDate;
+      return getLastDayOfMonth(today);
     }
 
     // Sort payments by date (oldest first for calculation)
@@ -1800,22 +1827,51 @@ case "billing":
       return dateA - dateB;
     });
 
-    // Start from the first payment date
-    const firstPaymentDate = sortedPayments[0].paymentDate?.toDate?.() || 
-                            sortedPayments[0].timestamp?.toDate?.() || new Date();
-    
-    // Each payment moves the due date forward by 25 days
-    let nextDueDate = new Date(firstPaymentDate);
-    
-    // For each payment, add 25 days
-    sortedPayments.forEach(() => {
-      nextDueDate.setDate(nextDueDate.getDate() + billingCycleDays);
-    });
+    let lastCoveredDate = null;
 
+    for (const payment of sortedPayments) {
+      const paymentDate = payment.paymentDate?.toDate?.() || payment.timestamp?.toDate?.() || new Date();
+      const monthsCovered = payment.advanceMonths || 1; // Default to 1 month if not specified
+      
+      if (!lastCoveredDate) {
+        // First payment - start from payment month
+        lastCoveredDate = new Date(paymentDate);
+        lastCoveredDate = getLastDayOfMonth(lastCoveredDate); // End of payment month
+        
+        // Add remaining months if advance payment
+        for (let i = 1; i < monthsCovered; i++) {
+          lastCoveredDate.setMonth(lastCoveredDate.getMonth() + 1);
+          lastCoveredDate = getLastDayOfMonth(lastCoveredDate);
+        }
+      } else {
+        // Check if payment is within or after current coverage
+        if (paymentDate <= lastCoveredDate) {
+          // Payment is within current coverage - extend from last covered date
+          for (let i = 0; i < monthsCovered; i++) {
+            lastCoveredDate.setMonth(lastCoveredDate.getMonth() + 1);
+            lastCoveredDate = getLastDayOfMonth(lastCoveredDate);
+          }
+        } else {
+          // There's a gap - start new coverage from payment month
+          lastCoveredDate = new Date(paymentDate);
+          lastCoveredDate = getLastDayOfMonth(lastCoveredDate);
+          
+          // Add remaining months if advance payment
+          for (let i = 1; i < monthsCovered; i++) {
+            lastCoveredDate.setMonth(lastCoveredDate.getMonth() + 1);
+            lastCoveredDate = getLastDayOfMonth(lastCoveredDate);
+          }
+        }
+      }
+    }
+
+    // Return the day AFTER last covered date as next due
+    const nextDueDate = new Date(lastCoveredDate);
+    nextDueDate.setDate(nextDueDate.getDate() + 1);
     return nextDueDate;
   }
 
-  // SIMPLE: Function to calculate coverage periods - each payment = 25 days
+  // Function to calculate coverage data
   function calculateCoverageData(payments) {
     const validPayments = payments.filter(p => 
       p.status === "Paid" || 
@@ -1832,40 +1888,81 @@ case "billing":
     });
 
     const coverageData = [];
-    let currentPeriodStart = null;
+    let currentCoverageEnd = null;
 
-    for (let i = 0; i < sortedPayments.length; i++) {
-      const payment = sortedPayments[i];
+    for (const payment of sortedPayments) {
       const paymentDate = payment.paymentDate?.toDate?.() || payment.timestamp?.toDate?.() || new Date();
+      const monthsCovered = payment.advanceMonths || 1;
       
-      if (i === 0) {
-        // First payment starts coverage from payment date
-        currentPeriodStart = new Date(paymentDate);
+      let periodStart, periodEnd;
+      
+      if (!currentCoverageEnd) {
+        // First payment - start from payment month
+        periodStart = new Date(paymentDate.getFullYear(), paymentDate.getMonth(), 1); // 1st of month
+        periodEnd = getLastDayOfMonth(paymentDate); // End of payment month
+        
+        // Add remaining months if advance payment
+        for (let i = 1; i < monthsCovered; i++) {
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+          periodEnd = getLastDayOfMonth(periodEnd);
+        }
+        currentCoverageEnd = new Date(periodEnd);
+      } else if (paymentDate <= currentCoverageEnd) {
+        // Payment within current coverage - extend from current end
+        periodStart = new Date(currentCoverageEnd);
+        periodStart.setDate(periodStart.getDate() + 1); // Start day after current coverage
+        
+        periodEnd = new Date(periodStart);
+        periodEnd = getLastDayOfMonth(periodEnd); // End of that month
+        
+        // Add remaining months if advance payment
+        for (let i = 1; i < monthsCovered; i++) {
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+          periodEnd = getLastDayOfMonth(periodEnd);
+        }
+        currentCoverageEnd = new Date(periodEnd);
+      } else {
+        // Gap in coverage - start new period from payment month
+        periodStart = new Date(paymentDate.getFullYear(), paymentDate.getMonth(), 1);
+        periodEnd = getLastDayOfMonth(paymentDate);
+        
+        // Add remaining months if advance payment
+        for (let i = 1; i < monthsCovered; i++) {
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+          periodEnd = getLastDayOfMonth(periodEnd);
+        }
+        currentCoverageEnd = new Date(periodEnd);
       }
-      
-      const periodEnd = new Date(currentPeriodStart);
-      periodEnd.setDate(periodEnd.getDate() + billingCycleDays - 1); // -1 to get end date
       
       coverageData.push({
         paymentId: payment.id,
         paymentDate: paymentDate,
         amount: payment.amount,
-        periodStart: new Date(currentPeriodStart),
+        monthsCovered: monthsCovered,
+        periodStart: periodStart,
         periodEnd: periodEnd,
         paymentMethod: payment.method,
         invoiceId: payment.invoiceId,
-        paymentNumber: i + 1
+        isAdvance: monthsCovered > 1
       });
-      
-      // Next period starts day after current period ends
-      currentPeriodStart = new Date(periodEnd);
-      currentPeriodStart.setDate(currentPeriodStart.getDate() + 1);
     }
     
     return coverageData;
   }
 
-  // Function to load tenant data and calculate due date
+  // Function to update advance payment UI
+  function updateAdvancePaymentUI() {
+    if (advancePaymentCheckbox.checked) {
+      advanceOptions.style.display = 'block';
+      const selectedMonths = parseInt(advanceMonths.value) || 1;
+      const advanceAmount = monthlyBaseAmount * selectedMonths;
+      advanceTotalAmount.textContent = `₱${advanceAmount.toLocaleString()}`;
+    } else {
+      advanceOptions.style.display = 'none';
+    }
+  }
+
+  // Function to load tenant data
   async function loadTenantData() {
     try {
       const tenantEmail = await getCurrentUserEmail();
@@ -1875,7 +1972,7 @@ case "billing":
       const userDoc = await getDoc(doc(db, "users", uid));
       tenantUnits = userDoc.data()?.unitNumbers || [];
       
-      // Calculate monthly base amount (25-day cycle amount)
+      // Calculate monthly base amount
       monthlyBaseAmount = 0;
       tenantUnits.forEach(unit => {
         const type = unit.split("-")[0];
@@ -1889,14 +1986,14 @@ case "billing":
       // Calculate next due date from payment history
       currentDueDate = await calculateNextDueDateFromHistory(allPayments);
       
+      // Calculate coverage data
+      paymentCoverageData = calculateCoverageData(allPayments);
+      
       return currentDueDate;
     } catch (error) {
       console.error("Error loading tenant data:", error);
       const today = new Date();
-      currentDueDate = new Date(today.getFullYear(), today.getMonth(), 25);
-      if (today > currentDueDate) {
-        currentDueDate.setMonth(currentDueDate.getMonth() + 1);
-      }
+      currentDueDate = getLastDayOfMonth(today);
       return currentDueDate;
     }
   }
@@ -1950,7 +2047,7 @@ case "billing":
     return diffDays;
   }
 
-  // Function to calculate late fee (if applicable)
+  // Function to calculate late fee
   function calculateLateFee() {
     if (!checkIfOverdue()) return 0;
     
@@ -1992,23 +2089,18 @@ case "billing":
   async function loadInvoice() {
     const tenantEmail = await getCurrentUserEmail();
     
-    // Load tenant data and calculate due date
     await loadTenantData();
     
-    // Calculate late fee if overdue
     const lateFee = calculateLateFee();
     computedAmount = monthlyBaseAmount + lateFee;
     
-    // Check payment status
     const isOverdue = checkIfOverdue();
     const daysUntilDue = calculateDaysUntilDue();
     
-    // Format amounts
     const formattedDisplayedAmount = `₱ ${computedAmount.toLocaleString()}`;
     const formattedBaseAmount = `₱ ${monthlyBaseAmount.toLocaleString()}`;
     const formattedLateFee = `₱ ${lateFee.toLocaleString()}`;
 
-    // Create breakdown HTML
     let breakdown = [];
     let breakdownHtml = "";
     tenantUnits.forEach(unit => {
@@ -2021,7 +2113,6 @@ case "billing":
       breakdownHtml = `<br><strong>Breakdown:</strong><br>${breakdown.join("<br>")}`;
     }
     
-    // Status indicator
     let statusHtml = "";
     if (isOverdue) {
       statusHtml = `<br><span style="color: #ff4444; font-weight: bold;">⚠️ OVERDUE</span>`;
@@ -2031,27 +2122,26 @@ case "billing":
       statusHtml = `<br><span style="color: #4CAF50; font-weight: bold;">✓ Current</span>`;
     }
     
-    // Late fee section if applicable
     let lateFeeHtml = "";
     if (lateFee > 0) {
       lateFeeHtml = `<br><strong>Late Fee:</strong> ${formattedLateFee}`;
     }
     
-    // Calculate coverage status from all payments
-    const coverageData = calculateCoverageData(allPayments);
+    // Show coverage status
     const today = new Date();
-    
-    if (coverageData.length > 0) {
-      const lastCoverage = coverageData[coverageData.length - 1];
+    if (paymentCoverageData.length > 0) {
+      const lastCoverage = paymentCoverageData[paymentCoverageData.length - 1];
       const paidUntil = lastCoverage.periodEnd;
       
       if (paidUntil > today) {
-        const daysAhead = Math.ceil((paidUntil - today) / (1000 * 60 * 60 * 24));
+        const monthsAhead = Math.ceil((paidUntil.getMonth() - today.getMonth() + 
+          (paidUntil.getFullYear() - today.getFullYear()) * 12));
+        
         coverageStatus.innerHTML = `
-          <span style="color: #2196F3; font-weight: bold;">📅 Payment Status:</span><br>
-          <strong>Paid Until:</strong> ${formatDate(paidUntil)}<br>
-          <strong>Total Payments:</strong> ${coverageData.length} payment(s)<br>
-          <small>Each payment covers exactly ${billingCycleDays} days forward</small>
+          <span style="color: #2196F3; font-weight: bold;">📅 Payment Coverage:</span><br>
+          <strong>Covered Until:</strong> ${formatDate(paidUntil)}<br>
+          <strong>Months Ahead:</strong> ${monthsAhead} month(s)<br>
+          <strong>Total Payments:</strong> ${paymentCoverageData.length} payment(s)
         `;
         coverageStatus.style.display = 'block';
         coverageStatus.style.backgroundColor = '#4a3728';
@@ -2066,15 +2156,15 @@ case "billing":
     invoiceDetails.innerHTML = `
       <strong>Unit Owner:</strong> ${tenantEmail}<br>
       <strong>Units:</strong> ${tenantUnits.join(", ") || "None"}<br>
-      <strong>25-Day Cycle Amount:</strong> ${formattedBaseAmount}<br>
+      <strong>Monthly Amount:</strong> ${formattedBaseAmount}<br>
       ${lateFeeHtml}
       <strong>Amount Due Now:</strong> ${formattedDisplayedAmount}<br>
       <strong>Next Due Date:</strong> ${formatDate(currentDueDate)}
       ${statusHtml}
       ${breakdownHtml}
       <br><br><small style="color: #888;">
-        Note: Each payment moves due date forward by ${billingCycleDays} days<br>
-        Next due date calculated from ${allPayments.filter(p => p.status === "Paid").length} payment(s)<br>
+        Note: Due dates are always at end of month<br>
+        You can pay multiple months in advance<br>
         1-Bedroom = ₱${(unitPricing["1B"] || 10).toLocaleString()}, 
         2-Bedroom = ₱${(unitPricing["2B"] || 20).toLocaleString()}<br>
         Grace period: ${gracePeriodDays} days after due date
@@ -2146,9 +2236,6 @@ case "billing":
 
     let total = 0;
 
-    // Calculate coverage data for display
-    const coverageData = calculateCoverageData(allPayments);
-
     filteredPayments.forEach(payment => {
       const d = payment;
       const time = d.timestamp
@@ -2156,20 +2243,27 @@ case "billing":
         : "N/A";
       
       // Find coverage data for this payment
-      const coverage = coverageData.find(c => c.paymentId === d.id);
+      const coverage = paymentCoverageData.find(c => c.paymentId === d.id);
       
       let periodCovered = "N/A";
-      let coverageInfo = "";
+      let advanceInfo = "";
       
       if (coverage) {
         periodCovered = `${formatShortDate(coverage.periodStart)} to ${formatShortDate(coverage.periodEnd)}`;
-        coverageInfo = `<br><small style="color: #666;">(Covers ${billingCycleDays} days)</small>`;
+        if (coverage.monthsCovered > 1) {
+          advanceInfo = `<br><span style="background:#e8f5e9; color:#2e7d32; padding:2px 6px; border-radius:3px; font-size:12px;">
+            ⏩ Advance (${coverage.monthsCovered} months)
+          </span>`;
+        }
       } else if (d.periodStart && d.periodEnd) {
-        // Fallback to stored period data
         const start = formatShortDate(d.periodStart.toDate());
         const end = formatShortDate(d.periodEnd.toDate());
         periodCovered = `${start} to ${end}`;
-        coverageInfo = `<br><small style="color: #666;">(Covers ${billingCycleDays} days)</small>`;
+        if (d.advanceMonths > 1) {
+          advanceInfo = `<br><span style="background:#e8f5e9; color:#2e7d32; padding:2px 6px; border-radius:3px; font-size:12px;">
+            ⏩ Advance (${d.advanceMonths} months)
+          </span>`;
+        }
       }
 
       let receipt = "";
@@ -2190,7 +2284,7 @@ case "billing":
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div style="flex: 1;">
             <strong>Invoice ID:</strong> ${d.invoiceId || "-"}<br>
-            <strong>Amount:</strong> ₱${d.amount}${coverageInfo}<br>
+            <strong>Amount:</strong> ₱${d.amount}${advanceInfo}<br>
             <strong>Period Covered:</strong> ${periodCovered}<br>
             <strong>Status:</strong> <span style="color:${statusColor};">${d.status}</span><br>
             <strong>Date:</strong> ${time}<br>
@@ -2233,7 +2327,7 @@ case "billing":
         transaction_id: paymentData.transactionId,
         payment_date: new Date().toLocaleString(),
         next_due_date: formatDate(currentDueDate),
-        days_covered: billingCycleDays
+        months_covered: paymentData.advanceMonths || 1
       };
       await emailjs.send("service_izx63bb", "template_asn4687", templateParams);
       console.log("Email receipt sent successfully");
@@ -2244,73 +2338,118 @@ case "billing":
 
   async function setupPayPal() {
     const tenantEmail = await getCurrentUserEmail();
-    const invoiceId = "INV-" + Date.now();
+    
+    // Setup advance payment UI events
+    advancePaymentCheckbox.addEventListener('change', updateAdvancePaymentUI);
+    advanceMonths.addEventListener('change', updateAdvancePaymentUI);
+    
+    // Initial UI update
+    updateAdvancePaymentUI();
 
-    paypal
-      .Buttons({
-        style: { color: "gold", shape: "rect", label: "pay", height: 40 },
-        createOrder: function (data, actions) {
-          return actions.order.create({
-            purchase_units: [
-              {
-                reference_id: invoiceId,
-                description: `Payment for ${billingCycleDays}-day cycle`,
-                amount: { currency_code: "PHP", value: computedAmount.toString() }
-              }
-            ]
-          });
-        },
-        onApprove: async function (data, actions) {
-          showLoading();
-          try {
-            const order = await actions.order.capture();
-            const paymentDate = new Date();
-            
-            // Calculate period for this payment (covers 25 days from current due date)
-            const periodStart = new Date(currentDueDate);
-            const periodEnd = new Date(currentDueDate);
-            periodEnd.setDate(periodEnd.getDate() + billingCycleDays - 1);
-            
-            const paymentRecord = {
-              tenantEmail,
-              invoiceId,
-              amount: computedAmount,
-              method: "PayPal",
-              status: "Paid",
-              transactionId: order.id,
-              payerEmail: order.payer.email_address,
-              periodStart: periodStart,
-              periodEnd: periodEnd,
-              timestamp: serverTimestamp(),
-              paymentDate: paymentDate,
-              monthlyAmount: monthlyBaseAmount
-            };
-
-            await addDoc(collection(db, "payments"), paymentRecord);
-            
-            // Show success message
-            showPopup(`✅ Payment successful!<br>This payment covers ${billingCycleDays} days<br>Next payment due in ${billingCycleDays} days.`);
-            
-            // Reload everything to recalculate due dates from updated history
-            await loadInvoice();
-            await loadAllPayments();
-            await sendEmailReceipt(paymentRecord);
-          } catch (error) {
-            console.error("Payment error:", error);
-            showPopup("❌ Payment failed. Please try again.");
-          } finally {
-            hideLoading();
-          }
-        },
-        onCancel: async function () {
-          showPopup("⚠️ Payment cancelled by user.");
-        },
-        onError: async function (err) {
-          console.error("PayPal error:", err);
-          showPopup("❌ Payment failed. Please try again later.");
+    paypal.Buttons({
+      style: { color: "gold", shape: "rect", label: "pay", height: 40 },
+      createOrder: function (data, actions) {
+        const invoiceId = "INV-" + Date.now();
+        const isAdvance = advancePaymentCheckbox.checked;
+        const advanceMonthsCount = parseInt(advanceMonths.value) || 1;
+        
+        let amount = computedAmount;
+        let description = "Monthly Dues Payment";
+        
+        if (isAdvance) {
+          amount = monthlyBaseAmount * advanceMonthsCount;
+          description = `Advance Payment (${advanceMonthsCount} month${advanceMonthsCount > 1 ? 's' : ''})`;
         }
-      })
-      .render(paypalContainer);
+        
+        return actions.order.create({
+          purchase_units: [
+            {
+              reference_id: invoiceId,
+              description: description,
+              amount: { currency_code: "PHP", value: amount.toString() }
+            }
+          ]
+        });
+      },
+      onApprove: async function (data, actions) {
+        showLoading();
+        try {
+          const order = await actions.order.capture();
+          const paymentDate = new Date();
+          const invoiceId = data.orderID.substring(0, 20);
+          const isAdvance = advancePaymentCheckbox.checked;
+          const advanceMonthsCount = parseInt(advanceMonths.value) || 1;
+          
+          let amount = computedAmount;
+          if (isAdvance) {
+            amount = monthlyBaseAmount * advanceMonthsCount;
+          }
+          
+          // Calculate period for this payment
+          const periodStart = new Date(currentDueDate.getFullYear(), currentDueDate.getMonth(), 1);
+          let periodEnd = getLastDayOfMonth(currentDueDate);
+          
+          // If advance payment, add additional months
+          if (isAdvance && advanceMonthsCount > 1) {
+            for (let i = 1; i < advanceMonthsCount; i++) {
+              periodEnd.setMonth(periodEnd.getMonth() + 1);
+              periodEnd = getLastDayOfMonth(periodEnd);
+            }
+          }
+          
+          const paymentRecord = {
+            tenantEmail,
+            invoiceId,
+            amount: amount,
+            method: "PayPal",
+            status: "Paid",
+            transactionId: order.id,
+            payerEmail: order.payer.email_address,
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            timestamp: serverTimestamp(),
+            paymentDate: paymentDate,
+            monthlyAmount: monthlyBaseAmount,
+            advanceMonths: isAdvance ? advanceMonthsCount : 1
+          };
+
+          await addDoc(collection(db, "payments"), paymentRecord);
+          
+          let message = "✅ Payment successful!";
+          if (isAdvance && advanceMonthsCount > 1) {
+            message += `<br>You've paid ${advanceMonthsCount} months in advance`;
+            message += `<br>Covered until: ${formatDate(periodEnd)}`;
+          } else {
+            message += `<br>Next due date: end of ${currentDueDate.toLocaleString('default', { month: 'long' })}`;
+          }
+          
+          showPopup(message);
+          
+          // Reset advance payment UI
+          advancePaymentCheckbox.checked = false;
+          updateAdvancePaymentUI();
+          advanceMonths.value = '1';
+          
+          // Reload everything
+          await loadInvoice();
+          await loadAllPayments();
+          await sendEmailReceipt(paymentRecord);
+          
+        } catch (error) {
+          console.error("Payment error:", error);
+          showPopup("❌ Payment failed. Please try again.");
+        } finally {
+          hideLoading();
+        }
+      },
+      onCancel: async function () {
+        showPopup("⚠️ Payment cancelled by user.");
+      },
+      onError: async function (err) {
+        console.error("PayPal error:", err);
+        showPopup("❌ Payment failed. Please try again later.");
+      }
+    }).render(paypalContainer);
   }
 
   historySort.addEventListener("change", applySorting);
@@ -2319,11 +2458,12 @@ case "billing":
   (async () => {
     await loadPricing();
     await loadAllPayments();
-    await loadInvoice(); // This calculates due date from history
+    await loadInvoice();
     await setupPayPal();
   })();
 
-  break;          /* ======================== FEEDBACK ======================== */
+  break;
+            /* ======================== FEEDBACK ======================== */
         case "feedback":
           loadFeedbackForm();
           hideLoading(); // Hide loading after content is rendered
