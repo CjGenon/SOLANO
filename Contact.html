@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Our Team – Solano Hills</title>
   <link rel="stylesheet" href="CONTACT.css" />
-  </head>
+  <!-- Add EmailJS script -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
 <body>
   <!-- ======================== NAVBAR ======================== -->
   <div class="navbar" id="navbar">
@@ -39,9 +41,10 @@
     <form id="contactForm">
       <input type="text" id="name" placeholder="Your Name" required />
       <input type="email" id="email" placeholder="Your Email" required />
-      <input type="text" id="number"placeholder="917 123 4567" 
-    maxlength="11" placeholder="Your Number" required inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
-/>
+      <input type="text" id="number" placeholder="917 123 4567" 
+             maxlength="11" inputmode="numeric" 
+             oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
+             required />
 
       <select id="Employement_Type" name="Employement_Type" required>
         <option value="" disabled selected>Select Employment Type</option>
@@ -74,7 +77,7 @@
 
       <textarea id="message" placeholder="Your Question or details (use this to clarify what you need)" required></textarea>
 
-      <button type="submit">Send Message</button>
+      <button type="submit" id="submitBtn">Send Message</button>
     </form>
   </section>
 
@@ -123,6 +126,12 @@
       onSnapshot
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
+    // Initialize EmailJS with your public key
+    // Replace 'YOUR_PUBLIC_KEY' with your actual EmailJS public key
+    (function() {
+      emailjs.init("JOQqxoCLq72v5huex"); // Get this from EmailJS dashboard
+    })();
+
     // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyAz8CoOb7k45On36GEQRcFPDxTvtdzU1ss",
@@ -152,11 +161,73 @@
       return guestId;
     }
 
+    // ======================= EMAILJS FUNCTION ==========================
+    async function sendEmailNotification(formData) {
+      try {
+        // Map inquiry topic to readable text
+        const inquiryTopicMap = {
+          payment: "Payment / Price Inquiry",
+          interested_1b: "Interested in 1 Bedroom Unit",
+          interested_2b: "Interested in 2 Bedroom Unit",
+          interested_both: "Interested in Both Unit Types",
+          other: "Other Inquiry"
+        };
+
+        // Map employment type to readable text
+        const employmentMap = {
+          "Employed": "Employed",
+          "Self-Employed": "Self-Employed", 
+          "Business Owner": "Business Owner"
+        };
+
+        // Prepare email parameters
+        const templateParams = {
+          to_name: "Solano Hills Team",
+          from_name: formData.name,
+          from_email: formData.email,
+          phone_number: formData.number,
+          employment_type: employmentMap[formData.Employement_Type] || formData.Employement_Type,
+          inquiry_topic: inquiryTopicMap[formData.inquiry_topic] || formData.inquiry_topic,
+          payment_info: formData.payment_info || "Not applicable",
+          message: formData.message || formData.firstMessageContent,
+          inquiry_id: formData.inquiryId,
+          date: new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          time: new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          subject: `New Inquiry from ${formData.name} - ${inquiryTopicMap[formData.inquiry_topic] || formData.inquiry_topic}`
+        };
+
+        // Send email using EmailJS
+        // Replace 'YOUR_SERVICE_ID' and 'YOUR_TEMPLATE_ID' with your actual IDs
+        const response = await emailjs.send(
+          'service_hehhqyt',      // Replace with your EmailJS Service ID
+          'template_dc67lup',     // Replace with your EmailJS Template ID
+          templateParams
+        );
+        
+        console.log('Email sent successfully:', response.status, response.text);
+        return response;
+      } catch (error) {
+        console.error('Failed to send email:', error);
+        // Don't throw error to prevent form submission failure
+        // Email failure shouldn't stop form submission
+        return null;
+      }
+    }
+
     // UI elements
     const inquiryTopic = document.getElementById('inquiry_topic');
     const paymentSection = document.getElementById('paymentSection');
     const paymentSelect = document.getElementById('payment_info');
     const messageTextarea = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
 
     function hideAllConditionalSections() {
       paymentSection.classList.add('hidden');
@@ -201,6 +272,10 @@
     // ========================= FORM SUBMIT ==========================
     document.getElementById('contactForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      // Disable submit button to prevent multiple submissions
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
 
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
@@ -230,30 +305,62 @@
         Employement_Type,
         inquiry_topic,
         payment_info: inquiry_topic === 'payment' ? payment_info : null,
-        ownerId: anonId,            // updated field for Firestore rule matching
+        ownerId: anonId,
         status: "new",
         createdAt: serverTimestamp()
       };
 
       try {
+        // Save to Firestore
         const inquiryRef = await addDoc(collection(db, "inquiries"), payload);
-
+        
+        // Save first message
         await addDoc(collection(db, "inquiries", inquiryRef.id, "messages"), {
           sender: "user",
           senderName: name,
-          senderId: anonId,          // added senderId for message subcollection
+          senderId: anonId,
           content: firstMessageContent,
           timestamp: serverTimestamp(),
           readByPM: false,
           readByUser: true
         });
 
+        // Prepare data for email
+        const emailData = {
+          name,
+          email,
+          number,
+          Employement_Type,
+          inquiry_topic,
+          payment_info: inquiry_topic === 'payment' ? payment_info : null,
+          message,
+          firstMessageContent,
+          inquiryId: inquiryRef.id
+        };
+
+        // Send email notification
+        await sendEmailNotification(emailData);
+
+        // Show success popup
         document.getElementById("popup").classList.remove("hidden");
+        
+        // Reset form
         e.target.reset();
         hideAllConditionalSections();
 
+        // Re-enable submit button
+        setTimeout(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send Message';
+        }, 2000);
+
       } catch (error) {
         document.getElementById("status").innerText = "Error: " + error.message;
+        console.error("Form submission error:", error);
+        
+        // Re-enable submit button on error
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Message';
       }
     });
 
@@ -274,22 +381,23 @@
 
     // Function to format message content with proper formatting
     function formatMessageContent(content) {
-    // Universal URL detection — make ALL links clickable
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+      // Universal URL detection — make ALL links clickable
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-    content = content.replace(urlRegex, (url) => {
-      return `<a href="${url}" target="_blank">${url}</a>`;
-    });
+      content = content.replace(urlRegex, (url) => {
+        return `<a href="${url}" target="_blank">${url}</a>`;
+      });
 
-    // Convert new lines
-    return content.replace(/\n/g, '<br>');
-  }
+      // Convert new lines
+      return content.replace(/\n/g, '<br>');
+    }
+
     async function startListeningToMessages() {
       const anonId = getGuestId();
 
       const inquiriesQuery = query(
         collection(db, "inquiries"),
-        where("ownerId", "==", anonId),    // updated field for query
+        where("ownerId", "==", anonId),
         orderBy("createdAt", "desc")
       );
 
@@ -416,7 +524,7 @@
         await addDoc(collection(db, "inquiries", currentInquiryId, "messages"), {
           sender: "user",
           senderName: "Anonymous",
-          senderId: anonId,         // added senderId for message subcollection
+          senderId: anonId,
           content,
           timestamp: serverTimestamp(),
           readByPM: false,
