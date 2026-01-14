@@ -39,12 +39,22 @@
     <h2>Contact Us</h2>
 
     <form id="contactForm">
-      <input type="text" id="name" placeholder="Your Name" required />
+      <input type="text" id="name" placeholder="Your Name" 
+            title="Please enter a valid name (letters, spaces, and periods only)"
+            pattern="[A-Za-z\s\.]{2,}"
+            onkeypress="return /[A-Za-z\s\.]/.test(event.key)"
+            required />
+      <div id="nameError" class="error-message" style="color:red; font-size:12px; margin-top:-10px; margin-bottom:10px; display:none;"></div>
+      
       <input type="email" id="email" placeholder="Your Email" required />
-      <input type="text" id="number" placeholder="917 123 4567" 
-             maxlength="11" inputmode="numeric" 
-             oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
+      
+      <input type="tel" id="number" placeholder="09171234567" 
+             maxlength="11" 
+             title="Please enter exactly 11 digits of your phillippine mobile number"
+             pattern="[0-9]{11}"
+             oninput="this.value = this.value.replace(/\D/g,'').slice(0,11)" 
              required />
+      <div id="phoneError" class="error-message" style="color:red; font-size:12px; margin-top:-10px; margin-bottom:10px; display:none;"></div>
 
       <select id="Employement_Type" name="Employement_Type" required>
         <option value="" disabled selected>Select Employment Type</option>
@@ -126,10 +136,9 @@
       onSnapshot
     } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-    // Initialize EmailJS with your public key
-    // Replace 'YOUR_PUBLIC_KEY' with your actual EmailJS public key
+    // Initialize EmailJS
     (function() {
-      emailjs.init("JOQqxoCLq72v5huex"); // Get this from EmailJS dashboard
+      emailjs.init("JOQqxoCLq72v5huex");
     })();
 
     // Firebase config
@@ -142,29 +151,52 @@
       appId: "1:98081894649:web:67f3e3d0ef8d3b7a013228"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Mortgage Calculator Link
-    const MORTGAGE_CALCULATOR_LINK = "https://cjgenon.github.io/SOLANO/Mortage_Calc.html";
+    // ======================= VALIDATION FUNCTION =======================
+    function validateForm() {
+      const name = document.getElementById('name').value.trim();
+      const number = document.getElementById('number').value;
+      const nameError = document.getElementById('nameError');
+      const phoneError = document.getElementById('phoneError');
+      
+      let isValid = true;
+      
+      // Name validation: only letters and spaces, minimum 2 characters
+      if (!/^[A-Za-z\s\.]{2,}$/.test(name)) {
+        nameError.textContent = 'Name should contain only letters, spaces, and periods (min 2 chars)';
+        nameError.style.display = 'block';
+        isValid = false;
+      } else {
+        nameError.style.display = 'none';
+      }
+      
+      // Phone validation: exactly 11 digits
+      if (!/^\d{11}$/.test(number)) {
+        phoneError.textContent = 'Phone number must be exactly 11 digits';
+        phoneError.style.display = 'block';
+        isValid = false;
+      } else {
+        phoneError.style.display = 'none';
+      }
+      
+      return isValid;
+    }
 
     // ======================= PERSISTENT GUEST ID ==========================
     function getGuestId() {
       let guestId = localStorage.getItem("guestId");
-
       if (!guestId) {
         guestId = crypto.randomUUID();
         localStorage.setItem("guestId", guestId);
       }
-
       return guestId;
     }
 
     // ======================= EMAILJS FUNCTION ==========================
     async function sendEmailNotification(formData) {
       try {
-        // Map inquiry topic to readable text
         const inquiryTopicMap = {
           payment: "Payment / Price Inquiry",
           interested_1b: "Interested in 1 Bedroom Unit",
@@ -173,14 +205,12 @@
           other: "Other Inquiry"
         };
 
-        // Map employment type to readable text
         const employmentMap = {
           "Employed": "Employed",
           "Self-Employed": "Self-Employed", 
           "Business Owner": "Business Owner"
         };
 
-        // Prepare email parameters
         const templateParams = {
           to_name: "Solano Hills Team",
           from_name: formData.name,
@@ -204,11 +234,9 @@
           subject: `New Inquiry from ${formData.name} - ${inquiryTopicMap[formData.inquiry_topic] || formData.inquiry_topic}`
         };
 
-        // Send email using EmailJS
-        // Replace 'YOUR_SERVICE_ID' and 'YOUR_TEMPLATE_ID' with your actual IDs
         const response = await emailjs.send(
-          'service_hehhqyt',      // Replace with your EmailJS Service ID
-          'template_dc67lup',     // Replace with your EmailJS Template ID
+          'service_hehhqyt',
+          'template_dc67lup',
           templateParams
         );
         
@@ -216,8 +244,6 @@
         return response;
       } catch (error) {
         console.error('Failed to send email:', error);
-        // Don't throw error to prevent form submission failure
-        // Email failure shouldn't stop form submission
         return null;
       }
     }
@@ -232,7 +258,6 @@
     function hideAllConditionalSections() {
       paymentSection.classList.add('hidden');
       paymentSelect.removeAttribute('required');
-
       messageTextarea.style.display = 'none';
       messageTextarea.required = false;
       messageTextarea.value = '';
@@ -256,7 +281,6 @@
 
     paymentSelect.addEventListener('change', () => {
       const val = paymentSelect.value;
-
       if (val === 'other_payment') {
         messageTextarea.style.display = 'block';
         messageTextarea.required = true;
@@ -273,13 +297,19 @@
     document.getElementById('contactForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      // Disable submit button to prevent multiple submissions
+      // Validate form before submission
+      if (!validateForm()) {
+        document.getElementById("status").innerText = "Please fix the errors above.";
+        return;
+      }
+      
+      document.getElementById("status").innerText = "";
       submitBtn.disabled = true;
       submitBtn.textContent = 'Sending...';
 
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
-      const number = document.getElementById('number').value.trim();
+      const number = document.getElementById('number').value;
       const Employement_Type = document.getElementById('Employement_Type').value;
       const inquiry_topic = document.getElementById('inquiry_topic').value;
       const payment_info = paymentSelect.value || null;
@@ -287,7 +317,6 @@
 
       const anonId = getGuestId();
 
-      // Map inquiry topic to readable text for first message
       const inquiryTopicMap = {
         payment: "Payment / Price",
         interested_1b: "I'm interested in 1 Bedroom unit",
@@ -311,10 +340,8 @@
       };
 
       try {
-        // Save to Firestore
         const inquiryRef = await addDoc(collection(db, "inquiries"), payload);
         
-        // Save first message
         await addDoc(collection(db, "inquiries", inquiryRef.id, "messages"), {
           sender: "user",
           senderName: name,
@@ -325,7 +352,6 @@
           readByUser: true
         });
 
-        // Prepare data for email
         const emailData = {
           name,
           email,
@@ -338,17 +364,12 @@
           inquiryId: inquiryRef.id
         };
 
-        // Send email notification
         await sendEmailNotification(emailData);
 
-        // Show success popup
         document.getElementById("popup").classList.remove("hidden");
-        
-        // Reset form
         e.target.reset();
         hideAllConditionalSections();
 
-        // Re-enable submit button
         setTimeout(() => {
           submitBtn.disabled = false;
           submitBtn.textContent = 'Send Message';
@@ -357,8 +378,6 @@
       } catch (error) {
         document.getElementById("status").innerText = "Error: " + error.message;
         console.error("Form submission error:", error);
-        
-        // Re-enable submit button on error
         submitBtn.disabled = false;
         submitBtn.textContent = 'Send Message';
       }
@@ -379,16 +398,11 @@
     let unsubscribeMessages = null;
     let currentInquiryId = null;
 
-    // Function to format message content with proper formatting
     function formatMessageContent(content) {
-      // Universal URL detection — make ALL links clickable
       const urlRegex = /(https?:\/\/[^\s]+)/g;
-
       content = content.replace(urlRegex, (url) => {
         return `<a href="${url}" target="_blank">${url}</a>`;
       });
-
-      // Convert new lines
       return content.replace(/\n/g, '<br>');
     }
 
@@ -459,7 +473,6 @@
         chatMessageInput.disabled = false;
         sendChatBtn.disabled = true;
         
-        // Auto-scroll to bottom
         setTimeout(() => {
           messagesContainerChat.scrollTop = messagesContainerChat.scrollHeight;
         }, 100);
@@ -488,12 +501,10 @@
 
     chatMessageInput.addEventListener('input', () => {
       sendChatBtn.disabled = chatMessageInput.value.trim() === '';
-      // Auto-resize textarea
       chatMessageInput.style.height = 'auto';
       chatMessageInput.style.height = Math.min(chatMessageInput.scrollHeight, 120) + 'px';
     });
 
-    // Allow Enter to send (Shift+Enter for new line)
     chatMessageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -513,7 +524,6 @@
       }
 
       sendChatBtn.disabled = true;
-
       chatMessageInput.value = '';
       chatMessageInput.style.height = 'auto';
       chatMessageInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -540,7 +550,6 @@
         console.error("Error sending message:", error.message);
         sendChatBtn.disabled = false;
         
-        // Show error in chat
         const errorMsg = document.createElement('div');
         errorMsg.className = 'message-block sender-pm';
         errorMsg.innerHTML = '<strong>System</strong><div>Failed to send message. Please try again.</div>';
@@ -548,7 +557,6 @@
       }
     });
 
-    // Initialize chat with welcome message if no inquiry exists
     window.addEventListener('DOMContentLoaded', () => {
       const anonId = getGuestId();
       const inquiriesQuery = query(
@@ -559,7 +567,6 @@
 
       getDocs(inquiriesQuery).then(snapshot => {
         if (snapshot.empty) {
-          // Show welcome message in chat preview
           messagesContainerChat.innerHTML = `
             <div class="system-message">
               <strong>Welcome to Solano Hills!</strong><br>
