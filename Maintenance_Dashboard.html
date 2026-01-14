@@ -651,7 +651,7 @@
   const pendingCount = document.getElementById("pendingCount");
   const completeCount = document.getElementById("completeCount");
 
-  // **Cloudinary Config — Replace with your actual cloud name and preset**
+  // **Cloudinary Config**
   const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dfklsyjch/upload";
   const CLOUDINARY_UPLOAD_PRESET = "tenant_uploads";
 
@@ -739,6 +739,12 @@
         ${data.status === "In Progress" ? `<p><strong>Work Time:</strong> ${calculateCurrentWorkTime(data.startTime)}</p>` : ""}
       `;
 
+      // Check if proof has been uploaded
+      let hasProof = false;
+      if (data.proofs && Array.isArray(data.proofs) && data.proofs.length > 0) {
+        hasProof = true;
+      }
+
       const actionsDiv = document.createElement("div");
       actionsDiv.className = "maintenance-card-actions";
 
@@ -760,9 +766,33 @@
       }
 
       if (data.status === "In Progress") {
+        // Show proof status
+        const proofStatus = document.createElement("div");
+        proofStatus.style.marginBottom = "10px";
+        if (hasProof) {
+          proofStatus.innerHTML = `<span style="color:#27ae60; font-weight:bold;">✓ Proof uploaded</span>`;
+        } else {
+          proofStatus.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">⚠️ Proof required before finishing work</span>`;
+        }
+        actionsDiv.appendChild(proofStatus);
+
+        addBtn("📤 Send Proof", "#2980b9", () => openProofUpload(id));
         addBtn("⏸️ On Hold", "#f39c12", () => pauseWork(id));
-        addBtn("✅ Finish Work", "#8e44ad", () => finishWork(id));
-        addBtn("📤 Send Proof", "#2980b9", () => openProofUpload(id));  // <-- Send Proof button
+        
+        // Disable Finish Work button if no proof
+        const finishBtn = document.createElement("button");
+        finishBtn.textContent = "✅ Finish Work";
+        finishBtn.className = "btn-primary";
+        finishBtn.onclick = () => {
+          if (!hasProof) {
+            showProofRequiredPopup(id);
+          } else {
+            finishWork(id);
+          }
+        };
+        finishBtn.style.background = hasProof ? "#8e44ad" : "#95a5a6";
+        finishBtn.disabled = !hasProof;
+        actionsDiv.appendChild(finishBtn);
       }
 
       if (data.status === "On Hold") {
@@ -825,6 +855,80 @@
     await logSystemMessage(id, "▶️ Work resumed");
   }
 
+  // NEW: Function to show proof required popup
+  function showProofRequiredPopup(taskId) {
+    // Create popup modal
+    const popup = document.createElement("div");
+    popup.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    `;
+
+    const popupContent = document.createElement("div");
+    popupContent.style.cssText = `
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    `;
+
+    popupContent.innerHTML = `
+      <h3 style="color: #e74c3c; margin-bottom: 15px;">⚠️ Proof Required</h3>
+      <p style="margin-bottom: 20px; color: #555;">
+        You must upload proof of work before finishing this task.
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="uploadProofBtn" style="
+          padding: 10px 20px;
+          background: #2980b9;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        ">Upload Proof Now</button>
+        <button id="cancelBtn" style="
+          padding: 10px 20px;
+          background: #95a5a6;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        ">Cancel</button>
+      </div>
+    `;
+
+    popup.appendChild(popupContent);
+    document.body.appendChild(popup);
+
+    // Add event listeners
+    document.getElementById("uploadProofBtn").onclick = () => {
+      document.body.removeChild(popup);
+      openProofUpload(taskId);
+    };
+
+    document.getElementById("cancelBtn").onclick = () => {
+      document.body.removeChild(popup);
+    };
+
+    // Close popup when clicking outside
+    popup.onclick = (e) => {
+      if (e.target === popup) {
+        document.body.removeChild(popup);
+      }
+    };
+  }
+
   async function finishWork(id) {
     const notes = prompt("Work summary / what was fixed:");
     if (notes === null) return;
@@ -864,48 +968,112 @@
     // Create hidden file input
     const fileInput = document.createElement("input");
     fileInput.type = "file";
-    fileInput.accept = "image/*";
+    fileInput.accept = "image/*,video/*,.pdf,.doc,.docx";
+    fileInput.multiple = true; // Allow multiple files
     fileInput.style.display = "none";
 
     fileInput.onchange = async () => {
-      const file = fileInput.files[0];
-      if (!file) return alert("No file selected.");
+      const files = fileInput.files;
+      if (!files || files.length === 0) return;
 
       try {
-        // Show uploading alert or spinner if you want here
+       // Show uploading indicator
+        const uploadIndicator = document.createElement("div");
+        uploadIndicator.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+          ">
+            <div style="
+              padding: 20px;
+              border-radius: 10px;
+              text-align: center;
+            ">
+              <p style="color: white; margin-bottom: 15px;">Uploading ${files.length} file(s)...</p>
+              <div class="spinner" style="
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #3498db;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 10px auto;
+              "></div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(uploadIndicator);
 
-        // Prepare form data for Cloudinary
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+        let uploadedCount = 0;
+        const uploadedUrls = [];
 
-        // Upload to Cloudinary
-        const res = await fetch(CLOUDINARY_URL, {
-          method: "POST",
-          body: formData
-        });
-        const data = await res.json();
-        if (!data.secure_url) throw new Error("Upload failed");
+        // Upload all files
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-        // Save proof url to Firestore under maintenance request's proofs subcollection
-        await db.collection("maintenanceRequests").doc(taskId)
-          .collection("proofs").add({
-            url: data.secure_url,
-            uploadedBy: currentMaintenancePerson,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          const res = await fetch(CLOUDINARY_URL, {
+            method: "POST",
+            body: formData
           });
+          const data = await res.json();
+          
+          if (data.secure_url) {
+            uploadedUrls.push(data.secure_url);
+            uploadedCount++;
+            
+            // Save each proof to Firestore
+            await db.collection("maintenanceRequests").doc(taskId)
+              .collection("proofs").add({
+                url: data.secure_url,
+                fileName: file.name,
+                fileType: file.type,
+                uploadedBy: currentMaintenancePerson,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+              });
+          }
+        }
 
-        alert("Proof sent successfully!");
+        // Update task to track that proof has been uploaded
+        await db.collection("maintenanceRequests").doc(taskId).update({
+          lastProofUpload: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Remove upload indicator
+        document.body.removeChild(uploadIndicator);
+
+        if (uploadedCount > 0) {
+          alert(`✅ ${uploadedCount} proof file(s) uploaded successfully!`);
+          // Refresh the tasks to update the proof status
+          applyFiltersAndSort();
+        } else {
+          alert("⚠️ No files were uploaded. Please try again.");
+        }
+
       } catch (error) {
         console.error("Proof upload error:", error);
         alert("Failed to upload proof. Please try again.");
+        
+        // Remove upload indicator if it exists
+        const indicator = document.querySelector('div[style*="background: rgba(0,0,0,0.7)"]');
+        if (indicator) {
+          document.body.removeChild(indicator);
+        }
       }
     };
 
     document.body.appendChild(fileInput);
     fileInput.click();
-
-    // Cleanup input after use
     fileInput.remove();
   }
 
@@ -915,8 +1083,24 @@
     .where("maintenanceName", "==", currentMaintenancePerson)
     .orderBy("timestamp", "desc")
     .onSnapshot(snapshot => {
-      allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      applyFiltersAndSort();
+      const tasksPromises = snapshot.docs.map(async doc => {
+        const data = { id: doc.id, ...doc.data() };
+        
+        // Load proofs for each task
+        const proofsSnapshot = await db.collection("maintenanceRequests")
+          .doc(doc.id)
+          .collection("proofs")
+          .orderBy("timestamp", "desc")
+          .get();
+        
+        data.proofs = proofsSnapshot.docs.map(proof => proof.data());
+        return data;
+      });
+
+      Promise.all(tasksPromises).then(tasks => {
+        allTasks = tasks;
+        applyFiltersAndSort();
+      });
     });
 
   statusFilter.onchange = priorityFilter.onchange = applyFiltersAndSort;
