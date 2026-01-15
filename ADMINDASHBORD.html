@@ -374,14 +374,13 @@
           initMaintenanceRequests();
           break;
 
-        case "Unit Owner Account Creation":
+ case "Unit Owner Account Creation":
           area.innerHTML = `
             <div class="admin-section-header">
               <h2>Account Creation</h2>
               <p>Create Solano accounts for unit owners or maintenance crew.</p>
             </div>
 
-            <!-- Account Type Selection -->
             <div class="list-card" style="margin-bottom: 20px;">
               <div style="margin-bottom: 15px;">
                 <label style="font-weight: 600; margin-bottom: 8px; display: block;">Account Type</label>
@@ -398,7 +397,6 @@
               </div>
             </div>
 
-            <!-- Unit Owner Form (Initially Visible) -->
             <div class="list-card" id="tenantFormContainer">
               <h3 style="margin-top: 0;">Create New Unit Owner Account</h3>
               <p style="color: var(--solano-text-muted); margin-bottom: 15px;">Create Solano accounts for unit owners and assign units.</p>
@@ -453,7 +451,6 @@
               </form>
             </div>
 
-            <!-- Maintenance Crew Form (Initially Hidden) -->
             <div class="list-card" id="maintenanceFormContainer" style="display: none;">
               <h3 style="margin-top: 0;">Create New Maintenance Crew Account</h3>
               <p style="color: var(--solano-text-muted); margin-bottom: 15px;">Create accounts for maintenance personnel with specialized roles.</p>
@@ -466,7 +463,9 @@
 
                 <div class="filter-group" style="margin-bottom:10px;">
                   <label for="maintenanceName">Full Name</label>
-                  <input type="text" id="maintenanceName" required placeholder="Enter full name (e.g., John Doe)" />
+                  <input type="text" id="maintenanceName" required 
+                         placeholder="Enter full name" 
+                         oninput="this.value = this.value.replace(/[^a-zA-Z\\s]/g, '')" />
                 </div>
 
                 <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
@@ -502,7 +501,12 @@
 
                 <div class="filter-group" style="margin-bottom:15px;">
                   <label for="maintenancePhone">Contact Number (Optional)</label>
-                  <input type="tel" id="maintenancePhone" placeholder="Enter contact number" />
+                  <input type="tel" id="maintenancePhone" 
+                         placeholder="09171234567" 
+                         maxlength="11"
+                         pattern="09[0-9]{9}"
+                         title="Please enter a valid PH mobile number starting with 09 (11 digits)"
+                         oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 11)" />
                 </div>
 
                 <div>
@@ -513,7 +517,6 @@
               </form>
             </div>
 
-            <!-- Combined User List -->
             <div class="list-card" style="margin-top: 20px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0;">Created Accounts</h3>
@@ -542,7 +545,6 @@
           `;
           initAccountCreation();
           break;
-
         case "Feedback Received":
           area.innerHTML = `
             <div class="admin-section-header">
