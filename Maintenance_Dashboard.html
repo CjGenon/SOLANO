@@ -684,6 +684,12 @@
     const q = taskSearch.value.toLowerCase();
 
     filteredTasks = allTasks.filter(t => {
+      // FIX: If status is Work Finished or Complete, hide it from "My Tasks"
+      // It should only show up in the Task History tab.
+      if (t.status === "Work Finished" || t.status === "Complete") {
+        return false;
+      }
+
       if (s !== "all" && t.status !== s) return false;
       if (p !== "all" && t.priority !== p) return false;
       if (q) {
@@ -706,23 +712,28 @@
 
     let pending = 0, inProgress = 0, finished = 0;
 
+    // We calculate stats based on ALL tasks assigned to the person, 
+    // even those filtered out of the current view if you want the dashboard numbers to stay accurate.
+    allTasks.forEach(t => {
+      if (t.status === "Pending") pending++;
+      if (t.status === "In Progress") inProgress++;
+      if (t.status === "Work Finished" || t.status === "Complete") finished++;
+    });
+
     if (!filteredTasks.length) {
-      tasksList.innerHTML = "<p>No assigned tasks.</p>";
-      taskStats.style.display = "none";
-      return;
+      tasksList.innerHTML = "<p style='padding: 20px; text-align: center; color: var(--solano-text-muted);'>No active assigned tasks.</p>";
+      // We keep stats visible so they can see their total progress
+      taskCount.textContent = "0";
+    } else {
+      taskCount.textContent = filteredTasks.length;
     }
 
     filteredTasks.forEach(data => {
       const id = data.id;
 
-      if (data.status === "Pending") pending++;
-      if (data.status === "In Progress") inProgress++;
-      if (data.status === "Work Finished" || data.status === "Complete") finished++;
-
-      let statusColor = "#f39c12";
+      let statusColor = "#f39c12"; // Pending
       if (data.status === "In Progress") statusColor = "#3498db";
       if (data.status === "On Hold") statusColor = "#e67e22";
-      if (data.status === "Work Finished") statusColor = "#9b59b6";
 
       const card = document.createElement("div");
       card.className = "maintenance-card";
@@ -735,20 +746,13 @@
         <p><strong>Owner:</strong> ${data.tenantEmail || "N/A"}</p>
         <p><strong>Details:</strong> ${data.comment || "-"}</p>
         ${data.startTime ? `<p><strong>Started:</strong> ${formatDateTimeAMPM(data.startTime)}</p>` : ""}
-        ${data.finishedTime ? `<p><strong>Finished:</strong> ${formatDateTimeAMPM(data.finishedTime)}</p>` : ""}
         ${data.status === "In Progress" ? `<p><strong>Work Time:</strong> ${calculateCurrentWorkTime(data.startTime)}</p>` : ""}
       `;
 
-      // Check if proof has been uploaded
-      let hasProof = false;
-      if (data.proofs && Array.isArray(data.proofs) && data.proofs.length > 0) {
-        hasProof = true;
-      }
+      let hasProof = (data.proofs && Array.isArray(data.proofs) && data.proofs.length > 0);
 
       const actionsDiv = document.createElement("div");
       actionsDiv.className = "maintenance-card-actions";
-
-      /* ---------------- BUTTON HELPERS ---------------- */
 
       function addBtn(label, color, fn) {
         const b = document.createElement("button");
@@ -759,39 +763,27 @@
         actionsDiv.appendChild(b);
       }
 
-      /* ---------------- STATUS ACTIONS ---------------- */
-
       if (data.status === "Pending") {
         addBtn("🛠️ Start Work", "#27ae60", () => startWork(id));
       }
 
       if (data.status === "In Progress") {
-        // Show proof status
         const proofStatus = document.createElement("div");
         proofStatus.style.marginBottom = "10px";
-        if (hasProof) {
-          proofStatus.innerHTML = `<span style="color:#27ae60; font-weight:bold;">✓ Proof uploaded</span>`;
-        } else {
-          proofStatus.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">⚠️ Proof required before finishing work</span>`;
-        }
+        proofStatus.innerHTML = hasProof 
+          ? `<span style="color:#27ae60; font-weight:bold;">✓ Proof uploaded</span>`
+          : `<span style="color:#e74c3c; font-weight:bold;">⚠️ Proof required before finishing</span>`;
         actionsDiv.appendChild(proofStatus);
 
         addBtn("📤 Send Proof", "#2980b9", () => openProofUpload(id));
         addBtn("⏸️ On Hold", "#f39c12", () => pauseWork(id));
         
-        // Disable Finish Work button if no proof
         const finishBtn = document.createElement("button");
         finishBtn.textContent = "✅ Finish Work";
         finishBtn.className = "btn-primary";
-        finishBtn.onclick = () => {
-          if (!hasProof) {
-            showProofRequiredPopup(id);
-          } else {
-            finishWork(id);
-          }
-        };
         finishBtn.style.background = hasProof ? "#8e44ad" : "#95a5a6";
         finishBtn.disabled = !hasProof;
+        finishBtn.onclick = () => hasProof ? finishWork(id) : showProofRequiredPopup(id);
         actionsDiv.appendChild(finishBtn);
       }
 
@@ -800,18 +792,11 @@
         addBtn("⚠️ Report Issue", "#e67e22", () => reportIssue(id));
       }
 
-      if (data.status === "Work Finished") {
-        const badge = document.createElement("div");
-        badge.textContent = "🕒 Waiting for owner confirmation";
-        badge.style.cssText = "padding:8px;background:#9b59b6;color:white;border-radius:6px";
-        actionsDiv.appendChild(badge);
-      }
-
       card.appendChild(actionsDiv);
       tasksList.appendChild(card);
     });
 
-    taskCount.textContent = filteredTasks.length;
+    // Update the Stat Dashboard
     pendingCount.textContent = pending;
     inProgressCount.textContent = inProgress;
     completeCount.textContent = finished;
@@ -855,78 +840,27 @@
     await logSystemMessage(id, "▶️ Work resumed");
   }
 
-  // NEW: Function to show proof required popup
   function showProofRequiredPopup(taskId) {
-    // Create popup modal
     const popup = document.createElement("div");
-    popup.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    `;
-
+    popup.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000;`;
     const popupContent = document.createElement("div");
-    popupContent.style.cssText = `
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      max-width: 400px;
-      width: 90%;
-      text-align: center;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    `;
-
+    popupContent.style.cssText = `background:white; padding:30px; border-radius:10px; max-width:400px; width:90%; text-align:center; box-shadow:0 5px 15px rgba(0,0,0,0.3);`;
     popupContent.innerHTML = `
       <h3 style="color: #e74c3c; margin-bottom: 15px;">⚠️ Proof Required</h3>
-      <p style="margin-bottom: 20px; color: #555;">
-        You must upload proof of work before finishing this task.
-      </p>
+      <p style="margin-bottom: 20px; color: #555;">You must upload proof of work before finishing this task.</p>
       <div style="display: flex; gap: 10px; justify-content: center;">
-        <button id="uploadProofBtn" style="
-          padding: 10px 20px;
-          background: #2980b9;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-        ">Upload Proof Now</button>
-        <button id="cancelBtn" style="
-          padding: 10px 20px;
-          background: #95a5a6;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-        ">Cancel</button>
+        <button id="uploadProofBtn" class="btn-primary" style="background:#2980b9;">Upload Proof Now</button>
+        <button id="cancelBtn" class="btn-secondary">Cancel</button>
       </div>
     `;
-
     popup.appendChild(popupContent);
     document.body.appendChild(popup);
 
-    // Add event listeners
     document.getElementById("uploadProofBtn").onclick = () => {
       document.body.removeChild(popup);
       openProofUpload(taskId);
     };
-
-    document.getElementById("cancelBtn").onclick = () => {
-      document.body.removeChild(popup);
-    };
-
-    // Close popup when clicking outside
-    popup.onclick = (e) => {
-      if (e.target === popup) {
-        document.body.removeChild(popup);
-      }
-    };
+    document.getElementById("cancelBtn").onclick = () => document.body.removeChild(popup);
   }
 
   async function finishWork(id) {
@@ -949,6 +883,7 @@
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
     }
+    // The task will automatically disappear from the list because of the Snapshot listener + filter logic
   }
 
   async function reportIssue(id) {
@@ -965,11 +900,10 @@
   /* ---------------- SEND PROOF ---------------- */
 
   async function openProofUpload(taskId) {
-    // Create hidden file input
     const fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = "image/*,video/*,.pdf,.doc,.docx";
-    fileInput.multiple = true; // Allow multiple files
+    fileInput.multiple = true;
     fileInput.style.display = "none";
 
     fileInput.onchange = async () => {
@@ -977,62 +911,28 @@
       if (!files || files.length === 0) return;
 
       try {
-       // Show uploading indicator
         const uploadIndicator = document.createElement("div");
         uploadIndicator.innerHTML = `
-          <div style="
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-          ">
-            <div style="
-              padding: 20px;
-              border-radius: 10px;
-              text-align: center;
-            ">
+          <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:2000;">
+            <div style="padding: 20px; text-align: center;">
               <p style="color: white; margin-bottom: 15px;">Uploading ${files.length} file(s)...</p>
-              <div class="spinner" style="
-                border: 4px solid #f3f3f3;
-                border-top: 4px solid #3498db;
-                border-radius: 50%;
-                width: 40px;
-                height: 40px;
-                animation: spin 1s linear infinite;
-                margin: 10px auto;
-              "></div>
+              <div class="spinner" style="border:4px solid #f3f3f3; border-top:4px solid #3498db; border-radius:50%; width:40px; height:40px; animation:spin 1s linear infinite; margin:10px auto;"></div>
             </div>
           </div>
         `;
         document.body.appendChild(uploadIndicator);
 
         let uploadedCount = 0;
-        const uploadedUrls = [];
-
-        // Upload all files
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const formData = new FormData();
           formData.append("file", file);
           formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
-          const res = await fetch(CLOUDINARY_URL, {
-            method: "POST",
-            body: formData
-          });
+          const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
           const data = await res.json();
           
           if (data.secure_url) {
-            uploadedUrls.push(data.secure_url);
-            uploadedCount++;
-            
-            // Save each proof to Firestore
             await db.collection("maintenanceRequests").doc(taskId)
               .collection("proofs").add({
                 url: data.secure_url,
@@ -1041,34 +941,25 @@
                 uploadedBy: currentMaintenancePerson,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
               });
+            uploadedCount++;
           }
         }
 
-        // Update task to track that proof has been uploaded
         await db.collection("maintenanceRequests").doc(taskId).update({
           lastProofUpload: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Remove upload indicator
         document.body.removeChild(uploadIndicator);
 
         if (uploadedCount > 0) {
           alert(`✅ ${uploadedCount} proof file(s) uploaded successfully!`);
-          // Refresh the tasks to update the proof status
           applyFiltersAndSort();
-        } else {
-          alert("⚠️ No files were uploaded. Please try again.");
         }
-
       } catch (error) {
         console.error("Proof upload error:", error);
-        alert("Failed to upload proof. Please try again.");
-        
-        // Remove upload indicator if it exists
+        alert("Failed to upload proof.");
         const indicator = document.querySelector('div[style*="background: rgba(0,0,0,0.7)"]');
-        if (indicator) {
-          document.body.removeChild(indicator);
-        }
+        if (indicator) document.body.removeChild(indicator);
       }
     };
 
@@ -1085,8 +976,6 @@
     .onSnapshot(snapshot => {
       const tasksPromises = snapshot.docs.map(async doc => {
         const data = { id: doc.id, ...doc.data() };
-        
-        // Load proofs for each task
         const proofsSnapshot = await db.collection("maintenanceRequests")
           .doc(doc.id)
           .collection("proofs")
@@ -1112,7 +1001,6 @@
     applyFiltersAndSort();
   };
 }
-
     function initTaskHistory() {
       const historyList = document.getElementById("historyList");
       const dateRangeFilter = document.getElementById("dateRangeFilter");
