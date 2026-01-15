@@ -1379,132 +1379,150 @@ function setupInquiriesLogic() {
     // DOCUMENTS – CLIENT DOCUMENT SETS
     // ============================================================
 
-    function renderDocuments() {
-      mainContent.innerHTML = `
-        <h1 class="doc-title">Client Documents</h1>
-        <p class="pm-dashboard-subtitle">
-          Upload and track document sets, categorized by client type.
-        </p>
+ function renderDocuments() {
+    mainContent.innerHTML = `
+      <h1 class="doc-title">Client Documents</h1>
+      <p class="pm-dashboard-subtitle">
+        Upload and track document sets, categorized by client type.
+      </p>
 
-        <div class="doc-layout">
-          <section class="card doc-form-card">
-            <h3>Upload document set</h3>
-            <p class="subtle">Fill in client details, select client type, then attach all required documents.</p>
+      <div class="doc-layout">
+        <section class="card doc-form-card">
+          <h3>Upload document set</h3>
+          <p class="subtle">Fill in client details, select client type, then attach all required documents.</p>
 
-            <form id="uploadForm">
-              <div class="form-grid">
-                <div class="form-field full">
-                  <label class="field-label" for="clientName">Client name</label>
-                  <input id="clientName" class="input" type="text" placeholder="Full name" required />
-                </div>
-
-                <div class="form-field full">
-                  <label class="field-label" for="clientTypeSelect">Client type</label>
-                  <select id="clientTypeSelect" class="doc-select" required>
-                    <option value="" disabled selected>– Select client type –</option>
-                    <option value="employed">Employed</option>
-                    <option value="self_employed">Self-Employed / Freelancer</option>
-                    <option value="business_owner">Business Owner</option>
-                  </select>
-                </div>
-
-                <div class="form-field">
-                  <label class="field-label" for="num1Bedroom"># of 1BR units</label>
-                  <input id="num1Bedroom" class="doc-number" type="number" min="0" value="-" required/>
-                </div>
-
-                <div class="form-field">
-                  <label class="field-label" for="num2Bedroom"># of 2BR units</label>
-                  <input id="num2Bedroom" class="doc-number" type="number" min="0" value="-" required/>
-                </div>
-
-                <div class="form-field full">
-                  <label class="field-label" for="paymentTerms">Payment terms</label>
-                  <select id="paymentTerms" class="doc-select" required>
-                    <option value="" disabled selected>– Select payment terms –</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Cash">Cash</option>
-                  </select>
-                </div>
-
-                <div class="form-field full">
-                  <label class="field-label">Required documents</label>
-                  <div class="requirements-wrapper">
-                    <p class="requirements-hint">
-                      Select a client type to see the exact list of required documents for upload.
-                      All fields are required.
-                    </p>
-                    <div id="requirementsList"></div>
-                  </div>
-                </div>
+          <form id="uploadForm">
+            <div class="form-grid">
+              <div class="form-field full">
+                <label class="field-label" for="clientName">Client name</label>
+                <input id="clientName" 
+                       class="input" 
+                       type="text" 
+                       placeholder="Full name" 
+                       pattern="[a-zA-Z\s]+"
+                       title="Name must contain letters only"
+                       oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')"
+                       required />
               </div>
 
-              <button type="submit" class="doc-submit-btn">Upload &amp; send to solano management</button>
-            </form>
-          </section>
+              <div class="form-field full">
+                <label class="field-label" for="clientTypeSelect">Client type</label>
+                <select id="clientTypeSelect" class="doc-select" required>
+                  <option value="" disabled selected>– Select client type –</option>
+                  <option value="employed">Employed</option>
+                  <option value="self_employed">Self-Employed / Freelancer</option>
+                  <option value="business_owner">Business Owner</option>
+                </select>
+              </div>
 
-          <aside class="card doc-requirements-card">
-            <h3>Requirements per client type</h3>
-            <p class="subtle">
-              General requirements apply to all buyers. Specific requirements depend on the chosen client type.
-            </p>
+              <div class="form-field">
+                <label class="field-label" for="num1Bedroom"># of 1BR units</label>
+                <input id="num1Bedroom" 
+                       class="doc-number" 
+                       type="number" 
+                       min="0" 
+                       max="144" 
+                       oninput="if(this.value > 144) this.value = 144"
+                       required/>
+              </div>
 
-            <div style="margin-top:10px;">
-              <div class="req-section-title">General requirements (all buyers)</div>
-              <ul class="req-list">
-                <li>Photocopy of at least two valid government-issued IDs.</li>
-                <li>Tax Identification Number (TIN) and BIR verification slip (if applicable).</li>
-                <li>Proof of billing (electricity, water, phone, or credit card bill).</li>
-                <li>Marriage certificate (if married).</li>
-                <li>Community Tax Certificate (Cedula), if required.</li>
-                <li>Reservation agreement and payment of reservation fee (for pre-selling units).</li>
-                <li>Passport or ACR – for foreign nationals residing in the Philippines.</li>
-              </ul>
+              <div class="form-field">
+                <label class="field-label" for="num2Bedroom"># of 2BR units</label>
+                <input id="num2Bedroom" 
+                       class="doc-number" 
+                       type="number" 
+                       min="0" 
+                       max="144" 
+                       oninput="if(this.value > 144) this.value = 144"
+                       required/>
+              </div>
 
-              <div class="req-block-title">Employed</div>
-              <ul class="req-list">
-                <li>Certificate of Employment and Compensation (COEC).</li>
-                <li>Latest payslips (typically last 3 months).</li>
-                <li>OFW employment contract (for overseas workers).</li>
-              </ul>
+              <div class="form-field full">
+                <label class="field-label" for="paymentTerms">Payment terms</label>
+                <select id="paymentTerms" class="doc-select" required>
+                  <option value="" disabled selected>– Select payment terms –</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
 
-              <div class="req-block-title">Self-Employed / Freelancers / Commission-Based</div>
-              <ul class="req-list">
-                <li>Certificate of Engagement from business owner or client.</li>
-                <li>Commission vouchers for the last 12 months.</li>
-                <li>Bank statements (3–12 months) showing consistent income.</li>
-                <li>Lease contract &amp; tax declaration (if income is from rentals).</li>
-                <li>Certified true copy of transport franchise (for PUV operators).</li>
-              </ul>
-
-              <div class="req-block-title">Business Owners</div>
-              <ul class="req-list">
-                <li>DTI Registration (for sole proprietors).</li>
-                <li>SEC Registration with Articles of Incorporation and By-laws (for corporations/partnerships).</li>
-                <li>Business / Mayor's Permit.</li>
-                <li>Income Tax Returns (BIR Form 1701 / 1702) with Audited Financial Statements.</li>
-                <li>Audited Financial Statements for the last 2–3 years.</li>
-                <li>Bank statements or passbook (3–12 months).</li>
-                <li>Trade references (list of key suppliers &amp; customers with contact details).</li>
-              </ul>
+              <div class="form-field full">
+                <label class="field-label">Required documents</label>
+                <div class="requirements-wrapper">
+                  <p class="requirements-hint">
+                    Select a client type to see the exact list of required documents for upload.
+                    All fields are required.
+                  </p>
+                  <div id="requirementsList"></div>
+                </div>
+              </div>
             </div>
-          </aside>
-        </div>
 
-        <section class="card upload-history-card">
-          <h3 class="upload-history-title">Upload history</h3>
-          <p class="upload-history-sub">
-            Local summary of recent document sets (stored in this browser).
-          </p>
-          <div id="uploadHistory" class="upload-history-list"></div>
+            <button type="submit" class="doc-submit-btn">Upload &amp; send to solano management</button>
+          </form>
         </section>
-      `;
 
-      setupDocumentLogic();
-      // Hide loading after content is rendered
-      setTimeout(() => hideLoading(), 300);
-    }
+        <aside class="card doc-requirements-card">
+          <h3>Requirements per client type</h3>
+          <p class="subtle">
+            General requirements apply to all buyers. Specific requirements depend on the chosen client type.
+          </p>
 
+          <div style="margin-top:10px;">
+            <div class="req-section-title">General requirements (all buyers)</div>
+            <ul class="req-list">
+              <li>Photocopy of at least two valid government-issued IDs.</li>
+              <li>Tax Identification Number (TIN) and BIR verification slip (if applicable).</li>
+              <li>Proof of billing (electricity, water, phone, or credit card bill).</li>
+              <li>Marriage certificate (if married).</li>
+              <li>Community Tax Certificate (Cedula), if required.</li>
+              <li>Reservation agreement and payment of reservation fee (for pre-selling units).</li>
+              <li>Passport or ACR – for foreign nationals residing in the Philippines.</li>
+            </ul>
+
+            <div class="req-block-title">Employed</div>
+            <ul class="req-list">
+              <li>Certificate of Employment and Compensation (COEC).</li>
+              <li>Latest payslips (typically last 3 months).</li>
+              <li>OFW employment contract (for overseas workers).</li>
+            </ul>
+
+            <div class="req-block-title">Self-Employed / Freelancers / Commission-Based</div>
+            <ul class="req-list">
+              <li>Certificate of Engagement from business owner or client.</li>
+              <li>Commission vouchers for the last 12 months.</li>
+              <li>Bank statements (3–12 months) showing consistent income.</li>
+              <li>Lease contract &amp; tax declaration (if income is from rentals).</li>
+              <li>Certified true copy of transport franchise (for PUV operators).</li>
+            </ul>
+
+            <div class="req-block-title">Business Owners</div>
+            <ul class="req-list">
+              <li>DTI Registration (for sole proprietors).</li>
+              <li>SEC Registration with Articles of Incorporation and By-laws (for corporations/partnerships).</li>
+              <li>Business / Mayor's Permit.</li>
+              <li>Income Tax Returns (BIR Form 1701 / 1702) with Audited Financial Statements.</li>
+              <li>Audited Financial Statements for the last 2–3 years.</li>
+              <li>Bank statements or passbook (3–12 months).</li>
+              <li>Trade references (list of key suppliers &amp; customers with contact details).</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      <section class="card upload-history-card">
+        <h3 class="upload-history-title">Upload history</h3>
+        <p class="upload-history-sub">
+          Local summary of recent document sets (stored in this browser).
+        </p>
+        <div id="uploadHistory" class="upload-history-list"></div>
+      </section>
+    `;
+
+    setupDocumentLogic();
+    // Hide loading after content is rendered
+    setTimeout(() => hideLoading(), 300);
+}
     function setupDocumentLogic() {
       const REQUIREMENTS_BASE = [
         "Two valid government-issued IDs",
