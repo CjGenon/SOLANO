@@ -1668,6 +1668,8 @@ function renderAdminCalendar() {
           </div>
         </div>
       `;
+           paypalList.appendChild(row);
+    });
 
     paymentCount.textContent = filteredPayments.length;
     totalAmount.textContent = total.toLocaleString(undefined, {
@@ -4291,5 +4293,6 @@ function initMaintenanceRequests() {
   </div>
 </body>
 </html>
+
 
 
