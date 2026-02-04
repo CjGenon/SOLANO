@@ -1657,29 +1657,17 @@ function renderAdminCalendar() {
       row.innerHTML = `
         <div class="payment-main">
           <div class="payment-email">${p.tenantEmail || "Unknown unit owner"}</div>
-          <div class="payment-sub">
-            ${p.payerEmail ? `Paid with: ${p.payerEmail}` : ""}
-            ${p.invoiceId ? `<br><small>Inv: ${p.invoiceId}</small>` : ""}
-          </div>
+          <div class="payment-sub">${p.payerEmail || ""}</div>
         </div>
-        <div class="payment-meta" style="text-align: right;">
+        <div class="payment-meta">
           <div class="payment-amount">${formatCurrency(p.amount)}</div>
-          <div class="payment-period" style="font-size: 0.85rem; color: #666;">
-            ${p.periodCovered || "No period specified"}
-          </div>
-          <div class="payment-meta-row" style="margin-top: 5px;">
+          <div class="payment-meta-row">
             <span class="badge ${statusClass}">${status}</span>
             <span class="payment-method">${p.method || ""}</span>
             <span class="payment-date">${dateStr}</span>
           </div>
-          ${p.transactionId ? 
-            `<div class="payment-txid" style="font-size: 0.75rem; color: #888; margin-top: 4px;">
-              TXID: ${p.transactionId}
-            </div>` : ""
-          }
         </div>
       `;
-      paypalList.appendChild(row);
 
     paymentCount.textContent = filteredPayments.length;
     totalAmount.textContent = total.toLocaleString(undefined, {
@@ -4303,4 +4291,5 @@ function initMaintenanceRequests() {
   </div>
 </body>
 </html>
+
 
